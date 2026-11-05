@@ -1,0 +1,1682 @@
+# Atelier Bureau — Issues do Projeto
+
+Repositório: `Ks7dev/Project_Senai` · Base: Levantamento de Requisitos v2.0
+
+Total: 12 épicos e 82 issues. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
+
+## Como usar
+
+- Cada épico vira uma issue com a label `epic`; as issues do épico são listadas nele como checklist.
+- Cada etapa vira um **milestone** no GitHub, com o mesmo nome usado no Trello.
+- O ID `AB-xxx` vai no início do título, para cruzar com os cards do Trello.
+- A estrutura definitiva (labels, templates) deve ser ajustada ao padrão do CRM e do Core após a issue AB-001.
+
+## Labels
+
+| Label | Uso |
+|---|---|
+| `epic` | Agrupador de módulo |
+| `feature` | Funcionalidade |
+| `nfr` | Requisito não funcional |
+| `design` | Identidade visual e UI |
+| `decision` | Decisão a tomar |
+| `chore` | Configuração e infraestrutura |
+| `docs` | Documentação |
+| `P0` | Essencial para o MVP |
+| `P1` | Importante |
+| `P2` | Desejável |
+| `mod:docs` | Módulo Decisões e Documentação |
+| `mod:infra` | Módulo Fundação Técnica |
+| `mod:design` | Módulo Design System e Identidade Visual |
+| `mod:catalogo` | Módulo Catálogo |
+| `mod:conta` | Módulo Conta e Acesso |
+| `mod:frete` | Módulo Endereço e Frete |
+| `mod:carrinho` | Módulo Carrinho, Cotação e Aprovação |
+| `mod:pagamento` | Módulo Checkout e Pagamento |
+| `mod:pedido` | Módulo Estoque e Pedido |
+| `mod:pos-venda` | Módulo Pós-venda e Atendimento |
+| `mod:backoffice` | Módulo Back Office e Administração |
+| `mod:qualidade` | Módulo Qualidade e Operação |
+
+## Milestones
+
+| Milestone | Prazo sugerido | Objetivo |
+|---|---|---|
+| Etapa 0 — Planejamento e Decisões | Semana 1 | Fechar decisões que bloqueiam o desenvolvimento. |
+| Etapa 1 — Fundação Técnica e Design System | Semanas 2–3 | Repositório, padrões, banco, CI e biblioteca de componentes. |
+| Etapa 2 — Catálogo e Conta | Semanas 4–5 | Vitrine navegável, cadastro de produtos e contas PF/PJ. |
+| Etapa 3 — Carrinho, Frete e Checkout | Semanas 6–8 | Compra completa via Mercado Pago com frete calculado. |
+| Etapa 4 — Fluxo B2B | Semanas 9–10 | Cotação, aprovação, faturado e crédito corporativo. |
+| Etapa 5 — Pós-venda e Back Office | Semanas 11–12 | Atendimento, promoções, conteúdo, LGPD e auditoria. |
+| Etapa 6 — Qualidade, Segurança e Lançamento | Semanas 13–14 | Testes, performance, acessibilidade, monitoramento e deploy. |
+
+## Resumo
+
+| ID | Título | Épico | Etapa | Prioridade |
+|---|---|---|---|---|
+| AB-001 | Definir stack e estrutura de pastas com base nos repositórios CRM e Core | Decisões e Documentação | E0 | P0 |
+| AB-002 | Validar o nome Atelier Bureau (INPI e domínio) | Decisões e Documentação | E0 | P1 |
+| AB-003 | Escolher a biblioteca oficial de ícones | Decisões e Documentação | E0 | P1 |
+| AB-004 | Validação jurídica das políticas de troca, arrependimento e garantia | Decisões e Documentação | E0 | P1 |
+| AB-005 | Confirmar os valores configuráveis das regras de negócio | Decisões e Documentação | E0 | P1 |
+| AB-006 | Setup do repositório: estrutura MVC, lint, formatter e templates | Fundação Técnica | E1 | P0 |
+| AB-007 | Configurar ambientes e variáveis (dev, homologação, produção) | Fundação Técnica | E1 | P0 |
+| AB-008 | Modelagem do banco de dados e migrations iniciais | Fundação Técnica | E1 | P0 |
+| AB-009 | Pipeline de CI com lint, testes e build | Fundação Técnica | E1 | P0 |
+| AB-010 | Padrão de tratamento de erros, logs e rate limiting | Fundação Técnica | E1 | P0 |
+| AB-011 | HTTPS obrigatório e headers de segurança | Fundação Técnica | E1 | P0 |
+| AB-012 | Padrão de documentação de código | Fundação Técnica | E1 | P1 |
+| AB-013 | Criar os tokens do design system Warm Editorial Atelier | Design System e Identidade Visual | E1 | P0 |
+| AB-014 | Redesenhar o logo e criar o kit de marca | Design System e Identidade Visual | E1 | P1 |
+| AB-015 | Componentes base da biblioteca de UI | Design System e Identidade Visual | E1 | P0 |
+| AB-016 | Componentes de commerce | Design System e Identidade Visual | E2 | P1 |
+| AB-017 | Layout base: header, footer e grid responsivo | Design System e Identidade Visual | E1 | P0 |
+| AB-018 | Corrigir as divergências do protótipo Stitch | Design System e Identidade Visual | E0 | P1 |
+| AB-019 | Prototipar as telas faltantes | Design System e Identidade Visual | E1 | P1 |
+| AB-020 | Auditoria de acessibilidade WCAG 2.1 AA | Design System e Identidade Visual | E6 | P1 |
+| AB-021 | Cadastro de produtos no back office | Catálogo | E2 | P0 |
+| AB-022 | Upload de imagens com conversão para WebP | Catálogo | E2 | P0 |
+| AB-023 | Categorias, subcategorias e navegação | Catálogo | E2 | P0 |
+| AB-024 | Listagem de produtos (PLP) com filtros avançados | Catálogo | E2 | P0 |
+| AB-025 | Busca de produtos | Catálogo | E2 | P0 |
+| AB-026 | Página de produto (PDP) | Catálogo | E2 | P0 |
+| AB-027 | Comparador de até 4 produtos | Catálogo | E2 | P2 |
+| AB-028 | Inativação de produtos sem perda de histórico | Catálogo | E2 | P1 |
+| AB-029 | Importação de produtos via CSV | Catálogo | E2 | P1 |
+| AB-030 | Home editorial com carrossel editável | Catálogo | E2 | P1 |
+| AB-031 | SEO técnico | Catálogo | E6 | P1 |
+| AB-032 | Cadastro e login de PF e PJ | Conta e Acesso | E2 | P0 |
+| AB-033 | Recuperação de senha e 2FA opcional | Conta e Acesso | E2 | P0 |
+| AB-034 | Conta corporativa multiusuário com consulta de CNPJ | Conta e Acesso | E2 | P0 |
+| AB-035 | Perfis de acesso da conta corporativa | Conta e Acesso | E2 | P0 |
+| AB-036 | Múltiplos endereços por conta | Conta e Acesso | E2 | P1 |
+| AB-037 | Área do cliente | Conta e Acesso | E2 | P1 |
+| AB-038 | Lista de favoritos | Conta e Acesso | E2 | P2 |
+| AB-039 | Consulta de endereço via ViaCEP com fallback | Endereço e Frete | E3 | P0 |
+| AB-040 | Módulo de frete com estratégias por modalidade | Endereço e Frete | E3 | P0 |
+| AB-041 | Integração com a API dos Correios | Endereço e Frete | E3 | P0 |
+| AB-042 | Integração com agregador de transportadoras | Endereço e Frete | E3 | P1 |
+| AB-043 | Entrega própria com montagem por faixa de CEP | Endereço e Frete | E3 | P1 |
+| AB-044 | Cotação manual de frete como contingência | Endereço e Frete | E3 | P1 |
+| AB-045 | Recotação de frete ao alterar endereço | Endereço e Frete | E3 | P2 |
+| AB-046 | Carrinho e lista de projeto salva | Carrinho, Cotação e Aprovação | E3 | P0 |
+| AB-047 | Personalização e serviços adicionais no carrinho | Carrinho, Cotação e Aprovação | E3 | P1 |
+| AB-048 | Solicitação de cotação com anexos | Carrinho, Cotação e Aprovação | E4 | P0 |
+| AB-049 | Número de cotação rastreável e validade | Carrinho, Cotação e Aprovação | E4 | P0 |
+| AB-050 | Back office comercial de cotações | Carrinho, Cotação e Aprovação | E4 | P0 |
+| AB-051 | Fluxo de aprovação de pedidos | Carrinho, Cotação e Aprovação | E4 | P0 |
+| AB-052 | Tabela de preços por cliente e desconto por volume | Carrinho, Cotação e Aprovação | E4 | P1 |
+| AB-053 | Agendamento de entrega e instalação | Carrinho, Cotação e Aprovação | E3 | P1 |
+| AB-054 | Integração do Payment Brick do Mercado Pago | Checkout e Pagamento | E3 | P0 |
+| AB-055 | Pix e boleto via Mercado Pago com expiração | Checkout e Pagamento | E3 | P0 |
+| AB-056 | Parcelamento configurável | Checkout e Pagamento | E3 | P1 |
+| AB-057 | Webhook do Mercado Pago | Checkout e Pagamento | E3 | P0 |
+| AB-058 | Status de pagamento e payment_id | Checkout e Pagamento | E3 | P0 |
+| AB-059 | Estornos total e parcial | Checkout e Pagamento | E5 | P1 |
+| AB-060 | Fluxo de pagamento faturado 28/56 dias | Checkout e Pagamento | E4 | P0 |
+| AB-061 | Aprovação de crédito corporativo | Checkout e Pagamento | E4 | P0 |
+| AB-062 | Checklist PCI-DSS SAQ A | Checkout e Pagamento | E6 | P1 |
+| AB-063 | Emissão de NF-e via API | Checkout e Pagamento | E5 | P1 |
+| AB-064 | Reserva, baixa e liberação de estoque | Estoque e Pedido | E3 | P0 |
+| AB-065 | Ciclo de vida do pedido | Estoque e Pedido | E3 | P0 |
+| AB-066 | Rastreamento do pedido | Estoque e Pedido | E3 | P1 |
+| AB-067 | E-mails transacionais | Estoque e Pedido | E3 | P1 |
+| AB-068 | Chamados de garantia e assistência técnica | Pós-venda e Atendimento | E5 | P1 |
+| AB-069 | Canal com vendedor dedicado (WhatsApp) | Pós-venda e Atendimento | E5 | P1 |
+| AB-070 | Agendamento de demonstração | Pós-venda e Atendimento | E5 | P2 |
+| AB-071 | Fluxo de troca, devolução e arrependimento | Pós-venda e Atendimento | E5 | P1 |
+| AB-072 | Usuários internos e permissões | Back Office e Administração | E2 | P0 |
+| AB-073 | Promoções, cupons e frete cortesia | Back Office e Administração | E5 | P1 |
+| AB-074 | Páginas institucionais editáveis | Back Office e Administração | E5 | P1 |
+| AB-075 | LGPD: consentimento e direitos do titular | Back Office e Administração | E5 | P0 |
+| AB-076 | Log de auditoria de ações sensíveis | Back Office e Administração | E5 | P1 |
+| AB-077 | Testes automatizados e cobertura mínima | Qualidade e Operação | E6 | P0 |
+| AB-078 | Orçamento de performance | Qualidade e Operação | E6 | P1 |
+| AB-079 | Teste de carga | Qualidade e Operação | E6 | P2 |
+| AB-080 | Monitoramento de disponibilidade e alertas | Qualidade e Operação | E6 | P1 |
+| AB-081 | Backup e teste de restauração | Qualidade e Operação | E6 | P1 |
+| AB-082 | Deploy e checklist de lançamento | Qualidade e Operação | E6 | P0 |
+
+---
+
+# Épicos
+
+## EPIC-00 — Decisões e Documentação
+
+**Labels:** `epic`, `mod:docs`
+
+**Issues:**
+
+- [ ] AB-001 — Definir stack e estrutura de pastas com base nos repositórios CRM e Core
+- [ ] AB-002 — Validar o nome Atelier Bureau (INPI e domínio)
+- [ ] AB-003 — Escolher a biblioteca oficial de ícones
+- [ ] AB-004 — Validação jurídica das políticas de troca, arrependimento e garantia
+- [ ] AB-005 — Confirmar os valores configuráveis das regras de negócio
+
+## EPIC-01 — Fundação Técnica
+
+**Labels:** `epic`, `mod:infra`
+
+**Issues:**
+
+- [ ] AB-006 — Setup do repositório: estrutura MVC, lint, formatter e templates
+- [ ] AB-007 — Configurar ambientes e variáveis (dev, homologação, produção)
+- [ ] AB-008 — Modelagem do banco de dados e migrations iniciais
+- [ ] AB-009 — Pipeline de CI com lint, testes e build
+- [ ] AB-010 — Padrão de tratamento de erros, logs e rate limiting
+- [ ] AB-011 — HTTPS obrigatório e headers de segurança
+- [ ] AB-012 — Padrão de documentação de código
+
+## EPIC-02 — Design System e Identidade Visual
+
+**Labels:** `epic`, `mod:design`
+
+**Issues:**
+
+- [ ] AB-013 — Criar os tokens do design system Warm Editorial Atelier
+- [ ] AB-014 — Redesenhar o logo e criar o kit de marca
+- [ ] AB-015 — Componentes base da biblioteca de UI
+- [ ] AB-016 — Componentes de commerce
+- [ ] AB-017 — Layout base: header, footer e grid responsivo
+- [ ] AB-018 — Corrigir as divergências do protótipo Stitch
+- [ ] AB-019 — Prototipar as telas faltantes
+- [ ] AB-020 — Auditoria de acessibilidade WCAG 2.1 AA
+
+## EPIC-03 — Catálogo
+
+**Labels:** `epic`, `mod:catalogo`
+
+**Issues:**
+
+- [ ] AB-021 — Cadastro de produtos no back office
+- [ ] AB-022 — Upload de imagens com conversão para WebP
+- [ ] AB-023 — Categorias, subcategorias e navegação
+- [ ] AB-024 — Listagem de produtos (PLP) com filtros avançados
+- [ ] AB-025 — Busca de produtos
+- [ ] AB-026 — Página de produto (PDP)
+- [ ] AB-027 — Comparador de até 4 produtos
+- [ ] AB-028 — Inativação de produtos sem perda de histórico
+- [ ] AB-029 — Importação de produtos via CSV
+- [ ] AB-030 — Home editorial com carrossel editável
+- [ ] AB-031 — SEO técnico
+
+## EPIC-04 — Conta e Acesso
+
+**Labels:** `epic`, `mod:conta`
+
+**Issues:**
+
+- [ ] AB-032 — Cadastro e login de PF e PJ
+- [ ] AB-033 — Recuperação de senha e 2FA opcional
+- [ ] AB-034 — Conta corporativa multiusuário com consulta de CNPJ
+- [ ] AB-035 — Perfis de acesso da conta corporativa
+- [ ] AB-036 — Múltiplos endereços por conta
+- [ ] AB-037 — Área do cliente
+- [ ] AB-038 — Lista de favoritos
+
+## EPIC-05 — Endereço e Frete
+
+**Labels:** `epic`, `mod:frete`
+
+**Issues:**
+
+- [ ] AB-039 — Consulta de endereço via ViaCEP com fallback
+- [ ] AB-040 — Módulo de frete com estratégias por modalidade
+- [ ] AB-041 — Integração com a API dos Correios
+- [ ] AB-042 — Integração com agregador de transportadoras
+- [ ] AB-043 — Entrega própria com montagem por faixa de CEP
+- [ ] AB-044 — Cotação manual de frete como contingência
+- [ ] AB-045 — Recotação de frete ao alterar endereço
+
+## EPIC-06 — Carrinho, Cotação e Aprovação
+
+**Labels:** `epic`, `mod:carrinho`
+
+**Issues:**
+
+- [ ] AB-046 — Carrinho e lista de projeto salva
+- [ ] AB-047 — Personalização e serviços adicionais no carrinho
+- [ ] AB-048 — Solicitação de cotação com anexos
+- [ ] AB-049 — Número de cotação rastreável e validade
+- [ ] AB-050 — Back office comercial de cotações
+- [ ] AB-051 — Fluxo de aprovação de pedidos
+- [ ] AB-052 — Tabela de preços por cliente e desconto por volume
+- [ ] AB-053 — Agendamento de entrega e instalação
+
+## EPIC-07 — Checkout e Pagamento
+
+**Labels:** `epic`, `mod:pagamento`
+
+**Issues:**
+
+- [ ] AB-054 — Integração do Payment Brick do Mercado Pago
+- [ ] AB-055 — Pix e boleto via Mercado Pago com expiração
+- [ ] AB-056 — Parcelamento configurável
+- [ ] AB-057 — Webhook do Mercado Pago
+- [ ] AB-058 — Status de pagamento e payment_id
+- [ ] AB-059 — Estornos total e parcial
+- [ ] AB-060 — Fluxo de pagamento faturado 28/56 dias
+- [ ] AB-061 — Aprovação de crédito corporativo
+- [ ] AB-062 — Checklist PCI-DSS SAQ A
+- [ ] AB-063 — Emissão de NF-e via API
+
+## EPIC-08 — Estoque e Pedido
+
+**Labels:** `epic`, `mod:pedido`
+
+**Issues:**
+
+- [ ] AB-064 — Reserva, baixa e liberação de estoque
+- [ ] AB-065 — Ciclo de vida do pedido
+- [ ] AB-066 — Rastreamento do pedido
+- [ ] AB-067 — E-mails transacionais
+
+## EPIC-09 — Pós-venda e Atendimento
+
+**Labels:** `epic`, `mod:pos-venda`
+
+**Issues:**
+
+- [ ] AB-068 — Chamados de garantia e assistência técnica
+- [ ] AB-069 — Canal com vendedor dedicado (WhatsApp)
+- [ ] AB-070 — Agendamento de demonstração
+- [ ] AB-071 — Fluxo de troca, devolução e arrependimento
+
+## EPIC-10 — Back Office e Administração
+
+**Labels:** `epic`, `mod:backoffice`
+
+**Issues:**
+
+- [ ] AB-072 — Usuários internos e permissões
+- [ ] AB-073 — Promoções, cupons e frete cortesia
+- [ ] AB-074 — Páginas institucionais editáveis
+- [ ] AB-075 — LGPD: consentimento e direitos do titular
+- [ ] AB-076 — Log de auditoria de ações sensíveis
+
+## EPIC-11 — Qualidade e Operação
+
+**Labels:** `epic`, `mod:qualidade`
+
+**Issues:**
+
+- [ ] AB-077 — Testes automatizados e cobertura mínima
+- [ ] AB-078 — Orçamento de performance
+- [ ] AB-079 — Teste de carga
+- [ ] AB-080 — Monitoramento de disponibilidade e alertas
+- [ ] AB-081 — Backup e teste de restauração
+- [ ] AB-082 — Deploy e checklist de lançamento
+
+---
+
+# Issues
+
+## EPIC-00 — Decisões e Documentação
+
+### AB-001 — Definir stack e estrutura de pastas com base nos repositórios CRM e Core
+
+**Labels:** `decision`, `mod:docs`, `P0`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-00 — Decisões e Documentação  
+**Referências:** RNF07
+
+**Descrição**
+
+Levantar linguagem, framework, ORM, padrão de pastas, convenções de commit e de issues usados no CRM e no Core e registrar como padrão do projeto.
+
+**Critérios de aceite**
+
+- [ ] Documento ARCHITECTURE.md no repositório com stack e justificativa
+- [ ] Estrutura de pastas MVC definida por módulo
+- [ ] Convenção de branches e commits definida
+
+### AB-002 — Validar o nome Atelier Bureau (INPI e domínio)
+
+**Labels:** `decision`, `mod:docs`, `P1`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-00 — Decisões e Documentação  
+**Referências:** Seção 1.1
+
+**Descrição**
+
+Pesquisar o nome na base do INPI (classe 35) e a disponibilidade do domínio .com.br.
+
+**Critérios de aceite**
+
+- [ ] Resultado da busca no INPI registrado
+- [ ] Domínio verificado
+- [ ] Nome confirmado ou alternativa aprovada
+
+### AB-003 — Escolher a biblioteca oficial de ícones
+
+**Labels:** `decision`, `mod:docs`, `P1`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-00 — Decisões e Documentação  
+**Referências:** RNF15
+
+**Descrição**
+
+Decidir entre Lucide, Phosphor (light) ou Material Symbols para manter coerência com o tom editorial.
+
+**Critérios de aceite**
+
+- [ ] Biblioteca escolhida e registrada no design system
+- [ ] Ícones do protótipo mapeados para a biblioteca escolhida
+
+### AB-004 — Validação jurídica das políticas de troca, arrependimento e garantia
+
+**Labels:** `decision`, `mod:docs`, `P1`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-00 — Decisões e Documentação  
+**Referências:** RN06, RN12, RN22
+
+**Descrição**
+
+Validar o tratamento de itens personalizados para PF, a redação da garantia estendida e os termos de uso.
+
+**Critérios de aceite**
+
+- [ ] Política de trocas e devoluções aprovada
+- [ ] Texto da garantia estendida aprovado
+- [ ] Termos de uso e política de privacidade aprovados
+
+### AB-005 — Confirmar os valores configuráveis das regras de negócio
+
+**Labels:** `decision`, `mod:docs`, `P1`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-00 — Decisões e Documentação  
+**Referências:** RN01, RN06, RN14, RN16, RN20
+
+**Descrição**
+
+Validar com os stakeholders os valores iniciais: aprovação acima de R$ 10.000, garantia acima de R$ 5.000, expiração de Pix/boleto, faixas de CEP da cobertura e limites de frete.
+
+**Critérios de aceite**
+
+- [ ] Valores confirmados e registrados no documento de requisitos
+- [ ] Valores carregados como seed de configuração
+
+## EPIC-01 — Fundação Técnica
+
+### AB-006 — Setup do repositório: estrutura MVC, lint, formatter e templates
+
+**Labels:** `chore`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF07, RNF08
+
+**Descrição**
+
+Criar a estrutura inicial seguindo o padrão definido no AB-001, com lint, formatter, README e templates de issue e pull request.
+
+**Critérios de aceite**
+
+- [ ] Projeto roda localmente com um comando documentado
+- [ ] Lint e formatter configurados e passando
+- [ ] Templates de issue e PR criados em .github/
+
+### AB-007 — Configurar ambientes e variáveis (dev, homologação, produção)
+
+**Labels:** `chore`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF05
+
+**Descrição**
+
+Separar configurações por ambiente e garantir que segredos (chaves Mercado Pago, NF-e, transportadoras) nunca fiquem no código.
+
+**Critérios de aceite**
+
+- [ ] Arquivo .env.example documentado
+- [ ] Segredos fora do repositório
+- [ ] Credenciais de sandbox usadas em dev e homologação
+
+### AB-008 — Modelagem do banco de dados e migrations iniciais
+
+**Labels:** `feature`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RF41, RF09, RF54
+
+**Descrição**
+
+Modelar as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração.
+
+**Critérios de aceite**
+
+- [ ] Diagrama ER no repositório
+- [ ] Migrations criam todas as tabelas
+- [ ] Seeds de desenvolvimento com produtos e contas de teste
+
+### AB-009 — Pipeline de CI com lint, testes e build
+
+**Labels:** `chore`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF07
+
+**Descrição**
+
+Criar pipeline que roda a cada pull request.
+
+**Critérios de aceite**
+
+- [ ] Pipeline executa lint, testes e build
+- [ ] PR bloqueado quando o pipeline falha
+
+### AB-010 — Padrão de tratamento de erros, logs e rate limiting
+
+**Labels:** `nfr`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF05
+
+**Descrição**
+
+Middleware global de erros sem vazamento de stack trace, logs estruturados e limite de requisições nas rotas públicas e de autenticação.
+
+**Critérios de aceite**
+
+- [ ] Respostas de erro padronizadas sem detalhes internos
+- [ ] Rate limiting ativo em login, cadastro e APIs públicas
+- [ ] Logs estruturados com identificador de requisição
+
+### AB-011 — HTTPS obrigatório e headers de segurança
+
+**Labels:** `nfr`, `mod:infra`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF06
+
+**Descrição**
+
+Forçar HTTPS sem fallback e configurar HSTS, CSP e demais headers de segurança.
+
+**Critérios de aceite**
+
+- [ ] Requisições HTTP redirecionadas ou recusadas
+- [ ] HSTS e CSP configurados
+- [ ] Verificação em ferramenta de análise de headers sem alertas críticos
+
+### AB-012 — Padrão de documentação de código
+
+**Labels:** `docs`, `mod:infra`, `P1`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-01 — Fundação Técnica  
+**Referências:** RNF08
+
+**Descrição**
+
+Definir o padrão JSDoc/docstrings e a geração de documentação por módulo.
+
+**Critérios de aceite**
+
+- [ ] Guia de documentação no repositório
+- [ ] Lint acusa função pública sem documentação
+
+## EPIC-02 — Design System e Identidade Visual
+
+### AB-013 — Criar os tokens do design system Warm Editorial Atelier
+
+**Labels:** `design`, `mod:design`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** RNF13, RNF15
+
+**Descrição**
+
+Arquivo único de tokens com a paleta aprovada (terracota ajustada para #7A5C4C, texto terciário só em desabilitados), tipografia Playfair Display + Plus Jakarta Sans, espaçamentos, raios e sombras.
+
+**Critérios de aceite**
+
+- [ ] Arquivo único de tokens versionado
+- [ ] Todas as combinações de texto com contraste de pelo menos 4,5:1
+- [ ] Paleta Material duplicada e Space Grotesk removidas
+
+### AB-014 — Redesenhar o logo e criar o kit de marca
+
+**Labels:** `design`, `mod:design`, `P1`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** Seção 7
+
+**Descrição**
+
+Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
+
+**Critérios de aceite**
+
+- [ ] Versões horizontal, monograma, negativo e monocromática em SVG
+- [ ] Favicons 32, 180 e 512 px
+- [ ] Logo legível em 24 px de altura
+
+### AB-015 — Componentes base da biblioteca de UI
+
+**Labels:** `feature`, `mod:design`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** RNF09, RNF13
+
+**Descrição**
+
+Botões (primário, ghost, texto editorial), inputs, select, checkbox, radio, chips, badges, tooltip e modal.
+
+**Critérios de aceite**
+
+- [ ] Componentes usam apenas tokens
+- [ ] Estados hover, foco, desabilitado e erro
+- [ ] Navegáveis por teclado com foco visível
+
+### AB-016 — Componentes de commerce
+
+**Labels:** `feature`, `mod:design`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** RNF09
+
+**Descrição**
+
+Card de produto, swatches de material, accordion de especificações, drawer de carrinho e resumo de pedido.
+
+**Critérios de aceite**
+
+- [ ] Componentes reutilizados na PLP, PDP e carrinho
+- [ ] Comportamento responsivo nos três breakpoints
+
+### AB-017 — Layout base: header, footer e grid responsivo
+
+**Labels:** `feature`, `mod:design`, `P0`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** RNF15
+
+**Descrição**
+
+Grid de 12/8/4 colunas, max-width de 1440 px, header com busca, menu e carrinho, e footer institucional.
+
+**Critérios de aceite**
+
+- [ ] Breakpoints mobile, tablet e desktop funcionando
+- [ ] Menu mobile acessível
+- [ ] Footer com links das páginas institucionais
+
+### AB-018 — Corrigir as divergências do protótipo Stitch
+
+**Labels:** `design`, `mod:design`, `P1`  
+**Milestone:** Etapa 0 — Planejamento e Decisões  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** Seção 7
+
+**Descrição**
+
+Ajustar prazo faturado para 28/56, remover frete cortesia fixo, marcar CNPJ como fictício, trocar placeholders do logo e unificar todas as telas no Warm Editorial Atelier.
+
+**Critérios de aceite**
+
+- [ ] Nenhuma tela usa Newsreader ou Space Grotesk
+- [ ] Prazos e textos alinhados ao documento v2
+
+### AB-019 — Prototipar as telas faltantes
+
+**Labels:** `design`, `mod:design`, `P1`  
+**Milestone:** Etapa 1 — Fundação Técnica e Design System  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** Seção 7
+
+**Descrição**
+
+Login/cadastro, área do cliente, cotação, aprovação, checkout com Payment Brick, rastreamento, comparador e back office.
+
+**Critérios de aceite**
+
+- [ ] Telas desktop e mobile no Stitch
+- [ ] Telas revisadas contra os requisitos correspondentes
+
+### AB-020 — Auditoria de acessibilidade WCAG 2.1 AA
+
+**Labels:** `nfr`, `mod:design`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-02 — Design System e Identidade Visual  
+**Referências:** RNF13
+
+**Descrição**
+
+Auditar as páginas principais com ferramenta automática e teste manual de teclado e leitor de tela.
+
+**Critérios de aceite**
+
+- [ ] Nenhum erro crítico na ferramenta automática
+- [ ] Fluxo de compra completo navegável só por teclado
+- [ ] Imagens de produto com texto alternativo
+
+## EPIC-03 — Catálogo
+
+### AB-021 — Cadastro de produtos no back office
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF41, RN06, RN09
+
+**Descrição**
+
+CRUD completo: nome, descrição, especificações, categoria, preço, imagens, peso/dimensões, certificações, garantia, edição limitada e numeração de lote.
+
+**Critérios de aceite**
+
+- [ ] Produto com certificação obrigatória não publica sem documento anexado
+- [ ] Peso e dimensões obrigatórios
+- [ ] Garantia estendida marcada automaticamente acima do valor configurado
+
+### AB-022 — Upload de imagens com conversão para WebP
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RNF04
+
+**Descrição**
+
+Aceitar JPG, PNG e WebP, converter para WebP no servidor com no máximo 300 KB e gerar versões responsivas.
+
+**Critérios de aceite**
+
+- [ ] Arquivos fora dos formatos aceitos são recusados com mensagem clara
+- [ ] Imagem final em WebP com até 300 KB
+- [ ] Versões em tamanhos diferentes geradas
+
+### AB-023 — Categorias, subcategorias e navegação
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF01
+
+**Descrição**
+
+Árvore de categorias gerenciável e menu de navegação.
+
+**Critérios de aceite**
+
+- [ ] Admin cria, edita e reordena categorias
+- [ ] Menu reflete a árvore sem alteração de código
+
+### AB-024 — Listagem de produtos (PLP) com filtros avançados
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF02
+
+**Descrição**
+
+Filtros por marca, faixa de preço, material/acabamento, especificação técnica e prazo de entrega, com ordenação e paginação.
+
+**Critérios de aceite**
+
+- [ ] Filtros combináveis e refletidos na URL
+- [ ] Contagem de resultados por filtro
+- [ ] Estado vazio tratado
+
+### AB-025 — Busca de produtos
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF02
+
+**Descrição**
+
+Busca textual por nome, descrição e especificação, com sugestões.
+
+**Critérios de aceite**
+
+- [ ] Busca tolera acentos e caixa
+- [ ] Produtos inativos não aparecem
+- [ ] Página de resultados usa os mesmos filtros da PLP
+
+### AB-026 — Página de produto (PDP)
+
+**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF03, RF18
+
+**Descrição**
+
+Galeria, especificações, ficha técnica em PDF, garantia, certificações, prazo, botão de cotação e contato com o vendedor.
+
+**Critérios de aceite**
+
+- [ ] Ficha técnica em PDF disponível para download
+- [ ] Sinalização de sob encomenda quando sem estoque
+- [ ] Botões de comprar e de solicitar cotação
+
+### AB-027 — Comparador de até 4 produtos
+
+**Labels:** `feature`, `mod:catalogo`, `P2`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF04
+
+**Descrição**
+
+Comparação lado a lado de especificações.
+
+**Critérios de aceite**
+
+- [ ] Limite de 4 produtos com aviso
+- [ ] Especificações alinhadas por atributo
+- [ ] Comparação mantida durante a navegação
+
+### AB-028 — Inativação de produtos sem perda de histórico
+
+**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF42
+
+**Descrição**
+
+Produto inativo sai da vitrine e da busca, mas permanece nos pedidos antigos.
+
+**Critérios de aceite**
+
+- [ ] Produto inativo some da vitrine e da busca
+- [ ] Pedidos antigos continuam exibindo o produto
+
+### AB-029 — Importação de produtos via CSV
+
+**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF48, RNF04
+
+**Descrição**
+
+Importação em massa com validação e relatório de erros por linha.
+
+**Critérios de aceite**
+
+- [ ] Modelo de CSV para download
+- [ ] Relatório de erros por linha
+- [ ] Linhas válidas importadas mesmo com erros em outras
+
+### AB-030 — Home editorial com carrossel editável
+
+**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RF47
+
+**Descrição**
+
+Home conforme o protótipo, com carrossel e vitrines configuráveis pelo admin.
+
+**Critérios de aceite**
+
+- [ ] Admin altera imagens, textos e produtos sem deploy
+- [ ] Carrossel acessível (pausa e navegação por teclado)
+
+### AB-031 — SEO técnico
+
+**Labels:** `nfr`, `mod:catalogo`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-03 — Catálogo  
+**Referências:** RNF14
+
+**Descrição**
+
+URLs amigáveis, sitemap, metadados por página e dados estruturados de produto.
+
+**Critérios de aceite**
+
+- [ ] Sitemap gerado automaticamente
+- [ ] Title e description em todas as páginas públicas
+- [ ] Schema Product validado sem erros
+
+## EPIC-04 — Conta e Acesso
+
+### AB-032 — Cadastro e login de PF e PJ
+
+**Labels:** `feature`, `mod:conta`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF39
+
+**Descrição**
+
+Fluxos distintos para CPF e CNPJ com validação de documento.
+
+**Critérios de aceite**
+
+- [ ] Validação de CPF e CNPJ
+- [ ] Dados obrigatórios distintos por tipo de conta
+- [ ] Senha armazenada com hash seguro
+
+### AB-033 — Recuperação de senha e 2FA opcional
+
+**Labels:** `feature`, `mod:conta`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF40
+
+**Descrição**
+
+Recuperação por e-mail com token expirável e 2FA opcional para contas corporativas.
+
+**Critérios de aceite**
+
+- [ ] Token de recuperação expira e é de uso único
+- [ ] 2FA ativável pela conta corporativa
+
+### AB-034 — Conta corporativa multiusuário com consulta de CNPJ
+
+**Labels:** `feature`, `mod:conta`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF09
+
+**Descrição**
+
+Consultar CNPJ via API (ex: BrasilAPI), preencher razão social e permitir convidar usuários.
+
+**Critérios de aceite**
+
+- [ ] CNPJ inativo bloqueia o cadastro
+- [ ] Razão social preenchida automaticamente
+- [ ] Convite de usuário por e-mail
+
+### AB-035 — Perfis de acesso da conta corporativa
+
+**Labels:** `feature`, `mod:conta`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF10, RN08
+
+**Descrição**
+
+Perfis solicitante, aprovador, financeiro e administrador da conta.
+
+**Critérios de aceite**
+
+- [ ] Conta multiusuário exige pelo menos um aprovador
+- [ ] Conta de usuário único acumula administrador e aprovador
+- [ ] Permissões aplicadas no backend
+
+### AB-036 — Múltiplos endereços por conta
+
+**Labels:** `feature`, `mod:conta`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF26
+
+**Descrição**
+
+Cadastro de matriz, filiais e obras como endereços de entrega.
+
+**Critérios de aceite**
+
+- [ ] CRUD de endereços com apelido
+- [ ] Endereço padrão definido
+
+### AB-037 — Área do cliente
+
+**Labels:** `feature`, `mod:conta`, `P1`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF31, RF15
+
+**Descrição**
+
+Painel com pedidos, cotações, dados, endereços, usuários (PJ) e favoritos.
+
+**Critérios de aceite**
+
+- [ ] Lista de pedidos com status
+- [ ] Acesso de acordo com o perfil do usuário
+
+### AB-038 — Lista de favoritos
+
+**Labels:** `feature`, `mod:conta`, `P2`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-04 — Conta e Acesso  
+**Referências:** RF45
+
+**Descrição**
+
+Cliente logado adiciona e remove produtos dos favoritos.
+
+**Critérios de aceite**
+
+- [ ] Favoritos persistem entre sessões
+- [ ] Ação disponível no card e na PDP
+
+## EPIC-05 — Endereço e Frete
+
+### AB-039 — Consulta de endereço via ViaCEP com fallback
+
+**Labels:** `feature`, `mod:frete`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RF22, RF23, RF24, RF38, RN21
+
+**Descrição**
+
+Preenchimento automático a partir do CEP, com validação e digitação manual em caso de falha.
+
+**Critérios de aceite**
+
+- [ ] CEP validado com 8 dígitos antes da consulta
+- [ ] Timeout libera digitação manual
+- [ ] Checkout nunca bloqueia por falha do ViaCEP
+
+### AB-040 — Módulo de frete com estratégias por modalidade
+
+**Labels:** `feature`, `mod:frete`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RF25, RN20
+
+**Descrição**
+
+Serviço que escolhe Correios, transportadora ou entrega própria conforme peso, dimensões e CEP.
+
+**Critérios de aceite**
+
+- [ ] Regra da RN20 aplicada e coberta por testes
+- [ ] Novas modalidades adicionáveis sem alterar o checkout
+
+### AB-041 — Integração com a API dos Correios
+
+**Labels:** `feature`, `mod:frete`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RF25
+
+**Descrição**
+
+Cálculo de PAC e SEDEX para volumes dentro dos limites.
+
+**Critérios de aceite**
+
+- [ ] Volume fora dos limites não é cotado nos Correios
+- [ ] Erro da API cai no fallback
+
+### AB-042 — Integração com agregador de transportadoras
+
+**Labels:** `feature`, `mod:frete`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RF49
+
+**Descrição**
+
+Cotação de frete para volumes grandes via agregador (ex: Melhor Envio) em sandbox.
+
+**Critérios de aceite**
+
+- [ ] Exibe transportadora, prazo e valor
+- [ ] Erro da API cai no fallback
+
+### AB-043 — Entrega própria com montagem por faixa de CEP
+
+**Labels:** `feature`, `mod:frete`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RF27, RF50, RN16
+
+**Descrição**
+
+Tabela de faixas de CEP e peso configurável no back office.
+
+**Critérios de aceite**
+
+- [ ] Admin edita faixas e valores
+- [ ] Indicação de cobertura exibida no checkout
+
+### AB-044 — Cotação manual de frete como contingência
+
+**Labels:** `feature`, `mod:frete`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RN16, RN20
+
+**Descrição**
+
+Encaminhar ao comercial pedidos sem frete calculável.
+
+**Critérios de aceite**
+
+- [ ] Pedido segue para a fila do comercial
+- [ ] Cliente é avisado do prazo de retorno
+
+### AB-045 — Recotação de frete ao alterar endereço
+
+**Labels:** `feature`, `mod:frete`, `P2`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-05 — Endereço e Frete  
+**Referências:** RN15
+
+**Descrição**
+
+Mudança de endereço após o pedido exige nova cotação de frete e prazo.
+
+**Critérios de aceite**
+
+- [ ] Alteração gera nova cotação
+- [ ] Cliente confirma a diferença antes de seguir
+
+## EPIC-06 — Carrinho, Cotação e Aprovação
+
+### AB-046 — Carrinho e lista de projeto salva
+
+**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF07
+
+**Descrição**
+
+Carrinho persistente e opção de salvar como lista/projeto.
+
+**Critérios de aceite**
+
+- [ ] Carrinho mantido após login
+- [ ] Lista salva pode ser retomada e convertida em carrinho
+
+### AB-047 — Personalização e serviços adicionais no carrinho
+
+**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF51, RF52, RN24
+
+**Descrição**
+
+Gravação a laser com prévia, embalagem institucional e montagem.
+
+**Critérios de aceite**
+
+- [ ] Custo e prazo extra somados ao pedido
+- [ ] Item personalizado não cancelável após início da produção
+
+### AB-048 — Solicitação de cotação com anexos
+
+**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF05, RF08
+
+**Descrição**
+
+Cotação de itens ou do carrinho inteiro com upload de arquivos.
+
+**Critérios de aceite**
+
+- [ ] Anexos com tipos e tamanho limitados
+- [ ] Cliente acompanha a cotação na área do cliente
+
+### AB-049 — Número de cotação rastreável e validade
+
+**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF06, RN02
+
+**Descrição**
+
+Cotação com número único e validade de 15 dias.
+
+**Critérios de aceite**
+
+- [ ] Número único gerado
+- [ ] Cotação vencida exige revalidação de preços
+
+### AB-050 — Back office comercial de cotações
+
+**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF20
+
+**Descrição**
+
+Comercial visualiza, responde e converte cotações em pedidos.
+
+**Critérios de aceite**
+
+- [ ] Fila de cotações com status
+- [ ] Conversão em pedido mantém os valores negociados
+
+### AB-051 — Fluxo de aprovação de pedidos
+
+**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF11, RN01
+
+**Descrição**
+
+Pedidos acima do limite vão para o aprovador da conta.
+
+**Critérios de aceite**
+
+- [ ] Aprovador diferente do solicitante
+- [ ] Aprovação ou recusa registrada com data, usuário e justificativa
+- [ ] Aprovador avisado por e-mail
+
+### AB-052 — Tabela de preços por cliente e desconto por volume
+
+**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF21, RN04
+
+**Descrição**
+
+Preços diferenciados por cliente ou segmento e descontos automáticos por quantidade.
+
+**Critérios de aceite**
+
+- [ ] Preço exibido conforme a tabela do cliente logado
+- [ ] Desconto por volume aplicado automaticamente
+
+### AB-053 — Agendamento de entrega e instalação
+
+**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
+**Referências:** RF16, RN05
+
+**Descrição**
+
+Seleção de data para itens com instalação obrigatória.
+
+**Critérios de aceite**
+
+- [ ] Pedido com instalação obrigatória não finaliza sem data
+- [ ] Datas indisponíveis bloqueadas
+
+## EPIC-07 — Checkout e Pagamento
+
+### AB-054 — Integração do Payment Brick do Mercado Pago
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF28, RF35, RF36, RF37
+
+**Descrição**
+
+Formulário embutido, tokenização no front, criação do pagamento em /v1/payments e 3DS2.
+
+**Critérios de aceite**
+
+- [ ] Nenhum dado de cartão chega ao backend
+- [ ] Pagamento aprovado em sandbox
+- [ ] 3DS2 funcionando quando exigido
+
+### AB-055 — Pix e boleto via Mercado Pago com expiração
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF29, RN14
+
+**Descrição**
+
+Geração de Pix e boleto com prazos de expiração configuráveis.
+
+**Critérios de aceite**
+
+- [ ] QR Code e linha digitável exibidos
+- [ ] Pedido cancelado e reserva liberada ao expirar
+
+### AB-056 — Parcelamento configurável
+
+**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF14
+
+**Descrição**
+
+Máximo de parcelas por faixa de valor e por perfil de cliente.
+
+**Critérios de aceite**
+
+- [ ] Admin configura as faixas
+- [ ] Brick exibe só as parcelas permitidas
+
+### AB-057 — Webhook do Mercado Pago
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF30, RN13
+
+**Descrição**
+
+Receber notificações, validar a assinatura e atualizar o pagamento.
+
+**Critérios de aceite**
+
+- [ ] Assinatura do webhook validada
+- [ ] Processamento idempotente
+- [ ] Pedido só confirma com status approved
+
+### AB-058 — Status de pagamento e payment_id
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF31, RF32
+
+**Descrição**
+
+Armazenar payment_id e exibir o status em tempo real.
+
+**Critérios de aceite**
+
+- [ ] payment_id vinculado ao pedido
+- [ ] Status atualizado na área do cliente sem recarregar
+
+### AB-059 — Estornos total e parcial
+
+**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF34, RN07, RN18, RN22
+
+**Descrição**
+
+Estorno via API respeitando as políticas e o direito de arrependimento.
+
+**Critérios de aceite**
+
+- [ ] Estorno de pedido faturado exige aprovação do financeiro
+- [ ] Arrependimento de PF em até 7 dias gera reembolso integral
+- [ ] Estorno registrado em auditoria
+
+### AB-060 — Fluxo de pagamento faturado 28/56 dias
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF12, RF33, RN03, RN17
+
+**Descrição**
+
+Fluxo próprio fora do Mercado Pago, com boleto e controle de vencimentos.
+
+**Critérios de aceite**
+
+- [ ] Disponível só para contas aprovadas
+- [ ] Vencimentos em 28 e 56 dias
+- [ ] Baixa manual registrada
+
+### AB-061 — Aprovação de crédito corporativo
+
+**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Milestone:** Etapa 4 — Fluxo B2B  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF58, RN10
+
+**Descrição**
+
+Financeiro aprova contas para o faturado e define o limite de crédito.
+
+**Critérios de aceite**
+
+- [ ] Limite excedido bloqueia novo pedido faturado
+- [ ] Histórico de alterações de limite
+
+### AB-062 — Checklist PCI-DSS SAQ A
+
+**Labels:** `nfr`, `mod:pagamento`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RN19
+
+**Descrição**
+
+Verificar os requisitos mínimos do SAQ A para o checkout transparente.
+
+**Critérios de aceite**
+
+- [ ] Checklist preenchido e versionado
+- [ ] Pendências viram issues
+
+### AB-063 — Emissão de NF-e via API
+
+**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-07 — Checkout e Pagamento  
+**Referências:** RF13
+
+**Descrição**
+
+Emissão automática em homologação após a confirmação do pedido.
+
+**Critérios de aceite**
+
+- [ ] XML, DANFE e chave armazenados no pedido
+- [ ] Falha de emissão gera alerta e reprocessamento
+
+## EPIC-08 — Estoque e Pedido
+
+### AB-064 — Reserva, baixa e liberação de estoque
+
+**Labels:** `feature`, `mod:pedido`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-08 — Estoque e Pedido  
+**Referências:** RF43, RF44, RN14
+
+**Descrição**
+
+Reserva na criação do pedido, baixa na confirmação e liberação na expiração ou cancelamento.
+
+**Critérios de aceite**
+
+- [ ] Dois pedidos simultâneos não reservam a mesma unidade
+- [ ] Estoque disponível desconta reservas
+- [ ] Reposição manual registrada
+
+### AB-065 — Ciclo de vida do pedido
+
+**Labels:** `feature`, `mod:pedido`, `P0`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-08 — Estoque e Pedido  
+**Referências:** RF54
+
+**Descrição**
+
+Implementar os status e as transições permitidas do pedido.
+
+**Critérios de aceite**
+
+- [ ] Transições inválidas recusadas
+- [ ] Cada transição grava data e responsável
+
+### AB-066 — Rastreamento do pedido
+
+**Labels:** `feature`, `mod:pedido`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-08 — Estoque e Pedido  
+**Referências:** RF15
+
+**Descrição**
+
+Linha do tempo do pedido e código de rastreio na área do cliente.
+
+**Critérios de aceite**
+
+- [ ] Linha do tempo com todos os status
+- [ ] Código de rastreio exibido quando houver
+
+### AB-067 — E-mails transacionais
+
+**Labels:** `feature`, `mod:pedido`, `P1`  
+**Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
+**Épico:** EPIC-08 — Estoque e Pedido  
+**Referências:** RF53
+
+**Descrição**
+
+Templates com a identidade visual para cadastro, cotação, aprovação, pagamento, NF-e, envio, entrega e chamados.
+
+**Critérios de aceite**
+
+- [ ] Templates responsivos
+- [ ] Disparo em cada evento listado
+- [ ] Envio com fila e nova tentativa
+
+## EPIC-09 — Pós-venda e Atendimento
+
+### AB-068 — Chamados de garantia e assistência técnica
+
+**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-09 — Pós-venda e Atendimento  
+**Referências:** RF17, RN12
+
+**Descrição**
+
+Abertura de chamado vinculado ao produto comprado, com anexos.
+
+**Critérios de aceite**
+
+- [ ] Chamado vinculado a pedido e item
+- [ ] Status acompanhado pelo cliente
+
+### AB-069 — Canal com vendedor dedicado (WhatsApp)
+
+**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-09 — Pós-venda e Atendimento  
+**Referências:** RF18, RN11
+
+**Descrição**
+
+Botão de contato com o vendedor da conta na PDP e no carrinho.
+
+**Critérios de aceite**
+
+- [ ] Vendedor definido por região ou segmento
+- [ ] Cliente não altera o vendedor
+
+### AB-070 — Agendamento de demonstração
+
+**Labels:** `feature`, `mod:pos-venda`, `P2`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-09 — Pós-venda e Atendimento  
+**Referências:** RF19
+
+**Descrição**
+
+Solicitação de reunião para itens complexos.
+
+**Critérios de aceite**
+
+- [ ] Cliente escolhe data e horário
+- [ ] Comercial recebe a solicitação
+
+### AB-071 — Fluxo de troca, devolução e arrependimento
+
+**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-09 — Pós-venda e Atendimento  
+**Referências:** RN12, RN22
+
+**Descrição**
+
+Solicitação de devolução com regras distintas para PF e PJ.
+
+**Critérios de aceite**
+
+- [ ] PF solicita arrependimento em até 7 dias do recebimento
+- [ ] Itens personalizados de PJ bloqueados, salvo defeito
+
+## EPIC-10 — Back Office e Administração
+
+### AB-072 — Usuários internos e permissões
+
+**Labels:** `feature`, `mod:backoffice`, `P0`  
+**Milestone:** Etapa 2 — Catálogo e Conta  
+**Épico:** EPIC-10 — Back Office e Administração  
+**Referências:** RF55
+
+**Descrição**
+
+Perfis administrador, comercial, financeiro e estoque com permissões por módulo.
+
+**Critérios de aceite**
+
+- [ ] Cada perfil acessa só os seus módulos
+- [ ] Permissões verificadas no backend
+
+### AB-073 — Promoções, cupons e frete cortesia
+
+**Labels:** `feature`, `mod:backoffice`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-10 — Back Office e Administração  
+**Referências:** RF46, RN23
+
+**Descrição**
+
+Descontos por produto, categoria ou cupom, com vigência.
+
+**Critérios de aceite**
+
+- [ ] Promoção ativa só dentro da vigência
+- [ ] Frete cortesia só por regra configurada
+
+### AB-074 — Páginas institucionais editáveis
+
+**Labels:** `feature`, `mod:backoffice`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-10 — Back Office e Administração  
+**Referências:** RF57
+
+**Descrição**
+
+Termos, privacidade, trocas e garantia editáveis no back office.
+
+**Critérios de aceite**
+
+- [ ] Admin edita sem deploy
+- [ ] Páginas linkadas no footer e no checkout
+
+### AB-075 — LGPD: consentimento e direitos do titular
+
+**Labels:** `nfr`, `mod:backoffice`, `P0`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-10 — Back Office e Administração  
+**Referências:** RF56, RNF03
+
+**Descrição**
+
+Banner de cookies, exportação e exclusão/anonimização de dados.
+
+**Critérios de aceite**
+
+- [ ] Cookies não essenciais só após consentimento
+- [ ] Exportação de dados em formato legível
+- [ ] Exclusão anonimiza sem quebrar pedidos e notas
+
+### AB-076 — Log de auditoria de ações sensíveis
+
+**Labels:** `nfr`, `mod:backoffice`, `P1`  
+**Milestone:** Etapa 5 — Pós-venda e Back Office  
+**Épico:** EPIC-10 — Back Office e Administração  
+**Referências:** RNF12
+
+**Descrição**
+
+Registro de aprovações, preços, crédito, estornos e perfis.
+
+**Critérios de aceite**
+
+- [ ] Log com usuário, data/hora, IP e valores anterior e novo
+- [ ] Log não editável pela interface
+
+## EPIC-11 — Qualidade e Operação
+
+### AB-077 — Testes automatizados e cobertura mínima
+
+**Labels:** `nfr`, `mod:qualidade`, `P0`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF07
+
+**Descrição**
+
+Testes unitários e de integração dos fluxos críticos (frete, estoque, pagamento, aprovação).
+
+**Critérios de aceite**
+
+- [ ] Cobertura mínima definida e verificada no CI
+- [ ] Fluxo de compra coberto por teste de ponta a ponta
+
+### AB-078 — Orçamento de performance
+
+**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF10
+
+**Descrição**
+
+Medir e otimizar LCP e tempo de resposta da API.
+
+**Critérios de aceite**
+
+- [ ] LCP de até 2,5 s nas páginas de vitrine
+- [ ] API com p95 de até 500 ms
+
+### AB-079 — Teste de carga
+
+**Labels:** `nfr`, `mod:qualidade`, `P2`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF02
+
+**Descrição**
+
+Simular 3x o tráfego médio esperado.
+
+**Critérios de aceite**
+
+- [ ] Relatório do teste de carga
+- [ ] Sem erros nem degradação acima do limite definido
+
+### AB-080 — Monitoramento de disponibilidade e alertas
+
+**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF01
+
+**Descrição**
+
+Monitorar uptime e erros, com alertas para a equipe.
+
+**Critérios de aceite**
+
+- [ ] Alerta disparado em queda
+- [ ] Painel de disponibilidade
+
+### AB-081 — Backup e teste de restauração
+
+**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF11
+
+**Descrição**
+
+Backup diário com retenção de 30 dias e restauração testada.
+
+**Critérios de aceite**
+
+- [ ] Backup automático configurado
+- [ ] Restauração testada e documentada dentro do RTO de 4 h
+
+### AB-082 — Deploy e checklist de lançamento
+
+**Labels:** `chore`, `mod:qualidade`, `P0`  
+**Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Épico:** EPIC-11 — Qualidade e Operação  
+**Referências:** RNF01, RNF06
+
+**Descrição**
+
+Publicar homologação e produção e executar o checklist final.
+
+**Critérios de aceite**
+
+- [ ] Ambientes publicados com HTTPS
+- [ ] Checklist de lançamento concluído
+- [ ] Apresentação final preparada
