@@ -5,12 +5,28 @@ Cada etapa abaixo é uma **lista** do Trello, na ordem em que aparecem. Cada iss
 ## Como montar o quadro
 
 1. Crie o quadro **Atelier Bureau — Project SENAI**.
-2. Crie as listas de etapa (seção “Listas”) e, ao final, as listas de fluxo: **Em andamento**, **Em revisão** e **Concluído**.
+2. Crie as listas de etapa (seção “Listas”), que funcionam como **backlog** por etapa, e, ao final, as listas de fluxo: **Bloqueado**, **Em andamento**, **Em revisão**, **Em teste**, **Em validação** e **Concluído**.
 3. Para criar vários cards de uma vez: copie o bloco “Cards para colar” da etapa, cole no campo de novo card da lista e confirme a opção de criar um card por linha.
 4. Abra cada card e adicione as etiquetas e o checklist listados no detalhamento.
-5. No card, cole o link da issue correspondente do GitHub (Power-Up do GitHub, se disponível).
+5. No card, cole o link da issue correspondente do GitHub (Power-Up do GitHub, se disponível). O número da issue de cada card está na seção “Mapeamento GitHub” do arquivo de issues.
 
-Fluxo de trabalho: o card sai da lista da etapa para **Em andamento**, depois **Em revisão** (pull request aberto) e termina em **Concluído** (PR mesclado e critérios de aceite marcados).
+## Fluxo de trabalho
+
+| Lista | Entra quando | Sai quando |
+|---|---|---|
+| Etapa N (backlog) | Card criado a partir da issue | Alguém assume o card |
+| Em andamento | Responsável definido e branch criada | Pull request aberto |
+| Em revisão | PR aberto e CI passando | PR aprovado em code review |
+| Em teste | PR aprovado | Testes automatizados e manuais passam em homologação |
+| Em validação | Testes concluídos | Critérios de aceite conferidos com o requisito (RF/RN/RNF) pelo responsável do produto |
+| Concluído | PR mesclado, critérios marcados e issue fechada | — |
+| Bloqueado | Depende de decisão, de outra issue ou de fator externo | Impedimento resolvido; o card volta para a lista de onde saiu |
+
+Regras:
+
+- Um card só avança com o checklist da lista anterior cumprido; reprovação em teste ou validação devolve o card para **Em andamento**.
+- Card em **Bloqueado** leva um comentário com o motivo e, quando for o caso, o ID da issue que o bloqueia.
+- Cards de decisão e de design (sem código) pulam **Em revisão** e **Em teste** e vão direto para **Em validação**.
 
 ## Etiquetas
 
@@ -37,9 +53,12 @@ Fluxo de trabalho: o card sai da lista da etapa para **Em andamento**, depois **
 | 5 | Etapa 4 — Fluxo B2B | Semanas 9–10 | 7 | Cotação, aprovação, faturado e crédito corporativo. |
 | 6 | Etapa 5 — Pós-venda e Back Office | Semanas 11–12 | 10 | Atendimento, promoções, conteúdo, LGPD e auditoria. |
 | 7 | Etapa 6 — Qualidade, Segurança e Lançamento | Semanas 13–14 | 9 | Testes, performance, acessibilidade, monitoramento e deploy. |
-| 8 | Em andamento | — | — | Fluxo de trabalho |
-| 9 | Em revisão | — | — | Fluxo de trabalho |
-| 10 | Concluído | — | — | Fluxo de trabalho |
+| 8 | Bloqueado | — | — | Cards impedidos |
+| 9 | Em andamento | — | — | Fluxo de trabalho |
+| 10 | Em revisão | — | — | Fluxo de trabalho |
+| 11 | Em teste | — | — | Fluxo de trabalho |
+| 12 | Em validação | — | — | Fluxo de trabalho |
+| 13 | Concluído | — | — | Fluxo de trabalho |
 
 ---
 
@@ -1081,13 +1100,14 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P0 — MVP, Backend  
 **Épico:** Back Office e Administração · **Referências:** RF56, RNF03
 
-Banner de cookies, exportação e exclusão/anonimização de dados.
+Banner de cookies, exportação e exclusão/anonimização de dados, com dados pessoais e financeiros protegidos em trânsito e em repouso.
 
 Checklist “Critérios de aceite”:
 
 - [ ] Cookies não essenciais só após consentimento
 - [ ] Exportação de dados em formato legível
 - [ ] Exclusão anonimiza sem quebrar pedidos e notas
+- [ ] Dados pessoais sensíveis criptografados em repouso e acesso restrito por perfil
 
 #### AB-076 — Log de auditoria de ações sensíveis
 

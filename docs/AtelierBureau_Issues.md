@@ -9,7 +9,29 @@ Total: 12 épicos e 82 issues. Os códigos entre parênteses (RF, RN, RNF) refer
 - Cada épico vira uma issue com a label `epic`; as issues do épico são listadas nele como checklist.
 - Cada etapa vira um **milestone** no GitHub, com o mesmo nome usado no Trello.
 - O ID `AB-xxx` vai no início do título, para cruzar com os cards do Trello.
+- As labels `backend`, `frontend` e `integracao` correspondem às etiquetas de mesmo nome no Trello.
 - A estrutura definitiva (labels, templates) deve ser ajustada ao padrão do CRM e do Core após a issue AB-001.
+
+## Mapeamento GitHub
+
+Issues criadas em `Ks7dev/Project_Senai` em 09/11/2026. O número da issue é o mesmo do ID: `AB-001` = #1 … `AB-082` = #82. Os épicos são #83 a #94 e têm as issues do módulo vinculadas como sub-issues.
+
+| Épico | Issue |
+|---|---|
+| EPIC-00 — Decisões e Documentação | #83 |
+| EPIC-01 — Fundação Técnica | #84 |
+| EPIC-02 — Design System e Identidade Visual | #85 |
+| EPIC-03 — Catálogo | #86 |
+| EPIC-04 — Conta e Acesso | #87 |
+| EPIC-05 — Endereço e Frete | #88 |
+| EPIC-06 — Carrinho, Cotação e Aprovação | #89 |
+| EPIC-07 — Checkout e Pagamento | #90 |
+| EPIC-08 — Estoque e Pedido | #91 |
+| EPIC-09 — Pós-venda e Atendimento | #92 |
+| EPIC-10 — Back Office e Administração | #93 |
+| EPIC-11 — Qualidade e Operação | #94 |
+
+Corpo de cada issue: épico, referências, descrição, critérios de aceite (checklist) e o ID `AB-xxx`. Alterações de escopo devem ser feitas neste arquivo e na issue correspondente.
 
 ## Labels
 
@@ -22,6 +44,9 @@ Total: 12 épicos e 82 issues. Os códigos entre parênteses (RF, RN, RNF) refer
 | `decision` | Decisão a tomar |
 | `chore` | Configuração e infraestrutura |
 | `docs` | Documentação |
+| `backend` | Regras, APIs e serviços (etiqueta Backend no Trello) |
+| `frontend` | Telas e componentes (etiqueta Frontend no Trello) |
+| `integracao` | Integração externa: Mercado Pago, ViaCEP, Correios, NF-e, CNPJ (etiqueta Integração externa no Trello) |
 | `P0` | Essencial para o MVP |
 | `P1` | Importante |
 | `P2` | Desejável |
@@ -434,7 +459,7 @@ Separar configurações por ambiente e garantir que segredos (chaves Mercado Pag
 
 ### AB-008 — Modelagem do banco de dados e migrations iniciais
 
-**Labels:** `feature`, `mod:infra`, `P0`  
+**Labels:** `feature`, `mod:infra`, `P0`, `backend`  
 **Milestone:** Etapa 1 — Fundação Técnica e Design System  
 **Épico:** EPIC-01 — Fundação Técnica  
 **Referências:** RF41, RF09, RF54
@@ -467,7 +492,7 @@ Criar pipeline que roda a cada pull request.
 
 ### AB-010 — Padrão de tratamento de erros, logs e rate limiting
 
-**Labels:** `nfr`, `mod:infra`, `P0`  
+**Labels:** `nfr`, `mod:infra`, `P0`, `backend`  
 **Milestone:** Etapa 1 — Fundação Técnica e Design System  
 **Épico:** EPIC-01 — Fundação Técnica  
 **Referências:** RNF05
@@ -484,7 +509,7 @@ Middleware global de erros sem vazamento de stack trace, logs estruturados e lim
 
 ### AB-011 — HTTPS obrigatório e headers de segurança
 
-**Labels:** `nfr`, `mod:infra`, `P0`  
+**Labels:** `nfr`, `mod:infra`, `P0`, `backend`  
 **Milestone:** Etapa 1 — Fundação Técnica e Design System  
 **Épico:** EPIC-01 — Fundação Técnica  
 **Referências:** RNF06
@@ -654,7 +679,7 @@ Auditar as páginas principais com ferramenta automática e teste manual de tecl
 
 ### AB-021 — Cadastro de produtos no back office
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF41, RN06, RN09
@@ -671,7 +696,7 @@ CRUD completo: nome, descrição, especificações, categoria, preço, imagens, 
 
 ### AB-022 — Upload de imagens com conversão para WebP
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RNF04
@@ -688,7 +713,7 @@ Aceitar JPG, PNG e WebP, converter para WebP no servidor com no máximo 300 KB e
 
 ### AB-023 — Categorias, subcategorias e navegação
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF01
@@ -704,7 +729,7 @@ Aceitar JPG, PNG e WebP, converter para WebP no servidor com no máximo 300 KB e
 
 ### AB-024 — Listagem de produtos (PLP) com filtros avançados
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF02
@@ -721,7 +746,7 @@ Filtros por marca, faixa de preço, material/acabamento, especificação técnic
 
 ### AB-025 — Busca de produtos
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF02
@@ -738,7 +763,7 @@ Busca textual por nome, descrição e especificação, com sugestões.
 
 ### AB-026 — Página de produto (PDP)
 
-**Labels:** `feature`, `mod:catalogo`, `P0`  
+**Labels:** `feature`, `mod:catalogo`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF03, RF18
@@ -755,7 +780,7 @@ Galeria, especificações, ficha técnica em PDF, garantia, certificações, pra
 
 ### AB-027 — Comparador de até 4 produtos
 
-**Labels:** `feature`, `mod:catalogo`, `P2`  
+**Labels:** `feature`, `mod:catalogo`, `P2`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF04
@@ -772,7 +797,7 @@ Comparação lado a lado de especificações.
 
 ### AB-028 — Inativação de produtos sem perda de histórico
 
-**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Labels:** `feature`, `mod:catalogo`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF42
@@ -788,7 +813,7 @@ Produto inativo sai da vitrine e da busca, mas permanece nos pedidos antigos.
 
 ### AB-029 — Importação de produtos via CSV
 
-**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Labels:** `feature`, `mod:catalogo`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF48, RNF04
@@ -805,7 +830,7 @@ Importação em massa com validação e relatório de erros por linha.
 
 ### AB-030 — Home editorial com carrossel editável
 
-**Labels:** `feature`, `mod:catalogo`, `P1`  
+**Labels:** `feature`, `mod:catalogo`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RF47
@@ -821,7 +846,7 @@ Home conforme o protótipo, com carrossel e vitrines configuráveis pelo admin.
 
 ### AB-031 — SEO técnico
 
-**Labels:** `nfr`, `mod:catalogo`, `P1`  
+**Labels:** `nfr`, `mod:catalogo`, `P1`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-03 — Catálogo  
 **Referências:** RNF14
@@ -840,7 +865,7 @@ URLs amigáveis, sitemap, metadados por página e dados estruturados de produto.
 
 ### AB-032 — Cadastro e login de PF e PJ
 
-**Labels:** `feature`, `mod:conta`, `P0`  
+**Labels:** `feature`, `mod:conta`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF39
@@ -857,7 +882,7 @@ Fluxos distintos para CPF e CNPJ com validação de documento.
 
 ### AB-033 — Recuperação de senha e 2FA opcional
 
-**Labels:** `feature`, `mod:conta`, `P0`  
+**Labels:** `feature`, `mod:conta`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF40
@@ -873,7 +898,7 @@ Recuperação por e-mail com token expirável e 2FA opcional para contas corpora
 
 ### AB-034 — Conta corporativa multiusuário com consulta de CNPJ
 
-**Labels:** `feature`, `mod:conta`, `P0`  
+**Labels:** `feature`, `mod:conta`, `P0`, `backend`, `frontend`, `integracao`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF09
@@ -890,7 +915,7 @@ Consultar CNPJ via API (ex: BrasilAPI), preencher razão social e permitir convi
 
 ### AB-035 — Perfis de acesso da conta corporativa
 
-**Labels:** `feature`, `mod:conta`, `P0`  
+**Labels:** `feature`, `mod:conta`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF10, RN08
@@ -907,7 +932,7 @@ Perfis solicitante, aprovador, financeiro e administrador da conta.
 
 ### AB-036 — Múltiplos endereços por conta
 
-**Labels:** `feature`, `mod:conta`, `P1`  
+**Labels:** `feature`, `mod:conta`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF26
@@ -923,7 +948,7 @@ Cadastro de matriz, filiais e obras como endereços de entrega.
 
 ### AB-037 — Área do cliente
 
-**Labels:** `feature`, `mod:conta`, `P1`  
+**Labels:** `feature`, `mod:conta`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF31, RF15
@@ -939,7 +964,7 @@ Painel com pedidos, cotações, dados, endereços, usuários (PJ) e favoritos.
 
 ### AB-038 — Lista de favoritos
 
-**Labels:** `feature`, `mod:conta`, `P2`  
+**Labels:** `feature`, `mod:conta`, `P2`, `backend`, `frontend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-04 — Conta e Acesso  
 **Referências:** RF45
@@ -957,7 +982,7 @@ Cliente logado adiciona e remove produtos dos favoritos.
 
 ### AB-039 — Consulta de endereço via ViaCEP com fallback
 
-**Labels:** `feature`, `mod:frete`, `P0`  
+**Labels:** `feature`, `mod:frete`, `P0`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RF22, RF23, RF24, RF38, RN21
@@ -974,7 +999,7 @@ Preenchimento automático a partir do CEP, com validação e digitação manual 
 
 ### AB-040 — Módulo de frete com estratégias por modalidade
 
-**Labels:** `feature`, `mod:frete`, `P0`  
+**Labels:** `feature`, `mod:frete`, `P0`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RF25, RN20
@@ -990,7 +1015,7 @@ Serviço que escolhe Correios, transportadora ou entrega própria conforme peso,
 
 ### AB-041 — Integração com a API dos Correios
 
-**Labels:** `feature`, `mod:frete`, `P0`  
+**Labels:** `feature`, `mod:frete`, `P0`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RF25
@@ -1006,7 +1031,7 @@ Cálculo de PAC e SEDEX para volumes dentro dos limites.
 
 ### AB-042 — Integração com agregador de transportadoras
 
-**Labels:** `feature`, `mod:frete`, `P1`  
+**Labels:** `feature`, `mod:frete`, `P1`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RF49
@@ -1022,7 +1047,7 @@ Cotação de frete para volumes grandes via agregador (ex: Melhor Envio) em sand
 
 ### AB-043 — Entrega própria com montagem por faixa de CEP
 
-**Labels:** `feature`, `mod:frete`, `P1`  
+**Labels:** `feature`, `mod:frete`, `P1`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RF27, RF50, RN16
@@ -1038,7 +1063,7 @@ Tabela de faixas de CEP e peso configurável no back office.
 
 ### AB-044 — Cotação manual de frete como contingência
 
-**Labels:** `feature`, `mod:frete`, `P1`  
+**Labels:** `feature`, `mod:frete`, `P1`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RN16, RN20
@@ -1054,7 +1079,7 @@ Encaminhar ao comercial pedidos sem frete calculável.
 
 ### AB-045 — Recotação de frete ao alterar endereço
 
-**Labels:** `feature`, `mod:frete`, `P2`  
+**Labels:** `feature`, `mod:frete`, `P2`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-05 — Endereço e Frete  
 **Referências:** RN15
@@ -1072,7 +1097,7 @@ Mudança de endereço após o pedido exige nova cotação de frete e prazo.
 
 ### AB-046 — Carrinho e lista de projeto salva
 
-**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Labels:** `feature`, `mod:carrinho`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF07
@@ -1088,7 +1113,7 @@ Carrinho persistente e opção de salvar como lista/projeto.
 
 ### AB-047 — Personalização e serviços adicionais no carrinho
 
-**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Labels:** `feature`, `mod:carrinho`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF51, RF52, RN24
@@ -1104,7 +1129,7 @@ Gravação a laser com prévia, embalagem institucional e montagem.
 
 ### AB-048 — Solicitação de cotação com anexos
 
-**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Labels:** `feature`, `mod:carrinho`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF05, RF08
@@ -1120,7 +1145,7 @@ Cotação de itens ou do carrinho inteiro com upload de arquivos.
 
 ### AB-049 — Número de cotação rastreável e validade
 
-**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Labels:** `feature`, `mod:carrinho`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF06, RN02
@@ -1136,7 +1161,7 @@ Cotação com número único e validade de 15 dias.
 
 ### AB-050 — Back office comercial de cotações
 
-**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Labels:** `feature`, `mod:carrinho`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF20
@@ -1152,7 +1177,7 @@ Comercial visualiza, responde e converte cotações em pedidos.
 
 ### AB-051 — Fluxo de aprovação de pedidos
 
-**Labels:** `feature`, `mod:carrinho`, `P0`  
+**Labels:** `feature`, `mod:carrinho`, `P0`, `backend`, `frontend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF11, RN01
@@ -1169,7 +1194,7 @@ Pedidos acima do limite vão para o aprovador da conta.
 
 ### AB-052 — Tabela de preços por cliente e desconto por volume
 
-**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Labels:** `feature`, `mod:carrinho`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF21, RN04
@@ -1185,7 +1210,7 @@ Preços diferenciados por cliente ou segmento e descontos automáticos por quant
 
 ### AB-053 — Agendamento de entrega e instalação
 
-**Labels:** `feature`, `mod:carrinho`, `P1`  
+**Labels:** `feature`, `mod:carrinho`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-06 — Carrinho, Cotação e Aprovação  
 **Referências:** RF16, RN05
@@ -1203,7 +1228,7 @@ Seleção de data para itens com instalação obrigatória.
 
 ### AB-054 — Integração do Payment Brick do Mercado Pago
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF28, RF35, RF36, RF37
@@ -1220,7 +1245,7 @@ Formulário embutido, tokenização no front, criação do pagamento em /v1/paym
 
 ### AB-055 — Pix e boleto via Mercado Pago com expiração
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF29, RN14
@@ -1236,7 +1261,7 @@ Geração de Pix e boleto com prazos de expiração configuráveis.
 
 ### AB-056 — Parcelamento configurável
 
-**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Labels:** `feature`, `mod:pagamento`, `P1`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF14
@@ -1252,7 +1277,7 @@ Máximo de parcelas por faixa de valor e por perfil de cliente.
 
 ### AB-057 — Webhook do Mercado Pago
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`, `integracao`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF30, RN13
@@ -1269,7 +1294,7 @@ Receber notificações, validar a assinatura e atualizar o pagamento.
 
 ### AB-058 — Status de pagamento e payment_id
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF31, RF32
@@ -1285,7 +1310,7 @@ Armazenar payment_id e exibir o status em tempo real.
 
 ### AB-059 — Estornos total e parcial
 
-**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Labels:** `feature`, `mod:pagamento`, `P1`, `backend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF34, RN07, RN18, RN22
@@ -1302,7 +1327,7 @@ Estorno via API respeitando as políticas e o direito de arrependimento.
 
 ### AB-060 — Fluxo de pagamento faturado 28/56 dias
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF12, RF33, RN03, RN17
@@ -1319,7 +1344,7 @@ Fluxo próprio fora do Mercado Pago, com boleto e controle de vencimentos.
 
 ### AB-061 — Aprovação de crédito corporativo
 
-**Labels:** `feature`, `mod:pagamento`, `P0`  
+**Labels:** `feature`, `mod:pagamento`, `P0`, `backend`  
 **Milestone:** Etapa 4 — Fluxo B2B  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF58, RN10
@@ -1335,7 +1360,7 @@ Financeiro aprova contas para o faturado e define o limite de crédito.
 
 ### AB-062 — Checklist PCI-DSS SAQ A
 
-**Labels:** `nfr`, `mod:pagamento`, `P1`  
+**Labels:** `nfr`, `mod:pagamento`, `P1`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RN19
@@ -1351,7 +1376,7 @@ Verificar os requisitos mínimos do SAQ A para o checkout transparente.
 
 ### AB-063 — Emissão de NF-e via API
 
-**Labels:** `feature`, `mod:pagamento`, `P1`  
+**Labels:** `feature`, `mod:pagamento`, `P1`, `backend`, `integracao`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-07 — Checkout e Pagamento  
 **Referências:** RF13
@@ -1369,7 +1394,7 @@ Emissão automática em homologação após a confirmação do pedido.
 
 ### AB-064 — Reserva, baixa e liberação de estoque
 
-**Labels:** `feature`, `mod:pedido`, `P0`  
+**Labels:** `feature`, `mod:pedido`, `P0`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-08 — Estoque e Pedido  
 **Referências:** RF43, RF44, RN14
@@ -1386,7 +1411,7 @@ Reserva na criação do pedido, baixa na confirmação e liberação na expiraç
 
 ### AB-065 — Ciclo de vida do pedido
 
-**Labels:** `feature`, `mod:pedido`, `P0`  
+**Labels:** `feature`, `mod:pedido`, `P0`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-08 — Estoque e Pedido  
 **Referências:** RF54
@@ -1402,7 +1427,7 @@ Implementar os status e as transições permitidas do pedido.
 
 ### AB-066 — Rastreamento do pedido
 
-**Labels:** `feature`, `mod:pedido`, `P1`  
+**Labels:** `feature`, `mod:pedido`, `P1`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-08 — Estoque e Pedido  
 **Referências:** RF15
@@ -1418,7 +1443,7 @@ Linha do tempo do pedido e código de rastreio na área do cliente.
 
 ### AB-067 — E-mails transacionais
 
-**Labels:** `feature`, `mod:pedido`, `P1`  
+**Labels:** `feature`, `mod:pedido`, `P1`, `backend`  
 **Milestone:** Etapa 3 — Carrinho, Frete e Checkout  
 **Épico:** EPIC-08 — Estoque e Pedido  
 **Referências:** RF53
@@ -1437,7 +1462,7 @@ Templates com a identidade visual para cadastro, cotação, aprovação, pagamen
 
 ### AB-068 — Chamados de garantia e assistência técnica
 
-**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Labels:** `feature`, `mod:pos-venda`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-09 — Pós-venda e Atendimento  
 **Referências:** RF17, RN12
@@ -1453,7 +1478,7 @@ Abertura de chamado vinculado ao produto comprado, com anexos.
 
 ### AB-069 — Canal com vendedor dedicado (WhatsApp)
 
-**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Labels:** `feature`, `mod:pos-venda`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-09 — Pós-venda e Atendimento  
 **Referências:** RF18, RN11
@@ -1469,7 +1494,7 @@ Botão de contato com o vendedor da conta na PDP e no carrinho.
 
 ### AB-070 — Agendamento de demonstração
 
-**Labels:** `feature`, `mod:pos-venda`, `P2`  
+**Labels:** `feature`, `mod:pos-venda`, `P2`, `backend`, `frontend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-09 — Pós-venda e Atendimento  
 **Referências:** RF19
@@ -1485,7 +1510,7 @@ Solicitação de reunião para itens complexos.
 
 ### AB-071 — Fluxo de troca, devolução e arrependimento
 
-**Labels:** `feature`, `mod:pos-venda`, `P1`  
+**Labels:** `feature`, `mod:pos-venda`, `P1`, `backend`, `frontend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-09 — Pós-venda e Atendimento  
 **Referências:** RN12, RN22
@@ -1503,7 +1528,7 @@ Solicitação de devolução com regras distintas para PF e PJ.
 
 ### AB-072 — Usuários internos e permissões
 
-**Labels:** `feature`, `mod:backoffice`, `P0`  
+**Labels:** `feature`, `mod:backoffice`, `P0`, `backend`  
 **Milestone:** Etapa 2 — Catálogo e Conta  
 **Épico:** EPIC-10 — Back Office e Administração  
 **Referências:** RF55
@@ -1519,7 +1544,7 @@ Perfis administrador, comercial, financeiro e estoque com permissões por módul
 
 ### AB-073 — Promoções, cupons e frete cortesia
 
-**Labels:** `feature`, `mod:backoffice`, `P1`  
+**Labels:** `feature`, `mod:backoffice`, `P1`, `backend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-10 — Back Office e Administração  
 **Referências:** RF46, RN23
@@ -1535,7 +1560,7 @@ Descontos por produto, categoria ou cupom, com vigência.
 
 ### AB-074 — Páginas institucionais editáveis
 
-**Labels:** `feature`, `mod:backoffice`, `P1`  
+**Labels:** `feature`, `mod:backoffice`, `P1`, `backend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-10 — Back Office e Administração  
 **Referências:** RF57
@@ -1551,24 +1576,25 @@ Termos, privacidade, trocas e garantia editáveis no back office.
 
 ### AB-075 — LGPD: consentimento e direitos do titular
 
-**Labels:** `nfr`, `mod:backoffice`, `P0`  
+**Labels:** `nfr`, `mod:backoffice`, `P0`, `backend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-10 — Back Office e Administração  
 **Referências:** RF56, RNF03
 
 **Descrição**
 
-Banner de cookies, exportação e exclusão/anonimização de dados.
+Banner de cookies, exportação e exclusão/anonimização de dados, com dados pessoais e financeiros protegidos em trânsito e em repouso.
 
 **Critérios de aceite**
 
 - [ ] Cookies não essenciais só após consentimento
 - [ ] Exportação de dados em formato legível
 - [ ] Exclusão anonimiza sem quebrar pedidos e notas
+- [ ] Dados pessoais sensíveis criptografados em repouso e acesso restrito por perfil
 
 ### AB-076 — Log de auditoria de ações sensíveis
 
-**Labels:** `nfr`, `mod:backoffice`, `P1`  
+**Labels:** `nfr`, `mod:backoffice`, `P1`, `backend`  
 **Milestone:** Etapa 5 — Pós-venda e Back Office  
 **Épico:** EPIC-10 — Back Office e Administração  
 **Referências:** RNF12
@@ -1586,7 +1612,7 @@ Registro de aprovações, preços, crédito, estornos e perfis.
 
 ### AB-077 — Testes automatizados e cobertura mínima
 
-**Labels:** `nfr`, `mod:qualidade`, `P0`  
+**Labels:** `nfr`, `mod:qualidade`, `P0`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-11 — Qualidade e Operação  
 **Referências:** RNF07
@@ -1602,7 +1628,7 @@ Testes unitários e de integração dos fluxos críticos (frete, estoque, pagame
 
 ### AB-078 — Orçamento de performance
 
-**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Labels:** `nfr`, `mod:qualidade`, `P1`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-11 — Qualidade e Operação  
 **Referências:** RNF10
@@ -1618,7 +1644,7 @@ Medir e otimizar LCP e tempo de resposta da API.
 
 ### AB-079 — Teste de carga
 
-**Labels:** `nfr`, `mod:qualidade`, `P2`  
+**Labels:** `nfr`, `mod:qualidade`, `P2`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-11 — Qualidade e Operação  
 **Referências:** RNF02
@@ -1634,7 +1660,7 @@ Simular 3x o tráfego médio esperado.
 
 ### AB-080 — Monitoramento de disponibilidade e alertas
 
-**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Labels:** `nfr`, `mod:qualidade`, `P1`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-11 — Qualidade e Operação  
 **Referências:** RNF01
@@ -1650,7 +1676,7 @@ Monitorar uptime e erros, com alertas para a equipe.
 
 ### AB-081 — Backup e teste de restauração
 
-**Labels:** `nfr`, `mod:qualidade`, `P1`  
+**Labels:** `nfr`, `mod:qualidade`, `P1`, `backend`  
 **Milestone:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Épico:** EPIC-11 — Qualidade e Operação  
 **Referências:** RNF11
