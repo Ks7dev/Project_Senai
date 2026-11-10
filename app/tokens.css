@@ -50,6 +50,29 @@
   --ab-shadow-2:
     0 16px 40px -8px rgb(30 34 33 / 0.08), 0 4px 12px -2px rgb(30 34 33 / 0.03);
   --ab-shadow-3: 0 24px 64px -12px rgb(30 34 33 / 0.16);
+
+  /*
+   * shadcn/ui semantic variables, mapped to the tokens above. The UI
+   * library reads these names; never give them raw values.
+   */
+  --background: var(--ab-surface-canvas);
+  --foreground: var(--ab-text-primary);
+  --card: var(--ab-surface-elevated);
+  --card-foreground: var(--ab-text-primary);
+  --popover: var(--ab-surface-elevated);
+  --popover-foreground: var(--ab-text-primary);
+  --primary: var(--ab-primary);
+  --primary-foreground: var(--ab-on-primary);
+  --secondary: var(--ab-surface-subtle);
+  --secondary-foreground: var(--ab-text-primary);
+  --muted: var(--ab-surface-subtle);
+  --muted-foreground: var(--ab-text-secondary);
+  --accent: var(--ab-surface-subtle);
+  --accent-foreground: var(--ab-text-primary);
+  --destructive: var(--ab-error);
+  --border: var(--ab-border);
+  --input: var(--ab-border);
+  --ring: var(--ab-primary);
 }
 
 @theme inline {
@@ -57,13 +80,30 @@
   --color-canvas: var(--ab-surface-canvas);
   --color-subtle: var(--ab-surface-subtle);
   --color-elevated: var(--ab-surface-elevated);
-  --color-primary: var(--ab-primary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--ab-primary-hover);
-  --color-on-primary: var(--ab-on-primary);
   --color-primary-tint: var(--ab-primary-tint);
-  --color-secondary: var(--ab-secondary);
-  --color-on-secondary: var(--ab-on-secondary);
-  --color-secondary-tint: var(--ab-secondary-tint);
+  /* Terracotta/clay editorial accent */
+  --color-clay: var(--ab-secondary);
+  --color-on-clay: var(--ab-on-secondary);
+  --color-clay-tint: var(--ab-secondary-tint);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-ink: var(--ab-text-primary);
   --color-ink-muted: var(--ab-text-secondary);
   --color-ink-disabled: var(--ab-text-disabled);
@@ -81,6 +121,7 @@
   /* Typography */
   --font-serif: var(--font-playfair), "Georgia", serif;
   --font-sans: var(--font-jakarta), "Segoe UI", system-ui, sans-serif;
+  --font-heading: var(--font-serif);
 
   --text-display: 3.5rem;
   --text-display--line-height: 4rem;

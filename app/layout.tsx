@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 import "./globals.css"
 
 const playfair = Playfair_Display({
@@ -30,9 +32,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
-      className={`${playfair.variable} ${jakarta.variable} h-full antialiased`}
+      className={cn("h-full antialiased", playfair.variable, jakarta.variable)}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   )
 }
