@@ -1009,6 +1009,7 @@ Serviço que escolhe Correios, transportadora ou entrega própria conforme peso,
 
 - [ ] Regra da RN20 aplicada e coberta por testes
 - [ ] Novas modalidades adicionáveis sem alterar o checkout
+- [ ] Frete calculado pelo maior entre peso real e peso cubado, somado por volume, com fator de cubagem configurável
 
 ### AB-041 — Integração com a API dos Correios
 
@@ -1569,12 +1570,13 @@ Solicitação de devolução com regras distintas para PF e PJ.
 
 **Descrição**
 
-Descontos por produto, categoria ou cupom, com vigência.
+Descontos por produto, categoria ou cupom, com vigência, e frete grátis a partir de um valor mínimo de pedido que varia conforme a região de entrega (faixas de CEP configuráveis, RN23).
 
 **Critérios de aceite**
 
 - [ ] Promoção ativa só dentro da vigência
 - [ ] Frete cortesia só por regra configurada
+- [ ] Frete grátis aplicado quando o pedido atinge o mínimo configurado para a região de entrega
 
 ### AB-074 — Páginas institucionais editáveis
 

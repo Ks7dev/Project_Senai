@@ -678,6 +678,7 @@ Checklist “Critérios de aceite”:
 
 - [ ] Regra da RN20 aplicada e coberta por testes
 - [ ] Novas modalidades adicionáveis sem alterar o checkout
+- [ ] Frete calculado pelo maior entre peso real e peso cubado, somado por volume, com fator de cubagem configurável
 
 #### AB-041 — Integração com a API dos Correios
 
@@ -1097,12 +1098,13 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P1 — Importante, Backend  
 **Issue:** #73 · **Área:** back office · **Milestone:** v0.4.0 · **Referências:** RF46, RN23
 
-Descontos por produto, categoria ou cupom, com vigência.
+Descontos por produto, categoria ou cupom, com vigência, e frete grátis a partir de um valor mínimo de pedido que varia conforme a região de entrega (faixas de CEP configuráveis, RN23).
 
 Checklist “Critérios de aceite”:
 
 - [ ] Promoção ativa só dentro da vigência
 - [ ] Frete cortesia só por regra configurada
+- [ ] Frete grátis aplicado quando o pedido atinge o mínimo configurado para a região de entrega
 
 #### AB-074 — Páginas institucionais editáveis
 
