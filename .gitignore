@@ -1,2 +1,32 @@
-﻿*.zip
+# dependencies
+/node_modules
 
+# testing
+/coverage
+/playwright-report
+/test-results
+
+# next.js
+/.next/
+/out/
+/build
+
+# misc
+.DS_Store
+*.pem
+*.zip
+
+# env files: only the example is versioned
+.env*
+!.env.example
+
+# local server
+/backups/
+/storage/
+
+# debug
+npm-debug.log*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
