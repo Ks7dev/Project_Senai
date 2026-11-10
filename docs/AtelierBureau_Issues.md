@@ -33,7 +33,7 @@ Total: 82 issues (`AB-001` = #1 … `AB-082` = #82). Os códigos entre parêntes
 | `área: pedidos` | Estoque, ciclo do pedido, rastreio e e-mails |
 | `área: pós-venda` | Garantia, trocas, vendedor dedicado e demonstrações |
 | `accessibility` | Barrier affecting people with disabilities |
-| `banco` | Exige migration e get_advisors depois |
+| `banco` | Exige migration Prisma (MySQL) e revisão do schema |
 | `documentação` | Documentação e exemplos de configuração |
 | `escopo a validar` | Depende de validação antes de começar |
 | `infra` | CI, deploy e ambiente |
@@ -277,7 +277,7 @@ Criar a estrutura inicial seguindo o padrão definido no AB-001, com lint, forma
 **Labels:** `tipo: task`, `área: app`, `segurança`, `infra`  
 **Milestone:** v0.1.0 · **Etapa:** Etapa 1 — Fundação Técnica e Design System  
 **Prioridade:** P0 · **Status inicial:** Backlog  
-**Referências:** RNF05
+**Referências:** RNF05, RNF16
 
 **Descrição**
 
@@ -288,6 +288,8 @@ Separar configurações por ambiente e garantir que segredos (chaves Mercado Pag
 - [ ] Arquivo .env.example documentado
 - [ ] Segredos fora do repositório
 - [ ] Credenciais de sandbox usadas em dev e homologação
+- [ ] `docker-compose.yml` com MySQL 8 (`utf8mb4`) para desenvolvimento
+- [ ] `DATABASE_URL` por ambiente, com TLS em homologação e produção e usuário da aplicação sem permissão de DDL
 
 ### AB-008 — Modelagem do banco de dados e migrations iniciais
 
@@ -295,11 +297,11 @@ Separar configurações por ambiente e garantir que segredos (chaves Mercado Pag
 **Labels:** `tipo: feature`, `área: app`, `banco`  
 **Milestone:** v0.1.0 · **Etapa:** Etapa 1 — Fundação Técnica e Design System  
 **Prioridade:** P0 · **Status inicial:** Backlog  
-**Referências:** RF41, RF09, RF54
+**Referências:** RF41, RF09, RF54, RNF16
 
 **Descrição**
 
-Modelar as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração.
+Modelar no `prisma/schema.prisma` (MySQL 8, InnoDB, `utf8mb4`) as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração. Seguir a seção 5 do `ARCHITECTURE.md`.
 
 **Critérios de aceite**
 
@@ -307,6 +309,9 @@ Modelar as entidades principais: usuário, conta corporativa, perfil, endereço,
 - [ ] Migrations criam todas as tabelas
 - [ ] Seeds de desenvolvimento com produtos e contas de teste
 - [ ] Valores das regras de negócio confirmados na #5 carregados como seed de configuração
+- [ ] Schema Prisma com `provider = "mysql"`, FKs, `UNIQUE` (CPF, CNPJ, e-mail, SKU, `payment_id`) e índices de filtro/busca (incluindo `FULLTEXT`)
+- [ ] Valores monetários em `DECIMAL(12,2)` e datas em UTC
+- [ ] `npx prisma migrate dev` e `npx prisma db seed` rodam do zero no MySQL do Docker
 
 ### AB-009 — Pipeline de CI com lint, testes e build
 
@@ -594,7 +599,7 @@ Monitorar uptime e erros, com alertas para a equipe.
 **Labels:** `tipo: task`, `área: app`, `infra`  
 **Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Prioridade:** P1 · **Status inicial:** Backlog  
-**Referências:** RNF11
+**Referências:** RNF11, RNF16
 
 **Descrição**
 
@@ -604,6 +609,7 @@ Backup diário com retenção de 30 dias e restauração testada.
 
 - [ ] Backup automático configurado
 - [ ] Restauração testada e documentada dentro do RTO de 4 h
+- [ ] Backup diário do MySQL gerenciado com retenção de 30 dias e restauração via `mysqldump` documentada
 
 ### AB-082 — Deploy e checklist de lançamento
 
@@ -611,7 +617,7 @@ Backup diário com retenção de 30 dias e restauração testada.
 **Labels:** `tipo: task`, `área: app`, `infra`  
 **Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
 **Prioridade:** P0 · **Status inicial:** Backlog  
-**Referências:** RNF01, RNF06
+**Referências:** RNF01, RNF06, RNF16
 
 **Descrição**
 
@@ -622,6 +628,7 @@ Publicar homologação e produção e executar o checklist final.
 - [ ] Ambientes publicados com HTTPS
 - [ ] Checklist de lançamento concluído
 - [ ] Apresentação final preparada
+- [ ] MySQL gerenciado na nuvem provisionado e `prisma migrate deploy` executado no deploy
 
 ## Catálogo
 
@@ -1419,6 +1426,7 @@ Reserva na criação do pedido, baixa na confirmação e liberação na expiraç
 - [ ] Dois pedidos simultâneos não reservam a mesma unidade
 - [ ] Estoque disponível desconta reservas
 - [ ] Reposição manual registrada
+- [ ] Reserva feita em transação com `SELECT ... FOR UPDATE` no MySQL, coberta por teste de concorrência
 
 ### AB-065 — Ciclo de vida do pedido
 

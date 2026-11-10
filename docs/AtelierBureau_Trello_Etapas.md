@@ -207,7 +207,7 @@ Checklist “Critérios de aceite”:
 #### AB-007 — Configurar ambientes e variáveis (dev, homologação, produção)
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Issue:** #7 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF05
+**Issue:** #7 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF05, RNF16
 
 Separar configurações por ambiente e garantir que segredos (chaves Mercado Pago, NF-e, transportadoras) nunca fiquem no código.
 
@@ -216,13 +216,15 @@ Checklist “Critérios de aceite”:
 - [ ] Arquivo .env.example documentado
 - [ ] Segredos fora do repositório
 - [ ] Credenciais de sandbox usadas em dev e homologação
+- [ ] `docker-compose.yml` com MySQL 8 (`utf8mb4`) para desenvolvimento
+- [ ] `DATABASE_URL` por ambiente, com TLS em homologação e produção e usuário da aplicação sem permissão de DDL
 
 #### AB-008 — Modelagem do banco de dados e migrations iniciais
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Issue:** #8 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RF41, RF09, RF54
+**Issue:** #8 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RF41, RF09, RF54, RNF16
 
-Modelar as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração.
+Modelar no `prisma/schema.prisma` (MySQL 8, InnoDB, `utf8mb4`) as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração. Seguir a seção 5 do `ARCHITECTURE.md`.
 
 Checklist “Critérios de aceite”:
 
@@ -230,6 +232,9 @@ Checklist “Critérios de aceite”:
 - [ ] Migrations criam todas as tabelas
 - [ ] Seeds de desenvolvimento com produtos e contas de teste
 - [ ] Valores das regras de negócio confirmados na #5 carregados como seed de configuração
+- [ ] Schema Prisma com `provider = "mysql"`, FKs, `UNIQUE` (CPF, CNPJ, e-mail, SKU, `payment_id`) e índices de filtro/busca (incluindo `FULLTEXT`)
+- [ ] Valores monetários em `DECIMAL(12,2)` e datas em UTC
+- [ ] `npx prisma migrate dev` e `npx prisma db seed` rodam do zero no MySQL do Docker
 
 #### AB-009 — Pipeline de CI com lint, testes e build
 
@@ -842,6 +847,7 @@ Checklist “Critérios de aceite”:
 - [ ] Dois pedidos simultâneos não reservam a mesma unidade
 - [ ] Estoque disponível desconta reservas
 - [ ] Reposição manual registrada
+- [ ] Reserva feita em transação com `SELECT ... FOR UPDATE` no MySQL, coberta por teste de concorrência
 
 #### AB-065 — Ciclo de vida do pedido
 
@@ -1243,7 +1249,7 @@ Checklist “Critérios de aceite”:
 #### AB-081 — Backup e teste de restauração
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
-**Issue:** #81 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF11
+**Issue:** #81 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF11, RNF16
 
 Backup diário com retenção de 30 dias e restauração testada.
 
@@ -1251,11 +1257,12 @@ Checklist “Critérios de aceite”:
 
 - [ ] Backup automático configurado
 - [ ] Restauração testada e documentada dentro do RTO de 4 h
+- [ ] Backup diário do MySQL gerenciado com retenção de 30 dias e restauração via `mysqldump` documentada
 
 #### AB-082 — Deploy e checklist de lançamento
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Issue:** #82 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF06
+**Issue:** #82 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF06, RNF16
 
 Publicar homologação e produção e executar o checklist final.
 
@@ -1264,3 +1271,4 @@ Checklist “Critérios de aceite”:
 - [ ] Ambientes publicados com HTTPS
 - [ ] Checklist de lançamento concluído
 - [ ] Apresentação final preparada
+- [ ] MySQL gerenciado na nuvem provisionado e `prisma migrate deploy` executado no deploy

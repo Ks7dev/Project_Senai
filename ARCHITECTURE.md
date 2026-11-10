@@ -9,13 +9,15 @@ Padrão técnico do projeto (issue #1, RNF07): stack, organização de código, 
 | Framework | **Next.js 16** (App Router) + **React 19** + **TypeScript** `strict` |
 | UI | **Tailwind CSS v4** (config em `app/globals.css`, sem `tailwind.config.js`), **shadcn/ui** (style `base-nova`, primitivas `@base-ui/react`), ícones **`lucide-react`** (decisão da #3), `framer-motion`, `next-themes` |
 | Formulários | `react-hook-form` + `zod` + `@hookform/resolvers/zod` |
-| Dados | **Supabase**: Postgres com RLS, Auth e Storage (`@supabase/ssr` + `@supabase/supabase-js`) |
+| Banco de dados (RNF16) | **MySQL 8** (InnoDB, `utf8mb4`), acessado só pelo **Prisma ORM**, que cuida do schema, das migrations e dos seeds |
+| Autenticação | **Better Auth** com adapter Prisma: sessão em cookie `httpOnly`, recuperação de senha, plugin de 2FA (RF40) e plugin de organizações para contas corporativas multiusuário (RF09, RF10) |
+| Arquivos | Imagens, fichas técnicas em PDF e anexos num armazenamento S3-compatível (disco local em dev). O banco guarda só a chave e os metadados do arquivo |
 | Listagens | `@tanstack/react-table` v9 + `@tanstack/react-query` v5 |
 | Imagens | `sharp` no servidor: valida, converte para WebP com até 300 KB e gera versões responsivas (RNF04) |
 | Qualidade | ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) + `tsc --noEmit` |
 | Testes (RNF07) | **Vitest**: unitários de schema, action e regras de negócio. **Playwright**: ponta a ponta do fluxo de compra |
 | Documentação de código (RNF08) | **JSDoc** em toda função exportada, cobrado por `eslint-plugin-jsdoc` |
-| Hospedagem | Vercel (app) + Supabase (banco, auth, storage), sempre por HTTPS (RNF06) |
+| Ambientes | **Dev:** MySQL 8 em Docker (`docker-compose.yml`). **Homologação e entrega:** app na Vercel + MySQL gerenciado na nuvem (ex.: Railway ou Aiven), com TLS e backup diário (RNF11). Sempre por HTTPS (RNF06) |
 
 Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transparente/Bricks), ViaCEP, Correios, agregador de transportadoras, BrasilAPI (CNPJ) e emissor de NF-e.
 
@@ -32,7 +34,11 @@ features/<dominio>/<feature>/
 features/shared/        → código usado por mais de uma feature
 lib/, hooks/            → utilitários e hooks genéricos
 emails/                 → templates de e-mail transacional (RF53)
-supabase/migrations/    → migrations versionadas (uma por mudança coesa)
+prisma/schema.prisma    → modelo de dados (fonte única do schema MySQL)
+prisma/migrations/      → migrations SQL versionadas, geradas pelo Prisma (uma por mudança coesa)
+prisma/seed.ts          → seed de configuração (valores das RN) e dados de desenvolvimento
+features/shared/lib/db/ → client Prisma único (server-only) e camada de acesso a dados com permissão
+docker-compose.yml      → MySQL 8 local
 tests/                  → testes Vitest e Playwright
 ```
 
@@ -48,36 +54,46 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 
 | MVC | Onde |
 |---|---|
-| Model | Tabelas Supabase com RLS + `schema/` (Zod e tipos) |
+| Model | Tabelas MySQL modeladas em `prisma/schema.prisma` + `schema/` (Zod e tipos) |
 | View | `*-view.tsx` e componentes da feature |
 | Controller | `action/*.ts` (Server Actions) e, só para webhooks, `app/api/webhooks/*` |
 
 ## 3. Regra de ouro: lógica só em Server Action
 
-- Regra de negócio, chamada ao Supabase, validação sensível e mutação ficam em `action/*.ts`. A action recebe o input, **revalida com Zod**, checa a permissão, chama o Supabase e retorna `{ success: true, ... } | { success: false; error: "..." }`, em vez de lançar exceção.
-- Views `"use client"` nunca falam com o Supabase nem decidem o que é permitido. O client de browser serve só para sessão e realtime (status do pagamento em tempo real, RF31).
+- Regra de negócio, acesso ao banco, validação sensível e mutação ficam em `action/*.ts`. A action recebe o input, **revalida com Zod**, checa a permissão, acessa o banco pelo Prisma e retorna `{ success: true, ... } | { success: false; error: "..." }`, em vez de lançar exceção.
+- Views `"use client"` nunca acessam o banco nem decidem o que é permitido. O status do pagamento "em tempo real" (RF31) é atualizado por polling curto (`refetchInterval` do React Query), que lê uma action e para quando o status é final.
+- Operações que mexem em mais de uma tabela (pedido + reserva de estoque, aprovação, estorno) rodam numa **transação** (`prisma.$transaction`). A reserva de estoque usa `SELECT ... FOR UPDATE`, para que dois pedidos simultâneos não reservem a mesma unidade (#64).
 - Erros nunca expõem stack trace nem detalhe interno (RNF05).
 - **Integração de saída** (Mercado Pago, Correios, transportadora, NF-e, BrasilAPI, ViaCEP) fica em `features/shared/lib/<integracao>/`. É `server-only`, só roda depois da checagem de permissão, tem chave em env sem `NEXT_PUBLIC_`, timeout e fallback (RN20, RN21), e o log sai sem headers, payload ou dados de cartão.
 - **Webhook do Mercado Pago** (Route Handler): valida a assinatura, processa de forma idempotente e confirma o pedido só com `approved` (RN13).
 
-## 4. Permissões (RBAC) em duas camadas
+## 4. Permissões (RBAC)
 
-- Tabelas com RLS obrigatório e declarado explicitamente. A permissão é verificada por função `SECURITY DEFINER` no schema `private`, com `auth.uid()`, e **nunca** recebe `user_id`.
+- O MySQL não tem segurança por linha (RLS). A autorização fica **no servidor, numa camada única**:
+  1. A Server Action obtém o usuário da sessão (Better Auth) e chama `requirePermission("<resource>:<action>")` antes de operar.
+  2. As consultas passam pela camada de acesso a dados (`features/shared/lib/db/`), que **sempre** aplica o escopo do usuário: a conta corporativa dele, os pedidos dele etc. O id do usuário vem da sessão, nunca do request.
+- O usuário de banco da aplicação tem só `SELECT`, `INSERT`, `UPDATE` e `DELETE` no schema dela, sem DDL. As migrations rodam com outro usuário, só no deploy.
+- Tabelas de RBAC: `roles`, `permissions` (`resource` + `action` únicos), `role_permissions` e `user_roles`. Permissão nova nasce numa migration ou no seed.
 - Permissões no formato `"<resource>[:<sub>]:<action>"`, em inglês.
-- Toda operação é verificada **na RLS e na Server Action**. Esconder botão ou menu é só UX.
+- Esconder botão ou menu é só UX: a checagem que vale é a da action.
 - As flags de permissão da UI são calculadas uma vez no `page.tsx` e descem por prop.
 - Dois conjuntos de perfis:
   - Internos (RF55): administrador, comercial, financeiro e estoque/logística.
   - Da conta corporativa (RF10, RN08): solicitante, aprovador, financeiro e administrador da conta.
-- Client admin (service role) é exceção e só pode ser usado dentro de uma action, depois da checagem de permissão.
-- Soft delete feito pelo usuário é sempre uma RPC no banco. Ações sensíveis gravam log de auditoria (RNF12).
+- Exclusão feita pelo usuário é **soft delete** (`deleted_at`), para não quebrar pedidos e notas antigos (RF42, LGPD). Ações sensíveis gravam log de auditoria (RNF12) na mesma transação da mudança.
 
-## 5. Banco e migrations
+## 5. Banco de dados (MySQL) e migrations
 
-- Migrations em `supabase/migrations/`, testadas na stack local (`supabase db reset`) e aplicadas só pelo merge na `master`. Nunca se escreve no banco pelo MCP ou pelo painel.
-- Migrations seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
-- Depois de toda mudança de schema, rode `supabase db advisors --local --type security`.
-- Valores configuráveis das regras de negócio (#5) ficam numa tabela de configuração com seed (#8).
+- **MySQL 8**, engine InnoDB, charset `utf8mb4` e collation `utf8mb4_0900_ai_ci`, para a busca ignorar acentos e caixa (#25). Datas são gravadas em UTC (`DATETIME(3)`) e exibidas no fuso do usuário.
+- **Prisma é o único caminho até o banco.** `prisma/schema.prisma` é a fonte da verdade. Nomes de tabela e coluna em inglês e `snake_case` (`@@map`/`@map`), e no código em `camelCase`.
+- **Dinheiro** é `DECIMAL(12,2)`, nunca `FLOAT`. Peso e dimensões usam `DECIMAL` com a unidade no nome da coluna (`weight_kg`, `length_cm`).
+- **Chaves:** `id` em UUID v7 (`CHAR(36)`) nas entidades expostas em URL (pedido, cotação), para não deixar a sequência visível. Códigos legíveis, como o número da cotação (RF06), ficam numa coluna própria, com `UNIQUE`.
+- **Integridade:** FKs explícitas, `UNIQUE` em documentos (CPF, CNPJ, e-mail, SKU, `payment_id`) e índices nas colunas de filtro e busca: categoria, status, preço e um `FULLTEXT` em nome e descrição.
+- **Migrations:** `npx prisma migrate dev` em dev, `npx prisma migrate deploy` no deploy, e uma por mudança coesa, versionada no PR. Nunca se altera o banco à mão em homologação ou produção. Seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
+- **Seed** (`prisma/seed.ts`): valores das regras de negócio confirmados na #5 (tabela de configuração), perfis e permissões, e dados fictícios de desenvolvimento (#8).
+- **Segurança (RNF03):** conexão com TLS em homologação e produção. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar. Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
+- **Backup (RNF11):** backup diário automático do MySQL gerenciado, com retenção de 30 dias, mais um `mysqldump` documentado e testado na restauração (#81).
+- **Desenvolvimento:** `docker compose up -d` sobe o MySQL. `DATABASE_URL` vem do `.env.local` e o `.env.example` traz o modelo.
 
 ## 6. Convenções de código
 
