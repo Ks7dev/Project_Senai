@@ -8,7 +8,8 @@ Cada etapa abaixo é uma **lista** do Trello, na ordem em que aparecem. Cada iss
 2. Crie as listas de etapa (seção “Listas”), que funcionam como **backlog** por etapa, e, ao final, as listas de fluxo: **Bloqueado**, **Em andamento**, **Em revisão**, **Em teste**, **Em validação** e **Concluído**.
 3. Para criar vários cards de uma vez: copie o bloco “Cards para colar” da etapa, cole no campo de novo card da lista e confirme a opção de criar um card por linha.
 4. Abra cada card e adicione as etiquetas e o checklist listados no detalhamento.
-5. No card, cole o link da issue correspondente do GitHub (Power-Up do GitHub, se disponível). O número da issue de cada card está na seção “Mapeamento GitHub” do arquivo de issues.
+5. No card, cole o link da issue correspondente do GitHub (Power-Up do GitHub, se disponível). O número da issue é o mesmo do ID (`AB-018` = #18).
+6. Mantenha o Status do GitHub Project [Atelier Bureau](https://github.com/users/Ks7dev/projects/1) igual à lista do card.
 
 ## Fluxo de trabalho
 
@@ -44,15 +45,15 @@ Regras:
 
 ## Listas
 
-| # | Lista | Prazo sugerido | Cards | Objetivo |
+| # | Lista | Prazo | Cards | Objetivo |
 |---|---|---|---|---|
-| 1 | Etapa 0 — Planejamento e Decisões | Semana 1 | 6 | Fechar decisões que bloqueiam o desenvolvimento. |
-| 2 | Etapa 1 — Fundação Técnica e Design System | Semanas 2–3 | 12 | Repositório, padrões, banco, CI e biblioteca de componentes. |
-| 3 | Etapa 2 — Catálogo e Conta | Semanas 4–5 | 19 | Vitrine navegável, cadastro de produtos e contas PF/PJ. |
-| 4 | Etapa 3 — Carrinho, Frete e Checkout | Semanas 6–8 | 19 | Compra completa via Mercado Pago com frete calculado. |
-| 5 | Etapa 4 — Fluxo B2B | Semanas 9–10 | 7 | Cotação, aprovação, faturado e crédito corporativo. |
-| 6 | Etapa 5 — Pós-venda e Back Office | Semanas 11–12 | 10 | Atendimento, promoções, conteúdo, LGPD e auditoria. |
-| 7 | Etapa 6 — Qualidade, Segurança e Lançamento | Semanas 13–14 | 9 | Testes, performance, acessibilidade, monitoramento e deploy. |
+| 1 | Etapa 0 — Planejamento e Decisões | Dia 1 (10/11/2026) | 6 | Fechar decisões que bloqueiam o desenvolvimento. |
+| 2 | Etapa 1 — Fundação Técnica e Design System | Dia 1 (10/11/2026) | 12 | Repositório, padrões, banco, CI e biblioteca de componentes. |
+| 3 | Etapa 2 — Catálogo e Conta | Dia 2 (11/11/2026) | 19 | Vitrine navegável, cadastro de produtos e contas PF/PJ. |
+| 4 | Etapa 3 — Carrinho, Frete e Checkout | Dia 3 (12/11/2026) | 19 | Compra completa via Mercado Pago com frete calculado. |
+| 5 | Etapa 4 — Fluxo B2B | Dia 4 (13/11/2026) | 7 | Cotação, aprovação, faturado e crédito corporativo. |
+| 6 | Etapa 5 — Pós-venda e Back Office | Dia 4 (13/11/2026) | 10 | Atendimento, promoções, conteúdo, LGPD e auditoria. |
+| 7 | Etapa 6 — Qualidade, Segurança e Lançamento | Dia 5 (14/11/2026), entrega final | 9 | Testes, performance, acessibilidade, monitoramento e deploy. |
 | 8 | Bloqueado | — | — | Cards impedidos |
 | 9 | Em andamento | — | — | Fluxo de trabalho |
 | 10 | Em revisão | — | — | Fluxo de trabalho |
@@ -64,7 +65,7 @@ Regras:
 
 ## Etapa 0 — Planejamento e Decisões
 
-**Prazo sugerido:** Semana 1 · **Objetivo:** Fechar decisões que bloqueiam o desenvolvimento.
+**Prazo:** Dia 1 (10/11/2026) · **Objetivo:** Fechar decisões que bloqueiam o desenvolvimento.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -84,7 +85,7 @@ AB-018 — Corrigir as divergências do protótipo Stitch
 #### AB-001 — Definir stack e estrutura de pastas com base nos repositórios CRM e Core
 
 **Etiquetas:** P0 — MVP, Decisão  
-**Épico:** Decisões e Documentação · **Referências:** RNF07
+**Issue:** #1 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF07
 
 Levantar linguagem, framework, ORM, padrão de pastas, convenções de commit e de issues usados no CRM e no Core e registrar como padrão do projeto.
 
@@ -97,9 +98,11 @@ Checklist “Critérios de aceite”:
 #### AB-002 — Validar o nome Atelier Bureau (INPI e domínio)
 
 **Etiquetas:** P1 — Importante, Decisão  
-**Épico:** Decisões e Documentação · **Referências:** Seção 1.1
+**Issue:** #2 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 1.1
 
 Pesquisar o nome na base do INPI (classe 35) e a disponibilidade do domínio .com.br.
+
+> Card começa em **Em andamento**: em formalização pelo responsável.
 
 Checklist “Critérios de aceite”:
 
@@ -110,21 +113,25 @@ Checklist “Critérios de aceite”:
 #### AB-003 — Escolher a biblioteca oficial de ícones
 
 **Etiquetas:** P1 — Importante, Decisão  
-**Épico:** Decisões e Documentação · **Referências:** RNF15
+**Issue:** #3 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF15
 
 Decidir entre Lucide, Phosphor (light) ou Material Symbols para manter coerência com o tom editorial.
 
+> Decisão tomada (Lucide): card vai direto para **Concluído**.
+
 Checklist “Critérios de aceite”:
 
-- [ ] Biblioteca escolhida e registrada no design system
-- [ ] Ícones do protótipo mapeados para a biblioteca escolhida
+- [x] Biblioteca escolhida: Lucide (`lucide-react`)
+- [x] ~~Ícones do protótipo mapeados~~ movido para a #18
 
 #### AB-004 — Validação jurídica das políticas de troca, arrependimento e garantia
 
 **Etiquetas:** P1 — Importante, Decisão  
-**Épico:** Decisões e Documentação · **Referências:** RN06, RN12, RN22
+**Issue:** #4 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RN06, RN12, RN22
 
 Validar o tratamento de itens personalizados para PF, a redação da garantia estendida e os termos de uso.
+
+> Card começa em **Em andamento**: em formalização pelo responsável.
 
 Checklist “Critérios de aceite”:
 
@@ -135,19 +142,21 @@ Checklist “Critérios de aceite”:
 #### AB-005 — Confirmar os valores configuráveis das regras de negócio
 
 **Etiquetas:** P1 — Importante, Decisão  
-**Épico:** Decisões e Documentação · **Referências:** RN01, RN06, RN14, RN16, RN20
+**Issue:** #5 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RN01, RN06, RN14, RN16, RN20
 
 Validar com os stakeholders os valores iniciais: aprovação acima de R$ 10.000, garantia acima de R$ 5.000, expiração de Pix/boleto, faixas de CEP da cobertura e limites de frete.
 
+> Valores confirmados: card vai direto para **Concluído**.
+
 Checklist “Critérios de aceite”:
 
-- [ ] Valores confirmados e registrados no documento de requisitos
-- [ ] Valores carregados como seed de configuração
+- [x] Valores confirmados e registrados no documento de requisitos
+- [x] ~~Valores carregados como seed de configuração~~ movido para a #8
 
 #### AB-018 — Corrigir as divergências do protótipo Stitch
 
 **Etiquetas:** P1 — Importante, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** Seção 7
+**Issue:** #18 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 7
 
 Ajustar prazo faturado para 28/56, remover frete cortesia fixo, marcar CNPJ como fictício, trocar placeholders do logo e unificar todas as telas no Warm Editorial Atelier.
 
@@ -155,10 +164,11 @@ Checklist “Critérios de aceite”:
 
 - [ ] Nenhuma tela usa Newsreader ou Space Grotesk
 - [ ] Prazos e textos alinhados ao documento v2
+- [ ] Ícones do protótipo mapeados para o Lucide (`lucide-react`), decisão da #3
 
 ## Etapa 1 — Fundação Técnica e Design System
 
-**Prazo sugerido:** Semanas 2–3 · **Objetivo:** Repositório, padrões, banco, CI e biblioteca de componentes.
+**Prazo:** Dia 1 (10/11/2026) · **Objetivo:** Repositório, padrões, banco, CI e biblioteca de componentes.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -184,7 +194,7 @@ AB-019 — Prototipar as telas faltantes
 #### AB-006 — Setup do repositório: estrutura MVC, lint, formatter e templates
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Épico:** Fundação Técnica · **Referências:** RNF07, RNF08
+**Issue:** #6 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF07, RNF08
 
 Criar a estrutura inicial seguindo o padrão definido no AB-001, com lint, formatter, README e templates de issue e pull request.
 
@@ -197,7 +207,7 @@ Checklist “Critérios de aceite”:
 #### AB-007 — Configurar ambientes e variáveis (dev, homologação, produção)
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Épico:** Fundação Técnica · **Referências:** RNF05
+**Issue:** #7 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF05
 
 Separar configurações por ambiente e garantir que segredos (chaves Mercado Pago, NF-e, transportadoras) nunca fiquem no código.
 
@@ -210,7 +220,7 @@ Checklist “Critérios de aceite”:
 #### AB-008 — Modelagem do banco de dados e migrations iniciais
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Épico:** Fundação Técnica · **Referências:** RF41, RF09, RF54
+**Issue:** #8 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RF41, RF09, RF54
 
 Modelar as entidades principais: usuário, conta corporativa, perfil, endereço, produto, SKU, categoria, carrinho, cotação, pedido, pagamento, frete, estoque e configuração.
 
@@ -219,11 +229,12 @@ Checklist “Critérios de aceite”:
 - [ ] Diagrama ER no repositório
 - [ ] Migrations criam todas as tabelas
 - [ ] Seeds de desenvolvimento com produtos e contas de teste
+- [ ] Valores das regras de negócio confirmados na #5 carregados como seed de configuração
 
 #### AB-009 — Pipeline de CI com lint, testes e build
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Épico:** Fundação Técnica · **Referências:** RNF07
+**Issue:** #9 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF07
 
 Criar pipeline que roda a cada pull request.
 
@@ -235,7 +246,7 @@ Checklist “Critérios de aceite”:
 #### AB-010 — Padrão de tratamento de erros, logs e rate limiting
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Épico:** Fundação Técnica · **Referências:** RNF05
+**Issue:** #10 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF05
 
 Middleware global de erros sem vazamento de stack trace, logs estruturados e limite de requisições nas rotas públicas e de autenticação.
 
@@ -248,7 +259,7 @@ Checklist “Critérios de aceite”:
 #### AB-011 — HTTPS obrigatório e headers de segurança
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Épico:** Fundação Técnica · **Referências:** RNF06
+**Issue:** #11 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF06
 
 Forçar HTTPS sem fallback e configurar HSTS, CSP e demais headers de segurança.
 
@@ -261,7 +272,7 @@ Checklist “Critérios de aceite”:
 #### AB-012 — Padrão de documentação de código
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade  
-**Épico:** Fundação Técnica · **Referências:** RNF08
+**Issue:** #12 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF08
 
 Definir o padrão JSDoc/docstrings e a geração de documentação por módulo.
 
@@ -273,7 +284,7 @@ Checklist “Critérios de aceite”:
 #### AB-013 — Criar os tokens do design system Warm Editorial Atelier
 
 **Etiquetas:** P0 — MVP, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** RNF13, RNF15
+**Issue:** #13 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF13, RNF15
 
 Arquivo único de tokens com a paleta aprovada (terracota ajustada para #7A5C4C, texto terciário só em desabilitados), tipografia Playfair Display + Plus Jakarta Sans, espaçamentos, raios e sombras.
 
@@ -286,7 +297,7 @@ Checklist “Critérios de aceite”:
 #### AB-014 — Redesenhar o logo e criar o kit de marca
 
 **Etiquetas:** P1 — Importante, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** Seção 7
+**Issue:** #14 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 7
 
 Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
 
@@ -299,7 +310,7 @@ Checklist “Critérios de aceite”:
 #### AB-015 — Componentes base da biblioteca de UI
 
 **Etiquetas:** P0 — MVP, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** RNF09, RNF13
+**Issue:** #15 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF09, RNF13
 
 Botões (primário, ghost, texto editorial), inputs, select, checkbox, radio, chips, badges, tooltip e modal.
 
@@ -312,7 +323,7 @@ Checklist “Critérios de aceite”:
 #### AB-017 — Layout base: header, footer e grid responsivo
 
 **Etiquetas:** P0 — MVP, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** RNF15
+**Issue:** #17 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF15
 
 Grid de 12/8/4 colunas, max-width de 1440 px, header com busca, menu e carrinho, e footer institucional.
 
@@ -325,7 +336,7 @@ Checklist “Critérios de aceite”:
 #### AB-019 — Prototipar as telas faltantes
 
 **Etiquetas:** P1 — Importante, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** Seção 7
+**Issue:** #19 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 7
 
 Login/cadastro, área do cliente, cotação, aprovação, checkout com Payment Brick, rastreamento, comparador e back office.
 
@@ -336,7 +347,7 @@ Checklist “Critérios de aceite”:
 
 ## Etapa 2 — Catálogo e Conta
 
-**Prazo sugerido:** Semanas 4–5 · **Objetivo:** Vitrine navegável, cadastro de produtos e contas PF/PJ.
+**Prazo:** Dia 2 (11/11/2026) · **Objetivo:** Vitrine navegável, cadastro de produtos e contas PF/PJ.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -369,7 +380,7 @@ AB-072 — Usuários internos e permissões
 #### AB-016 — Componentes de commerce
 
 **Etiquetas:** P1 — Importante, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** RNF09
+**Issue:** #16 · **Área:** app · **Milestone:** v0.2.0 · **Referências:** RNF09
 
 Card de produto, swatches de material, accordion de especificações, drawer de carrinho e resumo de pedido.
 
@@ -381,7 +392,7 @@ Checklist “Critérios de aceite”:
 #### AB-021 — Cadastro de produtos no back office
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF41, RN06, RN09
+**Issue:** #21 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF41, RN06, RN09
 
 CRUD completo: nome, descrição, especificações, categoria, preço, imagens, peso/dimensões, certificações, garantia, edição limitada e numeração de lote.
 
@@ -394,7 +405,7 @@ Checklist “Critérios de aceite”:
 #### AB-022 — Upload de imagens com conversão para WebP
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RNF04
+**Issue:** #22 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RNF04
 
 Aceitar JPG, PNG e WebP, converter para WebP no servidor com no máximo 300 KB e gerar versões responsivas.
 
@@ -407,7 +418,7 @@ Checklist “Critérios de aceite”:
 #### AB-023 — Categorias, subcategorias e navegação
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF01
+**Issue:** #23 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF01
 
 Árvore de categorias gerenciável e menu de navegação.
 
@@ -419,7 +430,7 @@ Checklist “Critérios de aceite”:
 #### AB-024 — Listagem de produtos (PLP) com filtros avançados
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF02
+**Issue:** #24 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF02
 
 Filtros por marca, faixa de preço, material/acabamento, especificação técnica e prazo de entrega, com ordenação e paginação.
 
@@ -432,7 +443,7 @@ Checklist “Critérios de aceite”:
 #### AB-025 — Busca de produtos
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF02
+**Issue:** #25 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF02
 
 Busca textual por nome, descrição e especificação, com sugestões.
 
@@ -445,7 +456,7 @@ Checklist “Critérios de aceite”:
 #### AB-026 — Página de produto (PDP)
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF03, RF18
+**Issue:** #26 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF03, RF18
 
 Galeria, especificações, ficha técnica em PDF, garantia, certificações, prazo, botão de cotação e contato com o vendedor.
 
@@ -458,7 +469,7 @@ Checklist “Critérios de aceite”:
 #### AB-027 — Comparador de até 4 produtos
 
 **Etiquetas:** P2 — Desejável, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF04
+**Issue:** #27 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF04
 
 Comparação lado a lado de especificações.
 
@@ -471,7 +482,7 @@ Checklist “Critérios de aceite”:
 #### AB-028 — Inativação de produtos sem perda de histórico
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF42
+**Issue:** #28 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF42
 
 Produto inativo sai da vitrine e da busca, mas permanece nos pedidos antigos.
 
@@ -483,7 +494,7 @@ Checklist “Critérios de aceite”:
 #### AB-029 — Importação de produtos via CSV
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF48, RNF04
+**Issue:** #29 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF48, RNF04
 
 Importação em massa com validação e relatório de erros por linha.
 
@@ -496,7 +507,7 @@ Checklist “Critérios de aceite”:
 #### AB-030 — Home editorial com carrossel editável
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Catálogo · **Referências:** RF47
+**Issue:** #30 · **Área:** catálogo · **Milestone:** v0.2.0 · **Referências:** RF47
 
 Home conforme o protótipo, com carrossel e vitrines configuráveis pelo admin.
 
@@ -508,7 +519,7 @@ Checklist “Critérios de aceite”:
 #### AB-032 — Cadastro e login de PF e PJ
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF39
+**Issue:** #32 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF39
 
 Fluxos distintos para CPF e CNPJ com validação de documento.
 
@@ -521,7 +532,7 @@ Checklist “Critérios de aceite”:
 #### AB-033 — Recuperação de senha e 2FA opcional
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF40
+**Issue:** #33 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF40
 
 Recuperação por e-mail com token expirável e 2FA opcional para contas corporativas.
 
@@ -533,7 +544,7 @@ Checklist “Critérios de aceite”:
 #### AB-034 — Conta corporativa multiusuário com consulta de CNPJ
 
 **Etiquetas:** P0 — MVP, Integração externa, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF09
+**Issue:** #34 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF09
 
 Consultar CNPJ via API (ex: BrasilAPI), preencher razão social e permitir convidar usuários.
 
@@ -546,7 +557,7 @@ Checklist “Critérios de aceite”:
 #### AB-035 — Perfis de acesso da conta corporativa
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF10, RN08
+**Issue:** #35 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF10, RN08
 
 Perfis solicitante, aprovador, financeiro e administrador da conta.
 
@@ -559,7 +570,7 @@ Checklist “Critérios de aceite”:
 #### AB-036 — Múltiplos endereços por conta
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF26
+**Issue:** #36 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF26
 
 Cadastro de matriz, filiais e obras como endereços de entrega.
 
@@ -571,7 +582,7 @@ Checklist “Critérios de aceite”:
 #### AB-037 — Área do cliente
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF31, RF15
+**Issue:** #37 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF31, RF15
 
 Painel com pedidos, cotações, dados, endereços, usuários (PJ) e favoritos.
 
@@ -583,7 +594,7 @@ Checklist “Critérios de aceite”:
 #### AB-038 — Lista de favoritos
 
 **Etiquetas:** P2 — Desejável, Frontend, Backend  
-**Épico:** Conta e Acesso · **Referências:** RF45
+**Issue:** #38 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF45
 
 Cliente logado adiciona e remove produtos dos favoritos.
 
@@ -595,7 +606,7 @@ Checklist “Critérios de aceite”:
 #### AB-072 — Usuários internos e permissões
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Back Office e Administração · **Referências:** RF55
+**Issue:** #72 · **Área:** acesso · **Milestone:** v0.2.0 · **Referências:** RF55
 
 Perfis administrador, comercial, financeiro e estoque com permissões por módulo.
 
@@ -606,7 +617,7 @@ Checklist “Critérios de aceite”:
 
 ## Etapa 3 — Carrinho, Frete e Checkout
 
-**Prazo sugerido:** Semanas 6–8 · **Objetivo:** Compra completa via Mercado Pago com frete calculado.
+**Prazo:** Dia 3 (12/11/2026) · **Objetivo:** Compra completa via Mercado Pago com frete calculado.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -639,7 +650,7 @@ AB-067 — E-mails transacionais
 #### AB-039 — Consulta de endereço via ViaCEP com fallback
 
 **Etiquetas:** P0 — MVP, Integração externa, Backend  
-**Épico:** Endereço e Frete · **Referências:** RF22, RF23, RF24, RF38, RN21
+**Issue:** #39 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RF22, RF23, RF24, RF38, RN21
 
 Preenchimento automático a partir do CEP, com validação e digitação manual em caso de falha.
 
@@ -652,7 +663,7 @@ Checklist “Critérios de aceite”:
 #### AB-040 — Módulo de frete com estratégias por modalidade
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Endereço e Frete · **Referências:** RF25, RN20
+**Issue:** #40 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RF25, RN20
 
 Serviço que escolhe Correios, transportadora ou entrega própria conforme peso, dimensões e CEP.
 
@@ -664,7 +675,7 @@ Checklist “Critérios de aceite”:
 #### AB-041 — Integração com a API dos Correios
 
 **Etiquetas:** P0 — MVP, Integração externa, Backend  
-**Épico:** Endereço e Frete · **Referências:** RF25
+**Issue:** #41 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RF25
 
 Cálculo de PAC e SEDEX para volumes dentro dos limites.
 
@@ -676,7 +687,7 @@ Checklist “Critérios de aceite”:
 #### AB-042 — Integração com agregador de transportadoras
 
 **Etiquetas:** P1 — Importante, Integração externa, Backend  
-**Épico:** Endereço e Frete · **Referências:** RF49
+**Issue:** #42 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RF49
 
 Cotação de frete para volumes grandes via agregador (ex: Melhor Envio) em sandbox.
 
@@ -688,7 +699,7 @@ Checklist “Critérios de aceite”:
 #### AB-043 — Entrega própria com montagem por faixa de CEP
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Endereço e Frete · **Referências:** RF27, RF50, RN16
+**Issue:** #43 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RF27, RF50, RN16
 
 Tabela de faixas de CEP e peso configurável no back office.
 
@@ -700,7 +711,7 @@ Checklist “Critérios de aceite”:
 #### AB-044 — Cotação manual de frete como contingência
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Endereço e Frete · **Referências:** RN16, RN20
+**Issue:** #44 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RN16, RN20
 
 Encaminhar ao comercial pedidos sem frete calculável.
 
@@ -712,7 +723,7 @@ Checklist “Critérios de aceite”:
 #### AB-045 — Recotação de frete ao alterar endereço
 
 **Etiquetas:** P2 — Desejável, Backend  
-**Épico:** Endereço e Frete · **Referências:** RN15
+**Issue:** #45 · **Área:** frete · **Milestone:** v0.3.0 · **Referências:** RN15
 
 Mudança de endereço após o pedido exige nova cotação de frete e prazo.
 
@@ -724,7 +735,7 @@ Checklist “Critérios de aceite”:
 #### AB-046 — Carrinho e lista de projeto salva
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF07
+**Issue:** #46 · **Área:** carrinho e cotação · **Milestone:** v0.3.0 · **Referências:** RF07
 
 Carrinho persistente e opção de salvar como lista/projeto.
 
@@ -736,7 +747,7 @@ Checklist “Critérios de aceite”:
 #### AB-047 — Personalização e serviços adicionais no carrinho
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF51, RF52, RN24
+**Issue:** #47 · **Área:** carrinho e cotação · **Milestone:** v0.3.0 · **Referências:** RF51, RF52, RN24
 
 Gravação a laser com prévia, embalagem institucional e montagem.
 
@@ -748,7 +759,7 @@ Checklist “Critérios de aceite”:
 #### AB-053 — Agendamento de entrega e instalação
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF16, RN05
+**Issue:** #53 · **Área:** carrinho e cotação · **Milestone:** v0.3.0 · **Referências:** RF16, RN05
 
 Seleção de data para itens com instalação obrigatória.
 
@@ -760,7 +771,7 @@ Checklist “Critérios de aceite”:
 #### AB-054 — Integração do Payment Brick do Mercado Pago
 
 **Etiquetas:** P0 — MVP, Integração externa, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF28, RF35, RF36, RF37
+**Issue:** #54 · **Área:** pagamento · **Milestone:** v0.3.0 · **Referências:** RF28, RF35, RF36, RF37
 
 Formulário embutido, tokenização no front, criação do pagamento em /v1/payments e 3DS2.
 
@@ -773,7 +784,7 @@ Checklist “Critérios de aceite”:
 #### AB-055 — Pix e boleto via Mercado Pago com expiração
 
 **Etiquetas:** P0 — MVP, Integração externa, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF29, RN14
+**Issue:** #55 · **Área:** pagamento · **Milestone:** v0.3.0 · **Referências:** RF29, RN14
 
 Geração de Pix e boleto com prazos de expiração configuráveis.
 
@@ -785,7 +796,7 @@ Checklist “Critérios de aceite”:
 #### AB-056 — Parcelamento configurável
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF14
+**Issue:** #56 · **Área:** pagamento · **Milestone:** v0.3.0 · **Referências:** RF14
 
 Máximo de parcelas por faixa de valor e por perfil de cliente.
 
@@ -797,7 +808,7 @@ Checklist “Critérios de aceite”:
 #### AB-057 — Webhook do Mercado Pago
 
 **Etiquetas:** P0 — MVP, Integração externa, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF30, RN13
+**Issue:** #57 · **Área:** pagamento · **Milestone:** v0.3.0 · **Referências:** RF30, RN13
 
 Receber notificações, validar a assinatura e atualizar o pagamento.
 
@@ -810,7 +821,7 @@ Checklist “Critérios de aceite”:
 #### AB-058 — Status de pagamento e payment_id
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF31, RF32
+**Issue:** #58 · **Área:** pagamento · **Milestone:** v0.3.0 · **Referências:** RF31, RF32
 
 Armazenar payment_id e exibir o status em tempo real.
 
@@ -822,7 +833,7 @@ Checklist “Critérios de aceite”:
 #### AB-064 — Reserva, baixa e liberação de estoque
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Estoque e Pedido · **Referências:** RF43, RF44, RN14
+**Issue:** #64 · **Área:** pedidos · **Milestone:** v0.3.0 · **Referências:** RF43, RF44, RN14
 
 Reserva na criação do pedido, baixa na confirmação e liberação na expiração ou cancelamento.
 
@@ -835,7 +846,7 @@ Checklist “Critérios de aceite”:
 #### AB-065 — Ciclo de vida do pedido
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Estoque e Pedido · **Referências:** RF54
+**Issue:** #65 · **Área:** pedidos · **Milestone:** v0.3.0 · **Referências:** RF54
 
 Implementar os status e as transições permitidas do pedido.
 
@@ -847,7 +858,7 @@ Checklist “Critérios de aceite”:
 #### AB-066 — Rastreamento do pedido
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Estoque e Pedido · **Referências:** RF15
+**Issue:** #66 · **Área:** pedidos · **Milestone:** v0.3.0 · **Referências:** RF15
 
 Linha do tempo do pedido e código de rastreio na área do cliente.
 
@@ -859,7 +870,7 @@ Checklist “Critérios de aceite”:
 #### AB-067 — E-mails transacionais
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Estoque e Pedido · **Referências:** RF53
+**Issue:** #67 · **Área:** pedidos · **Milestone:** v0.3.0 · **Referências:** RF53
 
 Templates com a identidade visual para cadastro, cotação, aprovação, pagamento, NF-e, envio, entrega e chamados.
 
@@ -871,7 +882,7 @@ Checklist “Critérios de aceite”:
 
 ## Etapa 4 — Fluxo B2B
 
-**Prazo sugerido:** Semanas 9–10 · **Objetivo:** Cotação, aprovação, faturado e crédito corporativo.
+**Prazo:** Dia 4 (13/11/2026) · **Objetivo:** Cotação, aprovação, faturado e crédito corporativo.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -892,7 +903,7 @@ AB-061 — Aprovação de crédito corporativo
 #### AB-048 — Solicitação de cotação com anexos
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF05, RF08
+**Issue:** #48 · **Área:** carrinho e cotação · **Milestone:** v0.4.0 · **Referências:** RF05, RF08
 
 Cotação de itens ou do carrinho inteiro com upload de arquivos.
 
@@ -904,7 +915,7 @@ Checklist “Critérios de aceite”:
 #### AB-049 — Número de cotação rastreável e validade
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF06, RN02
+**Issue:** #49 · **Área:** carrinho e cotação · **Milestone:** v0.4.0 · **Referências:** RF06, RN02
 
 Cotação com número único e validade de 15 dias.
 
@@ -916,7 +927,7 @@ Checklist “Critérios de aceite”:
 #### AB-050 — Back office comercial de cotações
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF20
+**Issue:** #50 · **Área:** carrinho e cotação · **Milestone:** v0.4.0 · **Referências:** RF20
 
 Comercial visualiza, responde e converte cotações em pedidos.
 
@@ -928,7 +939,7 @@ Checklist “Critérios de aceite”:
 #### AB-051 — Fluxo de aprovação de pedidos
 
 **Etiquetas:** P0 — MVP, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF11, RN01
+**Issue:** #51 · **Área:** carrinho e cotação · **Milestone:** v0.4.0 · **Referências:** RF11, RN01
 
 Pedidos acima do limite vão para o aprovador da conta.
 
@@ -941,7 +952,7 @@ Checklist “Critérios de aceite”:
 #### AB-052 — Tabela de preços por cliente e desconto por volume
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Carrinho, Cotação e Aprovação · **Referências:** RF21, RN04
+**Issue:** #52 · **Área:** carrinho e cotação · **Milestone:** v0.4.0 · **Referências:** RF21, RN04
 
 Preços diferenciados por cliente ou segmento e descontos automáticos por quantidade.
 
@@ -953,7 +964,7 @@ Checklist “Critérios de aceite”:
 #### AB-060 — Fluxo de pagamento faturado 28/56 dias
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF12, RF33, RN03, RN17
+**Issue:** #60 · **Área:** financeiro · **Milestone:** v0.4.0 · **Referências:** RF12, RF33, RN03, RN17
 
 Fluxo próprio fora do Mercado Pago, com boleto e controle de vencimentos.
 
@@ -966,7 +977,7 @@ Checklist “Critérios de aceite”:
 #### AB-061 — Aprovação de crédito corporativo
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF58, RN10
+**Issue:** #61 · **Área:** financeiro · **Milestone:** v0.4.0 · **Referências:** RF58, RN10
 
 Financeiro aprova contas para o faturado e define o limite de crédito.
 
@@ -977,7 +988,7 @@ Checklist “Critérios de aceite”:
 
 ## Etapa 5 — Pós-venda e Back Office
 
-**Prazo sugerido:** Semanas 11–12 · **Objetivo:** Atendimento, promoções, conteúdo, LGPD e auditoria.
+**Prazo:** Dia 4 (13/11/2026) · **Objetivo:** Atendimento, promoções, conteúdo, LGPD e auditoria.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -1001,7 +1012,7 @@ AB-076 — Log de auditoria de ações sensíveis
 #### AB-059 — Estornos total e parcial
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF34, RN07, RN18, RN22
+**Issue:** #59 · **Área:** financeiro · **Milestone:** v0.4.0 · **Referências:** RF34, RN07, RN18, RN22
 
 Estorno via API respeitando as políticas e o direito de arrependimento.
 
@@ -1014,7 +1025,7 @@ Checklist “Critérios de aceite”:
 #### AB-063 — Emissão de NF-e via API
 
 **Etiquetas:** P1 — Importante, Integração externa, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RF13
+**Issue:** #63 · **Área:** financeiro · **Milestone:** v0.4.0 · **Referências:** RF13
 
 Emissão automática em homologação após a confirmação do pedido.
 
@@ -1026,7 +1037,7 @@ Checklist “Critérios de aceite”:
 #### AB-068 — Chamados de garantia e assistência técnica
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Pós-venda e Atendimento · **Referências:** RF17, RN12
+**Issue:** #68 · **Área:** pós-venda · **Milestone:** v0.4.0 · **Referências:** RF17, RN12
 
 Abertura de chamado vinculado ao produto comprado, com anexos.
 
@@ -1038,7 +1049,7 @@ Checklist “Critérios de aceite”:
 #### AB-069 — Canal com vendedor dedicado (WhatsApp)
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Pós-venda e Atendimento · **Referências:** RF18, RN11
+**Issue:** #69 · **Área:** pós-venda · **Milestone:** v0.4.0 · **Referências:** RF18, RN11
 
 Botão de contato com o vendedor da conta na PDP e no carrinho.
 
@@ -1050,7 +1061,7 @@ Checklist “Critérios de aceite”:
 #### AB-070 — Agendamento de demonstração
 
 **Etiquetas:** P2 — Desejável, Frontend, Backend  
-**Épico:** Pós-venda e Atendimento · **Referências:** RF19
+**Issue:** #70 · **Área:** pós-venda · **Milestone:** v0.4.0 · **Referências:** RF19
 
 Solicitação de reunião para itens complexos.
 
@@ -1062,7 +1073,7 @@ Checklist “Critérios de aceite”:
 #### AB-071 — Fluxo de troca, devolução e arrependimento
 
 **Etiquetas:** P1 — Importante, Frontend, Backend  
-**Épico:** Pós-venda e Atendimento · **Referências:** RN12, RN22
+**Issue:** #71 · **Área:** pós-venda · **Milestone:** v0.4.0 · **Referências:** RN12, RN22
 
 Solicitação de devolução com regras distintas para PF e PJ.
 
@@ -1074,7 +1085,7 @@ Checklist “Critérios de aceite”:
 #### AB-073 — Promoções, cupons e frete cortesia
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Back Office e Administração · **Referências:** RF46, RN23
+**Issue:** #73 · **Área:** back office · **Milestone:** v0.4.0 · **Referências:** RF46, RN23
 
 Descontos por produto, categoria ou cupom, com vigência.
 
@@ -1086,7 +1097,7 @@ Checklist “Critérios de aceite”:
 #### AB-074 — Páginas institucionais editáveis
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Back Office e Administração · **Referências:** RF57
+**Issue:** #74 · **Área:** back office · **Milestone:** v0.4.0 · **Referências:** RF57
 
 Termos, privacidade, trocas e garantia editáveis no back office.
 
@@ -1098,7 +1109,7 @@ Checklist “Critérios de aceite”:
 #### AB-075 — LGPD: consentimento e direitos do titular
 
 **Etiquetas:** P0 — MVP, Backend  
-**Épico:** Back Office e Administração · **Referências:** RF56, RNF03
+**Issue:** #75 · **Área:** back office · **Milestone:** v0.4.0 · **Referências:** RF56, RNF03
 
 Banner de cookies, exportação e exclusão/anonimização de dados, com dados pessoais e financeiros protegidos em trânsito e em repouso.
 
@@ -1112,7 +1123,7 @@ Checklist “Critérios de aceite”:
 #### AB-076 — Log de auditoria de ações sensíveis
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Back Office e Administração · **Referências:** RNF12
+**Issue:** #76 · **Área:** back office · **Milestone:** v0.4.0 · **Referências:** RNF12
 
 Registro de aprovações, preços, crédito, estornos e perfis.
 
@@ -1123,7 +1134,7 @@ Checklist “Critérios de aceite”:
 
 ## Etapa 6 — Qualidade, Segurança e Lançamento
 
-**Prazo sugerido:** Semanas 13–14 · **Objetivo:** Testes, performance, acessibilidade, monitoramento e deploy.
+**Prazo:** Dia 5 (14/11/2026), entrega final · **Objetivo:** Testes, performance, acessibilidade, monitoramento e deploy.
 
 **Critério para encerrar a etapa:** todos os cards P0 em Concluído e nenhum card bloqueado.
 
@@ -1146,7 +1157,7 @@ AB-082 — Deploy e checklist de lançamento
 #### AB-020 — Auditoria de acessibilidade WCAG 2.1 AA
 
 **Etiquetas:** P1 — Importante, Design  
-**Épico:** Design System e Identidade Visual · **Referências:** RNF13
+**Issue:** #20 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF13
 
 Auditar as páginas principais com ferramenta automática e teste manual de teclado e leitor de tela.
 
@@ -1159,7 +1170,7 @@ Checklist “Critérios de aceite”:
 #### AB-031 — SEO técnico
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Catálogo · **Referências:** RNF14
+**Issue:** #31 · **Área:** catálogo · **Milestone:** v1.0.0 · **Referências:** RNF14
 
 URLs amigáveis, sitemap, metadados por página e dados estruturados de produto.
 
@@ -1172,7 +1183,7 @@ Checklist “Critérios de aceite”:
 #### AB-062 — Checklist PCI-DSS SAQ A
 
 **Etiquetas:** P1 — Importante, Backend  
-**Épico:** Checkout e Pagamento · **Referências:** RN19
+**Issue:** #62 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19
 
 Verificar os requisitos mínimos do SAQ A para o checkout transparente.
 
@@ -1184,7 +1195,7 @@ Checklist “Critérios de aceite”:
 #### AB-077 — Testes automatizados e cobertura mínima
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Épico:** Qualidade e Operação · **Referências:** RNF07
+**Issue:** #77 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF07
 
 Testes unitários e de integração dos fluxos críticos (frete, estoque, pagamento, aprovação).
 
@@ -1196,7 +1207,7 @@ Checklist “Critérios de aceite”:
 #### AB-078 — Orçamento de performance
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
-**Épico:** Qualidade e Operação · **Referências:** RNF10
+**Issue:** #78 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF10
 
 Medir e otimizar LCP e tempo de resposta da API.
 
@@ -1208,7 +1219,7 @@ Checklist “Critérios de aceite”:
 #### AB-079 — Teste de carga
 
 **Etiquetas:** P2 — Desejável, Infra/Qualidade, Backend  
-**Épico:** Qualidade e Operação · **Referências:** RNF02
+**Issue:** #79 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF02
 
 Simular 3x o tráfego médio esperado.
 
@@ -1220,7 +1231,7 @@ Checklist “Critérios de aceite”:
 #### AB-080 — Monitoramento de disponibilidade e alertas
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
-**Épico:** Qualidade e Operação · **Referências:** RNF01
+**Issue:** #80 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01
 
 Monitorar uptime e erros, com alertas para a equipe.
 
@@ -1232,7 +1243,7 @@ Checklist “Critérios de aceite”:
 #### AB-081 — Backup e teste de restauração
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
-**Épico:** Qualidade e Operação · **Referências:** RNF11
+**Issue:** #81 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF11
 
 Backup diário com retenção de 30 dias e restauração testada.
 
@@ -1244,7 +1255,7 @@ Checklist “Critérios de aceite”:
 #### AB-082 — Deploy e checklist de lançamento
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
-**Épico:** Qualidade e Operação · **Referências:** RNF01, RNF06
+**Issue:** #82 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF06
 
 Publicar homologação e produção e executar o checklist final.
 
