@@ -209,15 +209,15 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
 **Issue:** #7 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF05, RNF16
 
-Separar configurações por ambiente e garantir que segredos (chaves Mercado Pago, NF-e, transportadoras) nunca fiquem no código.
+Separar configurações por ambiente (dev e servidor local) e garantir que segredos (chaves Mercado Pago, NF-e, transportadoras, senhas do MySQL) nunca fiquem no código. O servidor roda em Docker na máquina local (`ARCHITECTURE.md`, seção 5.1).
 
 Checklist “Critérios de aceite”:
 
 - [ ] Arquivo .env.example documentado
 - [ ] Segredos fora do repositório
 - [ ] Credenciais de sandbox usadas em dev e homologação
-- [ ] `docker-compose.yml` com MySQL 8 (`utf8mb4`) para desenvolvimento
-- [ ] `DATABASE_URL` por ambiente, com TLS em homologação e produção e usuário da aplicação sem permissão de DDL
+- [ ] `docker-compose.yml` com `app`, `db` (MySQL 8, `utf8mb4`), `proxy` (Caddy) e `backup`, subindo com um único `docker compose up -d`
+- [ ] `.env.example` com `DATABASE_URL` e demais chaves; usuário de banco da aplicação sem permissão de DDL
 
 #### AB-008 — Modelagem do banco de dados e migrations iniciais
 
@@ -264,7 +264,7 @@ Checklist “Critérios de aceite”:
 #### AB-011 — HTTPS obrigatório e headers de segurança
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade, Backend  
-**Issue:** #11 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF06
+**Issue:** #11 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** RNF06, RNF16
 
 Forçar HTTPS sem fallback e configurar HSTS, CSP e demais headers de segurança.
 
@@ -273,6 +273,8 @@ Checklist “Critérios de aceite”:
 - [ ] Requisições HTTP redirecionadas ou recusadas
 - [ ] HSTS e CSP configurados
 - [ ] Verificação em ferramenta de análise de headers sem alertas críticos
+- [ ] Caddy com `tls internal` na frente do app; certificado raiz exportado e instalável nos dispositivos da rede
+- [ ] Porta 80 só redireciona para 443
 
 #### AB-012 — Padrão de documentação de código
 
@@ -822,6 +824,8 @@ Checklist “Critérios de aceite”:
 - [ ] Assinatura do webhook validada
 - [ ] Processamento idempotente
 - [ ] Pedido só confirma com status approved
+- [ ] Túnel (`cloudflared`) expõe só `/api/webhooks/mercadopago` para o servidor local
+- [ ] Reconciliação por `GET /v1/payments/{id}` quando o webhook não chega
 
 #### AB-058 — Status de pagamento e payment_id
 
@@ -1237,7 +1241,7 @@ Checklist “Critérios de aceite”:
 #### AB-080 — Monitoramento de disponibilidade e alertas
 
 **Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
-**Issue:** #80 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01
+**Issue:** #80 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF16
 
 Monitorar uptime e erros, com alertas para a equipe.
 
@@ -1245,6 +1249,7 @@ Checklist “Critérios de aceite”:
 
 - [ ] Alerta disparado em queda
 - [ ] Painel de disponibilidade
+- [ ] Healthcheck e `restart: unless-stopped` em todos os containers
 
 #### AB-081 — Backup e teste de restauração
 
@@ -1257,18 +1262,20 @@ Checklist “Critérios de aceite”:
 
 - [ ] Backup automático configurado
 - [ ] Restauração testada e documentada dentro do RTO de 4 h
-- [ ] Backup diário do MySQL gerenciado com retenção de 30 dias e restauração via `mysqldump` documentada
+- [ ] Container `backup` com `mysqldump` diário em `./backups`, retenção de 30 dias e restauração documentada
 
 #### AB-082 — Deploy e checklist de lançamento
 
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
 **Issue:** #82 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF06, RNF16
 
-Publicar homologação e produção e executar o checklist final.
+Subir o servidor local em Docker (app, MySQL, Caddy e backup), acessível pelos dispositivos da rede, e executar o checklist final.
 
 Checklist “Critérios de aceite”:
 
-- [ ] Ambientes publicados com HTTPS
+- [ ] Site acessível via HTTPS por outro dispositivo da rede (IP fixo da máquina servidora)
 - [ ] Checklist de lançamento concluído
 - [ ] Apresentação final preparada
-- [ ] MySQL gerenciado na nuvem provisionado e `prisma migrate deploy` executado no deploy
+- [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
+- [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
+- [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada

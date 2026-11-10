@@ -17,7 +17,7 @@ Padrão técnico do projeto (issue #1, RNF07): stack, organização de código, 
 | Qualidade | ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) + `tsc --noEmit` |
 | Testes (RNF07) | **Vitest**: unitários de schema, action e regras de negócio. **Playwright**: ponta a ponta do fluxo de compra |
 | Documentação de código (RNF08) | **JSDoc** em toda função exportada, cobrado por `eslint-plugin-jsdoc` |
-| Ambientes | **Dev:** MySQL 8 em Docker (`docker-compose.yml`). **Homologação e entrega:** app na Vercel + MySQL gerenciado na nuvem (ex.: Railway ou Aiven), com TLS e backup diário (RNF11). Sempre por HTTPS (RNF06) |
+| Servidor | **Docker Compose** numa máquina local, que é o servidor: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06) e backup diário (RNF11). Outros dispositivos acessam pela rede local, por IP ou hostname da máquina. Detalhes na seção 5.1 |
 
 Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transparente/Bricks), ViaCEP, Correios, agregador de transportadoras, BrasilAPI (CNPJ) e emissor de NF-e.
 
@@ -38,7 +38,9 @@ prisma/schema.prisma    → modelo de dados (fonte única do schema MySQL)
 prisma/migrations/      → migrations SQL versionadas, geradas pelo Prisma (uma por mudança coesa)
 prisma/seed.ts          → seed de configuração (valores das RN) e dados de desenvolvimento
 features/shared/lib/db/ → client Prisma único (server-only) e camada de acesso a dados com permissão
-docker-compose.yml      → MySQL 8 local
+docker-compose.yml      → servidor local: app, MySQL 8, Caddy e backup
+Dockerfile              → imagem do app (Next.js standalone)
+deploy/                 → Caddyfile, scripts de backup/restauração e config do MySQL
 tests/                  → testes Vitest e Playwright
 ```
 
@@ -91,9 +93,31 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Integridade:** FKs explícitas, `UNIQUE` em documentos (CPF, CNPJ, e-mail, SKU, `payment_id`) e índices nas colunas de filtro e busca: categoria, status, preço e um `FULLTEXT` em nome e descrição.
 - **Migrations:** `npx prisma migrate dev` em dev, `npx prisma migrate deploy` no deploy, e uma por mudança coesa, versionada no PR. Nunca se altera o banco à mão em homologação ou produção. Seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
 - **Seed** (`prisma/seed.ts`): valores das regras de negócio confirmados na #5 (tabela de configuração), perfis e permissões, e dados fictícios de desenvolvimento (#8).
-- **Segurança (RNF03):** conexão com TLS em homologação e produção. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar. Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
-- **Backup (RNF11):** backup diário automático do MySQL gerenciado, com retenção de 30 dias, mais um `mysqldump` documentado e testado na restauração (#81).
-- **Desenvolvimento:** `docker compose up -d` sobe o MySQL. `DATABASE_URL` vem do `.env.local` e o `.env.example` traz o modelo.
+- **Segurança (RNF03):** o MySQL exige TLS (`require_secure_transport=ON`) em conexões vindas da rede. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar. Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
+- **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`, e a restauração é testada e documentada (#81).
+- **Configuração:** `DATABASE_URL` e as demais chaves vêm do `.env` (não versionado), e o `.env.example` traz o modelo.
+
+### 5.1 Servidor local (Docker) e acesso pela rede
+
+A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tudo, e os outros dispositivos da mesma rede (notebooks, celulares) acessam por ela.
+
+| Serviço | Imagem | Porta publicada na rede | Papel |
+|---|---|---|---|
+| `proxy` | `caddy:2` | **80 e 443** | HTTPS na frente do app. O 80 só redireciona para o 443 (RNF06) |
+| `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
+| `db` | `mysql:8.4` | **3306** | MySQL com volume persistente `mysql-data` |
+| `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
+
+- **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
+- **Firewall do Windows:** libere 80, 443 e 3306 **só no perfil de rede Privada**, nunca em rede Pública.
+- **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/`) em cada dispositivo para o navegador não mostrar aviso.
+- **Acesso ao MySQL por outros dispositivos:**
+  - Só com usuários nomeados e senha forte, com host restrito à sub-rede (`'dev'@'192.168.0.%'`) e TLS obrigatório.
+  - O `root` não tem acesso remoto.
+  - O app usa um usuário próprio sem DDL. As migrations rodam com o usuário de migração.
+- **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, serviço opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago`. Se o webhook não chegar, uma reconciliação consulta `GET /v1/payments/{id}` (#57).
+- **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O app depende de a máquina servidora estar ligada e na rede, e o monitoramento fica na #80.
+- **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
 
 ## 6. Convenções de código
 
