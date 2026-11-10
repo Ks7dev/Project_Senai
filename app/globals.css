@@ -1,11 +1,20 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Design tokens last, so they override any library default */
 @import "./tokens.css";
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
   html {
-    background: var(--ab-surface-canvas);
-    color: var(--ab-text-primary);
-    font-family: var(--font-sans);
+    @apply bg-background font-sans text-foreground;
+  }
+
+  body {
+    @apply bg-background text-foreground;
   }
 
   h1,
