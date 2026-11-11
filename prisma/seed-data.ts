@@ -415,6 +415,6 @@ export const corporateAccount = {
   creditLimit: "50000.00",
   members: [
     { email: "solicitante@empresa-ficticia.test", role: "requester" },
-    { email: "aprovador@empresa-ficticia.test", role: "approver" },
+    { email: "aprovador@empresa-ficticia.test", role: "approver,admin" },
   ],
 }

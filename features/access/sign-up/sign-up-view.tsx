@@ -12,7 +12,10 @@ import { FormField, fieldAria } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { signUp } from "@/features/access/sign-up/action/sign-up"
+import {
+  lookupCnpjForSignUp,
+  signUp,
+} from "@/features/access/sign-up/action/sign-up"
 import {
   signUpSchema,
   type SignUpData,
@@ -45,6 +48,44 @@ export function SignUpView() {
     Record<string, { message?: string }>
   >
   const error = (name: string) => errors[name]?.message
+
+  const [cnpjNotice, setCnpjNotice] = useState<{
+    tone: "ok" | "warn"
+    text: string
+  }>()
+
+  const checkCnpj = async (value: string) => {
+    setCnpjNotice(undefined)
+    if (value.replace(/\D/g, "").length !== 14) return
+    const result = await lookupCnpjForSignUp({ cnpj: value })
+    if (!result.success) return
+    const { data } = result
+    if (data.found) {
+      form.setValue("legalName" as never, data.legalName as never, {
+        shouldValidate: true,
+      })
+      setCnpjNotice(
+        data.active
+          ? {
+              tone: "ok",
+              text: "Razão social preenchida com os dados da Receita Federal.",
+            }
+          : {
+              tone: "warn",
+              text: `Situação cadastral: ${data.situation}. Só empresas ativas podem abrir conta.`,
+            }
+      )
+    } else {
+      setCnpjNotice(
+        data.unavailable
+          ? {
+              tone: "warn",
+              text: "Não foi possível consultar o CNPJ agora. Preencha a razão social.",
+            }
+          : { tone: "warn", text: "CNPJ não encontrado na Receita Federal." }
+      )
+    }
+  }
 
   const onSubmit = form.handleSubmit((values) => {
     setServerError(undefined)
@@ -95,9 +136,24 @@ export function SignUpView() {
                 autoComplete="off"
                 placeholder="00.000.000/0000-00"
                 {...fieldAria("cnpj", error("cnpj"))}
-                {...form.register("cnpj" as never)}
+                {...form.register("cnpj" as never, {
+                  onBlur: (event: React.FocusEvent<HTMLInputElement>) =>
+                    checkCnpj(event.target.value),
+                })}
               />
             </FormField>
+            {cnpjNotice && (
+              <p
+                role="status"
+                className={
+                  cnpjNotice.tone === "ok"
+                    ? "text-body-sm text-success md:col-span-2"
+                    : "text-body-sm text-warning md:col-span-2"
+                }
+              >
+                {cnpjNotice.text}
+              </p>
+            )}
             <FormField
               id="legalName"
               label="Razão social"

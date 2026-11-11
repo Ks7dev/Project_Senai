@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation"
 import { logger, type LogFields } from "@/features/shared/lib/logger/logger"
 
 /** Result returned by every Server Action. Actions never throw to the UI. */
@@ -32,6 +33,8 @@ export class AppError extends Error {
 /**
  * Converts any error into a failed ActionResult without leaking stack
  * traces or internal details (RNF05). Unexpected errors are logged.
+ * Next.js control flow errors (redirect, notFound, request-time APIs
+ * during prerendering) are rethrown so the framework handles them.
  *
  * @param error - The caught error.
  * @param context - Extra log fields (action name, request id).
@@ -41,6 +44,7 @@ export function toActionError(
   error: unknown,
   context: LogFields = {}
 ): { success: false; error: string } {
+  unstable_rethrow(error)
   if (error instanceof AppError) {
     logger.warn("action rejected", { ...context, code: error.code })
     return { success: false, error: error.publicMessage }
