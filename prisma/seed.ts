@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 import { hashPassword } from "better-auth/crypto"
 import { PrismaClient } from "../generated/prisma/client"
+import { mariaDbConfig } from "../features/shared/lib/db/connection-config"
 import {
   accounts,
   categories,
@@ -22,7 +23,9 @@ try {
 const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
 if (!url) throw new Error("DATABASE_URL is not set")
 
-const prisma = new PrismaClient({ adapter: new PrismaMariaDb(url) })
+const prisma = new PrismaClient({
+  adapter: new PrismaMariaDb(mariaDbConfig(url)),
+})
 
 /** Development password for the fictitious accounts (never production). */
 const seedPassword = process.env.SEED_PASSWORD ?? "atelier-demo-2026"
