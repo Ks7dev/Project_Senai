@@ -1,10 +1,38 @@
+import { Suspense } from "react"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
+import { getMenuCategoryLinks } from "@/features/app/shell/store-navigation"
 import {
   categoryLinks,
   institutionalLinks,
   serviceLinks,
 } from "@/features/shared/config/navigation"
+
+/**
+ * Header with the category menu managed in the back office (#23).
+ *
+ * @returns The header.
+ */
+async function StoreHeader() {
+  const categories = await getMenuCategoryLinks()
+  return <SiteHeader categories={categories} services={serviceLinks} />
+}
+
+/**
+ * Footer with the category links managed in the back office (#23).
+ *
+ * @returns The footer.
+ */
+async function StoreFooter() {
+  const categories = await getMenuCategoryLinks()
+  return (
+    <SiteFooter
+      categories={categories}
+      services={serviceLinks}
+      institutional={institutionalLinks}
+    />
+  )
+}
 
 /**
  * Store layout: skip link, header, page content and institutional
@@ -22,15 +50,27 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
       >
         Pular para o conteúdo
       </a>
-      <SiteHeader categories={categoryLinks} services={serviceLinks} />
+      <Suspense
+        fallback={
+          <SiteHeader categories={categoryLinks} services={serviceLinks} />
+        }
+      >
+        <StoreHeader />
+      </Suspense>
       <div id="conteudo" className="flex flex-1 flex-col">
         {children}
       </div>
-      <SiteFooter
-        categories={categoryLinks}
-        services={serviceLinks}
-        institutional={institutionalLinks}
-      />
+      <Suspense
+        fallback={
+          <SiteFooter
+            categories={categoryLinks}
+            services={serviceLinks}
+            institutional={institutionalLinks}
+          />
+        }
+      >
+        <StoreFooter />
+      </Suspense>
     </>
   )
 }
