@@ -1,0 +1,813 @@
+// Atelier Bureau — data model (issue #8, RNF16)
+// MySQL 8 (InnoDB, utf8mb4). Tables and columns in English snake_case.
+// Money is DECIMAL(12,2); dates are DATETIME(3) stored in UTC.
+// Entities exposed in URLs (orders, quotes) use UUID v7 ids.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider     = "mysql"
+  relationMode = "foreignKeys"
+}
+
+// ---------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------
+
+enum PersonType {
+  PF
+  PJ
+}
+
+enum CreditStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductDocumentKind {
+  DATASHEET
+  CERTIFICATION
+  MANUAL
+}
+
+enum StockMovementType {
+  RESERVE
+  RELEASE
+  WRITE_OFF
+  RESTOCK
+  ADJUSTMENT
+}
+
+enum CartKind {
+  CART
+  PROJECT_LIST
+}
+
+enum QuoteStatus {
+  REQUESTED
+  IN_REVIEW
+  ANSWERED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum OrderStatus {
+  AWAITING_APPROVAL
+  AWAITING_SHIPPING_QUOTE
+  AWAITING_PAYMENT
+  PAID
+  IN_PRODUCTION
+  SEPARATING
+  SHIPPED
+  DELIVERED
+  CANCELED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  PIX
+  BOLETO
+  INVOICED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+  EXPIRED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum ShippingMethod {
+  CORREIOS_PAC
+  CORREIOS_SEDEX
+  CARRIER
+  OWN_DELIVERY
+  MANUAL_QUOTE
+}
+
+// ---------------------------------------------------------------------
+// Authentication (Better Auth: core, two-factor and organization)
+// ---------------------------------------------------------------------
+
+model User {
+  id               String     @id @db.VarChar(36)
+  name             String     @db.VarChar(160)
+  email            String     @unique @db.VarChar(191)
+  emailVerified    Boolean    @default(false) @map("email_verified")
+  image            String?    @db.Text
+  twoFactorEnabled Boolean?   @default(false) @map("two_factor_enabled")
+  personType       PersonType @map("person_type")
+  /// CPF (PF) or CNPJ (PJ), digits only
+  document         String     @unique @db.VarChar(14)
+  phone            String?    @db.VarChar(20)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt        DateTime?  @map("deleted_at") @db.DateTime(3)
+
+  sessions           Session[]
+  accounts           Account[]
+  twoFactors         TwoFactor[]
+  members            Member[]
+  invitations        Invitation[]
+  userRoles          UserRole[]
+  addresses          Address[]
+  carts              Cart[]
+  quotes             Quote[]
+  orders             Order[]              @relation("OrderCustomer")
+  approvedOrders     Order[]              @relation("OrderApprover")
+  orderStatusChanges OrderStatusHistory[]
+  favorites          Favorite[]
+  auditLogs          AuditLog[]
+  stockMovements     StockMovement[]
+  sellerAccounts     Organization[]       @relation("OrganizationSeller")
+  creditLimitChanges CreditLimitChange[]
+  updatedSettings    Setting[]
+
+  @@map("users")
+}
+
+model Session {
+  id                   String   @id @db.VarChar(36)
+  expiresAt            DateTime @map("expires_at") @db.DateTime(3)
+  token                String   @unique @db.VarChar(191)
+  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  ipAddress            String?  @map("ip_address") @db.VarChar(64)
+  userAgent            String?  @map("user_agent") @db.Text
+  userId               String   @map("user_id") @db.VarChar(36)
+  activeOrganizationId String?  @map("active_organization_id") @db.VarChar(36)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @db.VarChar(36)
+  accountId             String    @map("account_id") @db.VarChar(191)
+  providerId            String    @map("provider_id") @db.VarChar(64)
+  userId                String    @map("user_id") @db.VarChar(36)
+  accessToken           String?   @map("access_token") @db.Text
+  refreshToken          String?   @map("refresh_token") @db.Text
+  idToken               String?   @map("id_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.DateTime(3)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.DateTime(3)
+  scope                 String?   @db.Text
+  /// Password hash (never the plain password)
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @db.VarChar(36)
+  identifier String   @db.VarChar(191)
+  value      String   @db.Text
+  expiresAt  DateTime @map("expires_at") @db.DateTime(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model TwoFactor {
+  id                      String    @id @db.VarChar(36)
+  secret                  String    @db.VarChar(191)
+  backupCodes             String    @map("backup_codes") @db.Text
+  userId                  String    @map("user_id") @db.VarChar(36)
+  verified                Boolean?  @default(true)
+  failedVerificationCount Int?      @default(0) @map("failed_verification_count")
+  lockedUntil             DateTime? @map("locked_until") @db.DateTime(3)
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factors")
+}
+
+/// Corporate account (PJ) with multiple users (RF09, RF10)
+model Organization {
+  id           String       @id @db.VarChar(36)
+  name         String       @db.VarChar(160)
+  slug         String       @unique @db.VarChar(191)
+  logo         String?      @db.Text
+  metadata     String?      @db.Text
+  /// CNPJ, digits only
+  cnpj         String?      @unique @db.VarChar(14)
+  legalName    String?      @map("legal_name") @db.VarChar(191)
+  creditStatus CreditStatus @default(NONE) @map("credit_status")
+  creditLimit  Decimal?     @map("credit_limit") @db.Decimal(12, 2)
+  /// Dedicated seller by region or segment (RN11)
+  sellerId     String?      @map("seller_id") @db.VarChar(36)
+  createdAt    DateTime     @map("created_at") @db.DateTime(3)
+  deletedAt    DateTime?    @map("deleted_at") @db.DateTime(3)
+
+  seller             User?               @relation("OrganizationSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  members            Member[]
+  invitations        Invitation[]
+  addresses          Address[]
+  carts              Cart[]
+  quotes             Quote[]
+  orders             Order[]
+  creditLimitChanges CreditLimitChange[]
+
+  @@index([sellerId])
+  @@index([creditStatus])
+  @@map("organizations")
+}
+
+/// Corporate account member; role is requester, approver, finance or admin (RF10)
+model Member {
+  id             String       @id @db.VarChar(36)
+  organizationId String       @map("organization_id") @db.VarChar(36)
+  userId         String       @map("user_id") @db.VarChar(36)
+  role           String       @db.VarChar(64)
+  createdAt      DateTime     @map("created_at") @db.DateTime(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("members")
+}
+
+model Invitation {
+  id             String       @id @db.VarChar(36)
+  organizationId String       @map("organization_id") @db.VarChar(36)
+  email          String       @db.VarChar(191)
+  role           String?      @db.VarChar(64)
+  status         String       @db.VarChar(32)
+  expiresAt      DateTime     @map("expires_at") @db.DateTime(3)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  inviterId      String       @map("inviter_id") @db.VarChar(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------
+// Internal RBAC (RF55): administrator, sales, finance and stock
+// ---------------------------------------------------------------------
+
+model Role {
+  id              String           @id @default(uuid(7)) @db.Char(36)
+  /// Stable key in English, e.g. "admin", "sales"
+  key             String           @unique @db.VarChar(64)
+  name            String           @db.VarChar(120)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid(7)) @db.Char(36)
+  /// Format "<resource>[:<sub>]", e.g. "product", "order:status"
+  resource        String           @db.VarChar(64)
+  /// e.g. "read", "create", "update", "delete", "approve"
+  action          String           @db.VarChar(32)
+  description     String?          @db.VarChar(191)
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Char(36)
+  permissionId String     @map("permission_id") @db.Char(36)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.VarChar(36)
+  roleId String @map("role_id") @db.Char(36)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------
+// Addresses (RF26): owned by a user (PF) or a corporate account (PJ)
+// ---------------------------------------------------------------------
+
+model Address {
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  userId         String?       @map("user_id") @db.VarChar(36)
+  organizationId String?       @map("organization_id") @db.VarChar(36)
+  /// Nickname: head office, branch, construction site
+  label          String        @db.VarChar(80)
+  recipient      String        @db.VarChar(160)
+  cep            String        @db.Char(8)
+  street         String        @db.VarChar(191)
+  number         String        @db.VarChar(20)
+  complement     String?       @db.VarChar(120)
+  district       String        @db.VarChar(120)
+  city           String        @db.VarChar(120)
+  state          String        @db.Char(2)
+  isDefault      Boolean       @default(false) @map("is_default")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt      DateTime?     @map("deleted_at") @db.DateTime(3)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([cep])
+  @@map("addresses")
+}
+
+// ---------------------------------------------------------------------
+// Catalog (RF01, RF41, RF42)
+// ---------------------------------------------------------------------
+
+model Category {
+  id        String     @id @default(uuid(7)) @db.Char(36)
+  parentId  String?    @map("parent_id") @db.Char(36)
+  name      String     @db.VarChar(120)
+  slug      String     @unique @db.VarChar(160)
+  position  Int        @default(0)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+
+  @@index([parentId, position])
+  @@map("categories")
+}
+
+model Product {
+  id                       String        @id @default(uuid(7)) @db.Char(36)
+  categoryId               String        @map("category_id") @db.Char(36)
+  slug                     String        @unique @db.VarChar(191)
+  name                     String        @db.VarChar(191)
+  description              String        @db.Text
+  brand                    String?       @db.VarChar(120)
+  /// Technical specifications as key/value pairs (RF03)
+  specs                    Json?
+  basePrice                Decimal       @map("base_price") @db.Decimal(12, 2)
+  weightKg                 Decimal       @map("weight_kg") @db.Decimal(8, 3)
+  lengthCm                 Decimal       @map("length_cm") @db.Decimal(8, 2)
+  widthCm                  Decimal       @map("width_cm") @db.Decimal(8, 2)
+  heightCm                 Decimal       @map("height_cm") @db.Decimal(8, 2)
+  warrantyMonths           Int           @default(3) @map("warranty_months")
+  /// Set automatically above the configured price (RN06)
+  includesExtendedWarranty Boolean       @default(false) @map("includes_extended_warranty")
+  /// Cannot be published without the certification document (RN09)
+  requiresCertification    Boolean       @default(false) @map("requires_certification")
+  /// Checkout requires a delivery/installation date (RN05)
+  requiresInstallation     Boolean       @default(false) @map("requires_installation")
+  personalizable           Boolean       @default(false)
+  limitedEdition           Boolean       @default(false) @map("limited_edition")
+  lotNumber                String?       @map("lot_number") @db.VarChar(60)
+  leadTimeDays             Int           @default(5) @map("lead_time_days")
+  status                   ProductStatus @default(DRAFT)
+  createdAt                DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt                DateTime?     @map("deleted_at") @db.DateTime(3)
+
+  category   Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images     ProductImage[]
+  documents  ProductDocument[]
+  skus       Sku[]
+  favorites  Favorite[]
+  quoteItems QuoteItem[]
+
+  @@index([categoryId, status])
+  @@index([status, basePrice])
+  @@index([brand])
+  @@fulltext([name, description])
+  @@map("products")
+}
+
+model ProductImage {
+  id         String   @id @default(uuid(7)) @db.Char(36)
+  productId  String   @map("product_id") @db.Char(36)
+  /// Key in the S3-compatible storage (local disk in dev)
+  storageKey String   @map("storage_key") @db.VarChar(255)
+  alt        String   @db.VarChar(191)
+  position   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+model ProductDocument {
+  id         String              @id @default(uuid(7)) @db.Char(36)
+  productId  String              @map("product_id") @db.Char(36)
+  kind       ProductDocumentKind
+  name       String              @db.VarChar(191)
+  storageKey String              @map("storage_key") @db.VarChar(255)
+  createdAt  DateTime            @default(now()) @map("created_at") @db.DateTime(3)
+  product    Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, kind])
+  @@map("product_documents")
+}
+
+model Sku {
+  id             String          @id @default(uuid(7)) @db.Char(36)
+  productId      String          @map("product_id") @db.Char(36)
+  code           String          @unique @db.VarChar(64)
+  name           String          @db.VarChar(191)
+  /// Variant attributes, e.g. { "acabamento": "Nogueira" }
+  attributes     Json?
+  /// Overrides the product base price when set
+  price          Decimal?        @db.Decimal(12, 2)
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.DateTime(3)
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stock          Stock?
+  stockMovements StockMovement[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+
+  @@index([productId])
+  @@map("skus")
+}
+
+// ---------------------------------------------------------------------
+// Stock (RF43, RF44, RN14): available = on_hand - reserved
+// ---------------------------------------------------------------------
+
+model Stock {
+  skuId     String   @id @map("sku_id") @db.Char(36)
+  onHand    Int      @default(0) @map("on_hand")
+  reserved  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  sku       Sku      @relation(fields: [skuId], references: [id], onDelete: Cascade)
+
+  @@map("stock")
+}
+
+model StockMovement {
+  id        String            @id @default(uuid(7)) @db.Char(36)
+  skuId     String            @map("sku_id") @db.Char(36)
+  type      StockMovementType
+  quantity  Int
+  orderId   String?           @map("order_id") @db.Char(36)
+  userId    String?           @map("user_id") @db.VarChar(36)
+  note      String?           @db.VarChar(255)
+  createdAt DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  sku       Sku               @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  order     Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([skuId, createdAt])
+  @@index([orderId])
+  @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------
+// Cart and saved project lists (RF07, RF51, RF52)
+// ---------------------------------------------------------------------
+
+model Cart {
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  kind           CartKind      @default(CART)
+  name           String?       @db.VarChar(120)
+  userId         String?       @map("user_id") @db.VarChar(36)
+  organizationId String?       @map("organization_id") @db.VarChar(36)
+  /// Anonymous cart id stored in a cookie before login
+  guestToken     String?       @unique @map("guest_token") @db.VarChar(64)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items          CartItem[]
+
+  @@index([userId, kind])
+  @@map("carts")
+}
+
+model CartItem {
+  id              String   @id @default(uuid(7)) @db.Char(36)
+  cartId          String   @map("cart_id") @db.Char(36)
+  skuId           String   @map("sku_id") @db.Char(36)
+  quantity        Int
+  /// Laser engraving text and preview options (RF51)
+  personalization Json?
+  /// Additional services: institutional packaging, assembly (RF52)
+  services        Json?
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  sku             Sku      @relation(fields: [skuId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, skuId])
+  @@index([skuId])
+  @@map("cart_items")
+}
+
+// ---------------------------------------------------------------------
+// Quotes (RF05, RF06, RF08, RF20, RN02)
+// ---------------------------------------------------------------------
+
+model Quote {
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  /// Readable tracking number, e.g. "COT-2026-000123" (RF06)
+  number         String            @unique @db.VarChar(20)
+  userId         String            @map("user_id") @db.VarChar(36)
+  organizationId String?           @map("organization_id") @db.VarChar(36)
+  status         QuoteStatus       @default(REQUESTED)
+  notes          String?           @db.Text
+  /// Valid for 15 days after the answer (RN02)
+  validUntil     DateTime?         @map("valid_until") @db.DateTime(3)
+  subtotal       Decimal           @default(0) @db.Decimal(12, 2)
+  discount       Decimal           @default(0) @db.Decimal(12, 2)
+  shippingTotal  Decimal           @default(0) @map("shipping_total") @db.Decimal(12, 2)
+  total          Decimal           @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items          QuoteItem[]
+  attachments    QuoteAttachment[]
+  orders         Order[]
+
+  @@index([status, validUntil])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id          String   @id @default(uuid(7)) @db.Char(36)
+  quoteId     String   @map("quote_id") @db.Char(36)
+  productId   String   @map("product_id") @db.Char(36)
+  description String   @db.VarChar(255)
+  quantity    Int
+  unitPrice   Decimal? @map("unit_price") @db.Decimal(12, 2)
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([quoteId])
+  @@index([productId])
+  @@map("quote_items")
+}
+
+model QuoteAttachment {
+  id         String   @id @default(uuid(7)) @db.Char(36)
+  quoteId    String   @map("quote_id") @db.Char(36)
+  name       String   @db.VarChar(191)
+  mimeType   String   @map("mime_type") @db.VarChar(100)
+  sizeBytes  Int      @map("size_bytes")
+  storageKey String   @map("storage_key") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  quote      Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+  @@map("quote_attachments")
+}
+
+// ---------------------------------------------------------------------
+// Orders, payment and shipping (RF11, RF28–RF33, RF54, RN01, RN13)
+// ---------------------------------------------------------------------
+
+model Order {
+  id                  String        @id @default(uuid(7)) @db.Char(36)
+  /// Readable order number, e.g. "AB-2026-000123"
+  number              String        @unique @db.VarChar(20)
+  userId              String        @map("user_id") @db.VarChar(36)
+  organizationId      String?       @map("organization_id") @db.VarChar(36)
+  quoteId             String?       @map("quote_id") @db.Char(36)
+  status              OrderStatus
+  paymentMethod       PaymentMethod @map("payment_method")
+  subtotal            Decimal       @db.Decimal(12, 2)
+  discount            Decimal       @default(0) @db.Decimal(12, 2)
+  servicesTotal       Decimal       @default(0) @map("services_total") @db.Decimal(12, 2)
+  shippingTotal       Decimal       @default(0) @map("shipping_total") @db.Decimal(12, 2)
+  total               Decimal       @db.Decimal(12, 2)
+  /// Address snapshot at checkout, so later edits do not change the order
+  shippingAddress     Json          @map("shipping_address")
+  scheduledDeliveryAt DateTime?     @map("scheduled_delivery_at") @db.DateTime(3)
+  /// Above the approval limit, waits for an approver (RN01)
+  requiresApproval    Boolean       @default(false) @map("requires_approval")
+  approvedById        String?       @map("approved_by_id") @db.VarChar(36)
+  approvedAt          DateTime?     @map("approved_at") @db.DateTime(3)
+  approvalNote        String?       @map("approval_note") @db.Text
+  createdAt           DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user           User                 @relation("OrderCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  quote          Quote?               @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  approvedBy     User?                @relation("OrderApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+  payments       Payment[]
+  shipment       Shipment?
+  stockMovements StockMovement[]
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([organizationId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String  @id @default(uuid(7)) @db.Char(36)
+  orderId         String  @map("order_id") @db.Char(36)
+  skuId           String  @map("sku_id") @db.Char(36)
+  /// Name and SKU snapshot, kept even if the product is inactivated (RF42)
+  productName     String  @map("product_name") @db.VarChar(191)
+  skuCode         String  @map("sku_code") @db.VarChar(64)
+  quantity        Int
+  unitPrice       Decimal @map("unit_price") @db.Decimal(12, 2)
+  total           Decimal @db.Decimal(12, 2)
+  personalization Json?
+  services        Json?
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sku             Sku     @relation(fields: [skuId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([skuId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(uuid(7)) @db.Char(36)
+  orderId     String       @map("order_id") @db.Char(36)
+  fromStatus  OrderStatus? @map("from_status")
+  toStatus    OrderStatus  @map("to_status")
+  changedById String?      @map("changed_by_id") @db.VarChar(36)
+  note        String?      @db.VarChar(255)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy   User?        @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+model Payment {
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  orderId        String        @map("order_id") @db.Char(36)
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  /// Mercado Pago payment id; null for invoiced payments (RF32)
+  paymentId      String?       @unique @map("payment_id") @db.VarChar(64)
+  /// Raw provider status, e.g. "approved", "in_process"
+  providerStatus String?       @map("provider_status") @db.VarChar(64)
+  amount         Decimal       @db.Decimal(12, 2)
+  refundedAmount Decimal       @default(0) @map("refunded_amount") @db.Decimal(12, 2)
+  installments   Int           @default(1)
+  /// Pix and boleto expiration (RN14); invoiced due date
+  expiresAt      DateTime?     @map("expires_at") @db.DateTime(3)
+  pixQrCode      String?       @map("pix_qr_code") @db.Text
+  boletoUrl      String?       @map("boleto_url") @db.Text
+  paidAt         DateTime?     @map("paid_at") @db.DateTime(3)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([status, expiresAt])
+  @@map("payments")
+}
+
+model Shipment {
+  id           String         @id @default(uuid(7)) @db.Char(36)
+  orderId      String         @unique @map("order_id") @db.Char(36)
+  method       ShippingMethod
+  carrier      String?        @db.VarChar(120)
+  service      String?        @db.VarChar(120)
+  price        Decimal        @db.Decimal(12, 2)
+  deliveryDays Int?           @map("delivery_days")
+  trackingCode String?        @map("tracking_code") @db.VarChar(64)
+  /// Quote returned by the shipping API (binding after confirmation, RN15)
+  quoteData    Json?          @map("quote_data")
+  shippedAt    DateTime?      @map("shipped_at") @db.DateTime(3)
+  deliveredAt  DateTime?      @map("delivered_at") @db.DateTime(3)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([trackingCode])
+  @@map("shipments")
+}
+
+/// CEP ranges for own delivery coverage (RN16) and regional free
+/// shipping minimum (RN23), editable in the back office (RF50)
+model ShippingRegion {
+  id                  String   @id @default(uuid(7)) @db.Char(36)
+  name                String   @db.VarChar(120)
+  cepStart            String   @map("cep_start") @db.Char(8)
+  cepEnd              String   @map("cep_end") @db.Char(8)
+  ownDelivery         Boolean  @default(false) @map("own_delivery")
+  /// Own delivery price table by weight, e.g. [{ "maxKg": 30, "price": "150.00" }]
+  ownDeliveryRates    Json?    @map("own_delivery_rates")
+  freeShippingMinimum Decimal? @map("free_shipping_minimum") @db.Decimal(12, 2)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([cepStart, cepEnd])
+  @@map("shipping_regions")
+}
+
+// ---------------------------------------------------------------------
+// Configuration, audit, favorites and credit history
+// ---------------------------------------------------------------------
+
+/// Configurable business rule values (RN01, RN06, RN14, RN16, RN20)
+model Setting {
+  key         String   @id @db.VarChar(100)
+  value       Json
+  description String   @db.VarChar(255)
+  updatedById String?  @map("updated_by_id") @db.VarChar(36)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+  @@map("settings")
+}
+
+/// Append-only log of sensitive actions (RNF12)
+model AuditLog {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  userId    String?  @map("user_id") @db.VarChar(36)
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(64)
+  entityId  String?  @map("entity_id") @db.VarChar(36)
+  before    Json?
+  after     Json?
+  ipAddress String?  @map("ip_address") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Favorite {
+  userId    String   @map("user_id") @db.VarChar(36)
+  productId String   @map("product_id") @db.Char(36)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([productId])
+  @@map("favorites")
+}
+
+/// History of corporate credit limit changes (RF58, RN10)
+model CreditLimitChange {
+  id             String       @id @default(uuid(7)) @db.Char(36)
+  organizationId String       @map("organization_id") @db.VarChar(36)
+  previousLimit  Decimal?     @map("previous_limit") @db.Decimal(12, 2)
+  newLimit       Decimal?     @map("new_limit") @db.Decimal(12, 2)
+  status         CreditStatus
+  changedById    String       @map("changed_by_id") @db.VarChar(36)
+  note           String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  changedBy      User         @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([changedById])
+  @@map("credit_limit_changes")
+}
