@@ -1,0 +1,101 @@
+# Atelier Bureau — local server (issue #7, ARCHITECTURE.md section 5.1)
+# Start everything: docker compose up -d
+# Other devices on the LAN open https://<SITE_HOST>
+
+name: atelier-bureau
+
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_HOST: ${SITE_HOST:-localhost}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      # Root certificate exported for the devices on the network
+      - ./deploy/certs:/certs
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://atelier_app:${MYSQL_APP_PASSWORD}@db:3306/atelier_bureau
+      MIGRATION_DATABASE_URL: mysql://atelier_migrate:${MYSQL_MIGRATE_PASSWORD}@db:3306/atelier_bureau
+    # Not published: only reachable through the proxy
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      # root only from inside the container, never remote
+      MYSQL_ROOT_HOST: localhost
+      MYSQL_DATABASE: atelier_bureau
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:?set MYSQL_APP_PASSWORD in .env}
+      MYSQL_MIGRATE_PASSWORD: ${MYSQL_MIGRATE_PASSWORD:?set MYSQL_MIGRATE_PASSWORD in .env}
+      MYSQL_DEV_PASSWORD: ${MYSQL_DEV_PASSWORD:-}
+      MYSQL_BACKUP_PASSWORD: ${MYSQL_BACKUP_PASSWORD:?set MYSQL_BACKUP_PASSWORD in .env}
+      LAN_SUBNET: ${LAN_SUBNET:-192.168.0.%}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./deploy/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./deploy/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  backup:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_BACKUP_PASSWORD: ${MYSQL_BACKUP_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_HOUR: ${BACKUP_HOUR:-03}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["sh", "/usr/local/bin/backup.sh", "--daemon"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Optional: exposes only the Mercado Pago webhook route to the internet
+  # docker compose --profile tunnel up -d
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - proxy
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:
