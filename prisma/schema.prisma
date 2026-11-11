@@ -701,6 +701,8 @@ model Payment {
   paymentId      String?       @unique @map("payment_id") @db.VarChar(64)
   /// Raw provider status, e.g. "approved", "in_process"
   providerStatus String?       @map("provider_status") @db.VarChar(64)
+  /// Raw provider detail, e.g. "cc_rejected_insufficient_amount" (RF30)
+  statusDetail   String?       @map("status_detail") @db.VarChar(64)
   amount         Decimal       @db.Decimal(12, 2)
   refundedAmount Decimal       @default(0) @map("refunded_amount") @db.Decimal(12, 2)
   installments   Int           @default(1)
