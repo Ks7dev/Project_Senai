@@ -1,11 +1,18 @@
 # Atelier Bureau — HTTPS reverse proxy (issues #7 and #11, RNF06)
 # Local CA (`tls internal`). Export the root certificate with
-# deploy/export-root-cert.sh and install it on each device.
-# Caddy's automatic HTTPS makes port 80 only redirect to 443.
+# deploy/export-root-cert.sh (or .ps1 on Windows) and install it on each
+# device. Check the headers with deploy/check-headers.sh.
 
 {
 	local_certs
 	admin 127.0.0.1:2019
+}
+
+# Port 80 never serves content: every request, whatever the host, is
+# redirected to HTTPS (no fallback to HTTP, RNF06). Hosts without a
+# certificate are then refused by the TLS handshake on 443.
+http:// {
+	redir https://{host}{uri} 308
 }
 
 https://{$SITE_HOST}, https://localhost {
@@ -20,6 +27,7 @@ https://{$SITE_HOST}, https://localhost {
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(self)"
 		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
 		-Server
 		-X-Powered-By
 	}

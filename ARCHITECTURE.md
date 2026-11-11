@@ -110,7 +110,8 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
 
 - **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
 - **Firewall do Windows:** libere 80 e 443 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.
-- **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/`) em cada dispositivo para o navegador não mostrar aviso.
+- **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/certs/root.crt` por `deploy/export-root-cert.sh` ou, no Windows, `deploy/export-root-cert.ps1`) em cada dispositivo para o navegador não mostrar aviso.
+- **Sem fallback para HTTP (RNF06):** a porta 80 só responde com redirecionamento `308` para o HTTPS, qualquer que seja o host. Um host sem certificado é recusado no handshake TLS da 443. O HSTS e os demais headers de segurança saem do Caddy, e a CSP sai do próprio app (`features/shared/lib/security/headers.ts`). Para conferir de outro dispositivo: `sh deploy/check-headers.sh <ip-do-servidor>`, que sai com erro se faltar algum header crítico.
 - **Acesso ao MySQL por outros dispositivos:**
   - Só com usuários nomeados e senha forte, com host restrito à sub-rede (`'dev'@'192.168.0.%'`) e TLS obrigatório.
   - O `root` não tem acesso remoto.
