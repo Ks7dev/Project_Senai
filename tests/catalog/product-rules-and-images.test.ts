@@ -123,14 +123,18 @@ describe("image processing (#22, RNF04)", () => {
     }
   }, 60_000)
 
-  it("never upscales a small image", async () => {
+  it("writes every width but never upscales a small image", async () => {
     const small = await sharp({
       create: { width: 500, height: 400, channels: 3, background: "#ccc" },
     })
       .jpeg()
       .toBuffer()
     const variants = await processProductImage(small)
-    expect(variants.map((v) => v.width)).toEqual([320])
+    expect(variants.map((v) => v.width)).toEqual([...IMAGE_WIDTHS])
+    for (const variant of variants) {
+      const meta = await sharp(variant.data).metadata()
+      expect(meta.width).toBeLessThanOrEqual(500)
+    }
   })
 
   it("refuses files that are not JPG, PNG or WebP, whatever the name", async () => {

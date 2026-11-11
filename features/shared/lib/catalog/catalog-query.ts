@@ -316,3 +316,30 @@ export async function searchSuggestions(q: string): Promise<{
   ])
   return { categories, products }
 }
+
+/**
+ * Product cards for a list of slugs, in the given order, skipping
+ * products that are not published (home showcases, RF47).
+ *
+ * @param slugs - Product slugs chosen in the back office.
+ * @returns Cards of the published products.
+ */
+export async function getProductCardsBySlugs(
+  slugs: string[]
+): Promise<ProductCardData[]> {
+  "use cache"
+  cacheTag(PRODUCTS_CACHE_TAG, CATEGORIES_CACHE_TAG)
+  cacheLife("minutes")
+  if (slugs.length === 0) return []
+  const rows = await prisma.product.findMany({
+    where: {
+      slug: { in: slugs },
+      status: "ACTIVE",
+      deletedAt: null,
+      category: { active: true },
+    },
+    select: cardSelect,
+  })
+  const bySlug = new Map(rows.map((row) => [row.slug, toCard(row)]))
+  return slugs.flatMap((slug) => bySlug.get(slug) ?? [])
+}
