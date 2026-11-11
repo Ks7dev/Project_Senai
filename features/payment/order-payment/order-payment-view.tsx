@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import Script from "next/script"
 import { useRouter } from "next/navigation"
-import { LockIcon } from "lucide-react"
+import { CopyIcon, ExternalLinkIcon, LockIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   payOrder,
   type OrderPaymentContext,
@@ -88,6 +89,136 @@ function PaymentHistory({ payments }: { payments: PaymentView[] }) {
 }
 
 /**
+ * Payment methods the Brick shows for the order method (RF29).
+ *
+ * @param method - Order payment method.
+ * @param maxInstallments - Most card installments allowed (RF14).
+ * @returns The Brick `paymentMethods` customization.
+ */
+function brickPaymentMethods(
+  method: string,
+  maxInstallments: number
+): Record<string, unknown> {
+  if (method === "PIX") return { bankTransfer: ["pix"] }
+  if (method === "BOLETO") return { ticket: ["bolbradesco"] }
+  return { creditCard: "all", minInstallments: 1, maxInstallments }
+}
+
+/**
+ * Button that copies a Pix code or a boleto line.
+ *
+ * @param props - Text to copy and the button label.
+ * @returns The button.
+ */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Button
+      type="button"
+      variant="subtle"
+      className="self-start"
+      onClick={() => {
+        navigator.clipboard
+          ?.writeText(value)
+          .then(() => setCopied(true))
+          .catch(() => setCopied(false))
+      }}
+    >
+      <CopyIcon aria-hidden />
+      {copied ? "Copiado" : label}
+    </Button>
+  )
+}
+
+/**
+ * Pix QR Code and copy-and-paste code, or the boleto line and PDF, of a
+ * pending payment, with the deadline (RF29, RN14).
+ *
+ * @param props - The pending payment.
+ * @returns The instructions, or null for a card payment.
+ */
+function PendingInstructions({ payment }: { payment: PaymentView }) {
+  const id = useId()
+  const deadline = payment.expiresAt
+    ? `Pague até ${dateTime.format(new Date(payment.expiresAt))}. Depois disso, o pedido é cancelado e os itens voltam ao estoque.`
+    : null
+  if (payment.pix) {
+    return (
+      <section
+        aria-labelledby={`${id}-pix`}
+        className="flex flex-col gap-sm rounded-lg border border-line-subtle p-md"
+      >
+        <h2 id={`${id}-pix`} className="text-headline-sm">
+          Pague com Pix
+        </h2>
+        {payment.pix.qrCodeImage && (
+          // eslint-disable-next-line @next/next/no-img-element -- inline data URI from Mercado Pago
+          <img
+            src={`data:image/png;base64,${payment.pix.qrCodeImage}`}
+            alt="QR Code Pix do pedido"
+            width={220}
+            height={220}
+            className="self-center"
+          />
+        )}
+        <label htmlFor={`${id}-code`} className="text-label">
+          Pix copia e cola
+        </label>
+        <textarea
+          id={`${id}-code`}
+          readOnly
+          value={payment.pix.qrCode}
+          rows={3}
+          className="w-full rounded border border-line-subtle bg-subtle p-sm text-body-sm break-all"
+        />
+        <CopyButton value={payment.pix.qrCode} label="Copiar código Pix" />
+        {deadline && <p className="text-body-sm text-ink-muted">{deadline}</p>}
+      </section>
+    )
+  }
+  if (payment.boleto) {
+    return (
+      <section
+        aria-labelledby={`${id}-boleto`}
+        className="flex flex-col gap-sm rounded-lg border border-line-subtle p-md"
+      >
+        <h2 id={`${id}-boleto`} className="text-headline-sm">
+          Pague o boleto
+        </h2>
+        {payment.boleto.line && (
+          <>
+            <label htmlFor={`${id}-line`} className="text-label">
+              Linha digitável
+            </label>
+            <input
+              id={`${id}-line`}
+              readOnly
+              value={payment.boleto.line}
+              className="w-full rounded border border-line-subtle bg-subtle p-sm text-body-sm"
+            />
+            <CopyButton value={payment.boleto.line} label="Copiar linha" />
+          </>
+        )}
+        {payment.boleto.url && (
+          <a
+            href={payment.boleto.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-xs text-body-sm text-primary underline"
+          >
+            Abrir o boleto em PDF
+            <ExternalLinkIcon className="size-4" aria-hidden />
+            <span className="sr-only">(abre em nova aba)</span>
+          </a>
+        )}
+        {deadline && <p className="text-body-sm text-ink-muted">{deadline}</p>}
+      </section>
+    )
+  }
+  return null
+}
+
+/**
  * Payment of an order with the Mercado Pago Payment Brick (RF28, RF35,
  * RF36, RF37). The card is typed in the Brick, which tokenizes it in
  * the browser: only the token goes to the Server Action (RN19). When the
@@ -112,6 +243,9 @@ export function OrderPaymentView({
   const controller = useRef<BrickController | null>(null)
 
   const showForm = context.canPay && !attempt
+  const pendingPayment =
+    context.payments.find((payment) => payment.status === "PENDING") ??
+    (attempt?.payment.status === "PENDING" ? attempt.payment : undefined)
   const { orderId, method, total, payerEmail, maxInstallments } = context
 
   const submit = useCallback(
@@ -119,9 +253,9 @@ export function OrderPaymentView({
       setError(undefined)
       const result = await payOrder({
         orderId,
-        method: method as "CARD",
-        formData: formData as never,
-      })
+        method,
+        formData,
+      } as never)
       if (!result.success) {
         setError(result.error)
         return
@@ -142,11 +276,7 @@ export function OrderPaymentView({
       .create("payment", paymentContainer, {
         initialization: { amount: Number(total), payer: { email: payerEmail } },
         customization: {
-          paymentMethods: {
-            creditCard: "all",
-            minInstallments: 1,
-            maxInstallments,
-          },
+          paymentMethods: brickPaymentMethods(method, maxInstallments),
         },
         callbacks: {
           onReady: () => undefined,
@@ -179,6 +309,7 @@ export function OrderPaymentView({
     total,
     payerEmail,
     maxInstallments,
+    method,
     submit,
   ])
 
@@ -273,6 +404,8 @@ export function OrderPaymentView({
       )}
 
       {threeDs && <div id={statusContainer} />}
+
+      {pendingPayment && <PendingInstructions payment={pendingPayment} />}
 
       {attempt?.payment.status === "REJECTED" && context.canPay && (
         <button

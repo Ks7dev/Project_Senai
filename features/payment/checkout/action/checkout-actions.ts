@@ -38,6 +38,7 @@ import {
 } from "@/features/shared/lib/errors/action-result"
 import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
+import { loadPaymentDeadlines } from "@/features/shared/lib/payments/payment-deadlines"
 import { PAYMENT_METHOD_LABEL } from "@/features/shared/lib/payments/payment-messages"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
@@ -246,11 +247,22 @@ function assertCartReady(cart: CartView): void {
  * @returns The options.
  */
 async function paymentOptions(): Promise<CheckoutPaymentOption[]> {
+  const { pixMinutes, boletoBusinessDays } = await loadPaymentDeadlines()
   return [
     {
       method: "CARD",
       label: PAYMENT_METHOD_LABEL.CARD,
       note: "Os dados do cartão são digitados no formulário seguro do Mercado Pago e não passam pelos nossos servidores.",
+    },
+    {
+      method: "PIX",
+      label: PAYMENT_METHOD_LABEL.PIX,
+      note: `O código Pix vale por ${pixMinutes} minutos. Sem pagamento nesse prazo, o pedido é cancelado e os itens voltam ao estoque.`,
+    },
+    {
+      method: "BOLETO",
+      label: PAYMENT_METHOD_LABEL.BOLETO,
+      note: `O boleto vence em ${boletoBusinessDays} ${boletoBusinessDays === 1 ? "dia útil" : "dias úteis"}. Sem pagamento nesse prazo, o pedido é cancelado e os itens voltam ao estoque.`,
     },
   ]
 }
