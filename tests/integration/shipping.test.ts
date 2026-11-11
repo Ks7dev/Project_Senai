@@ -33,6 +33,9 @@ const { saveAddress, deleteAddress } =
 const { quoteShipping } =
   await import("@/features/shared/lib/shipping/shipping-actions")
 
+const { listShippingRegions, saveShippingRegion, toggleShippingRegion } =
+  await import("@/features/shipping/regions/action/region-actions")
+
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 
 /**
@@ -201,5 +204,125 @@ describe("shipping strategies against MySQL (#40, RF25, RN20)", () => {
         items: [{ skuCode: "PAP-CAD-A5-CAR", quantity: 1 }],
       })
     ).toEqual({ success: false, error: "CEP deve ter 8 números." })
+  })
+})
+
+describe("own delivery regions in the back office (#43, RF27, RF50, RN16)", () => {
+  const desk = [{ skuCode: "MOB-MES-REG-CAR", quantity: 1 }]
+
+  it("lets the admin create, price and deactivate a CEP range", async () => {
+    await login("admin@atelierbureau.test")
+    const saved = await saveShippingRegion({
+      name: "Campinas (teste)",
+      cepStart: "13000-000",
+      cepEnd: "13139-999",
+      ownDelivery: true,
+      rates: [
+        { maxKg: "200", price: "520,00" },
+        { maxKg: "50", price: "310,50" },
+      ],
+      freeShippingMinimum: "",
+      active: true,
+    })
+    expect(saved.success).toBe(true)
+    if (!saved.success) return
+    try {
+      const listed = await listShippingRegions()
+      const region =
+        listed.success && listed.regions.find((item) => item.id === saved.id)
+      expect(region).toMatchObject({
+        cepStart: "13000000",
+        cepEnd: "13139999",
+        rates: [
+          { maxKg: "50", price: "310.50" },
+          { maxKg: "200", price: "520.00" },
+        ],
+        freeShippingMinimum: "",
+      })
+      expect(
+        await prisma.auditLog.count({
+          where: { entityId: saved.id, action: "shipping_region.create" },
+        })
+      ).toBe(1)
+
+      // Desk: 62 kg billable → 200 kg rate of the new region
+      expect(await quoteShipping({ cep: "13010-000", items: desk })).toEqual({
+        success: true,
+        quote: {
+          status: "quoted",
+          strategy: "own_delivery",
+          options: [expect.objectContaining({ price: "520.00" })],
+          coverage: { ownDelivery: true, regionName: "Campinas (teste)" },
+        },
+      })
+
+      const edited = await saveShippingRegion({
+        id: saved.id,
+        name: "Campinas (teste)",
+        cepStart: "13000000",
+        cepEnd: "13139999",
+        ownDelivery: true,
+        rates: [{ maxKg: "100", price: "400" }],
+        freeShippingMinimum: "3000,00",
+        active: true,
+      })
+      expect(edited).toEqual({ success: true, id: saved.id })
+      const quoted = await quoteShipping({ cep: "13010000", items: desk })
+      expect(quoted.success && quoted.quote.status === "quoted").toBe(true)
+      if (quoted.success && quoted.quote.status === "quoted") {
+        expect(quoted.quote.options[0]?.price).toBe("400.00")
+      }
+
+      expect(
+        await toggleShippingRegion({ id: saved.id, active: false })
+      ).toEqual({ success: true })
+      expect(await quoteShipping({ cep: "13010000", items: desk })).toEqual({
+        success: true,
+        quote: {
+          status: "manual_quote",
+          reason: "assembly_outside_coverage",
+          coverage: { ownDelivery: false, regionName: null },
+        },
+      })
+    } finally {
+      await prisma.shippingRegion.delete({ where: { id: saved.id } })
+    }
+  })
+
+  it("refuses a range that overlaps an active region", async () => {
+    await login("admin@atelierbureau.test")
+    const result = await saveShippingRegion({
+      name: "Sobreposta",
+      cepStart: "09000000",
+      cepEnd: "11000000",
+      ownDelivery: false,
+      rates: [],
+      active: true,
+    })
+    expect(result).toEqual({
+      success: false,
+      error:
+        'A faixa de CEP se sobrepõe à região "Região Metropolitana de São Paulo".',
+    })
+  })
+
+  it("keeps the coverage table out of reach of other profiles", async () => {
+    await login("comercial@atelierbureau.test")
+    expect((await listShippingRegions()).success).toBe(false)
+    expect(
+      (
+        await saveShippingRegion({
+          name: "Sem permissão",
+          cepStart: "80000000",
+          cepEnd: "80999999",
+          ownDelivery: false,
+          rates: [],
+          active: true,
+        })
+      ).success
+    ).toBe(false)
+    expect(
+      await prisma.shippingRegion.count({ where: { name: "Sem permissão" } })
+    ).toBe(0)
   })
 })
