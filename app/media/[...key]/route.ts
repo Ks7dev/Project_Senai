@@ -7,7 +7,8 @@ const CONTENT_TYPES: Record<string, string> = {
 }
 
 /**
- * Serves public catalog files (product images and datasheets) from the
+ * Serves public catalog and home content files (product images,
+ * datasheets and carousel images) from the
  * local storage. Only WebP and PDF are served; keys that try to leave
  * the storage folder are refused.
  *
@@ -23,7 +24,9 @@ export async function GET(
   const path = key.join("/")
   const extension = path.split(".").pop() ?? ""
   const contentType = CONTENT_TYPES[extension]
-  if (!contentType || !path.startsWith("products/")) {
+  const publicPrefix =
+    path.startsWith("products/") || path.startsWith("content/")
+  if (!contentType || !publicPrefix) {
     return new NextResponse(null, { status: 404 })
   }
 

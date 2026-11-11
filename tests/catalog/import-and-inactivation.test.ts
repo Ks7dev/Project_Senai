@@ -103,3 +103,37 @@ describe("product inactivation keeps history (#28, RF42)", () => {
     expect(orderItem).toMatch(/onDelete: Restrict/)
   })
 })
+
+describe("home content (#30, RF47)", async () => {
+  const { parseHomeContent, homeContentSchema, DEFAULT_HOME_CONTENT } =
+    await import("@/features/shared/lib/content/home-content")
+
+  it("falls back to the default content when nothing valid is stored", () => {
+    expect(parseHomeContent(undefined)).toEqual(DEFAULT_HOME_CONTENT)
+    expect(parseHomeContent({ slides: [] })).toEqual(DEFAULT_HOME_CONTENT)
+  })
+
+  it("only accepts internal links and content image keys", () => {
+    const slide = { id: "s", title: "Título do slide" }
+    const check = (patch: object) =>
+      homeContentSchema.safeParse({
+        slides: [{ ...slide, ...patch }],
+        showcases: [],
+      }).success
+    expect(check({ ctaHref: "/categoria/iluminacao" })).toBe(true)
+    expect(check({ ctaHref: "https://evil.example" })).toBe(false)
+    expect(check({ ctaHref: "//evil.example" })).toBe(false)
+    expect(check({ imageKey: "content/home/abc" })).toBe(true)
+    expect(check({ imageKey: "../secrets" })).toBe(false)
+  })
+
+  it("limits slides and showcase products", () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({
+      id: `s${i}`,
+      title: "Título do slide",
+    }))
+    expect(
+      homeContentSchema.safeParse({ slides: many, showcases: [] }).success
+    ).toBe(false)
+  })
+})

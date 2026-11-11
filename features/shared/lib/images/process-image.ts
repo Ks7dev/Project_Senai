@@ -27,7 +27,8 @@ export type ImageVariant = {
  * 300 KB (RNF04). Only JPG, PNG and WebP are accepted.
  *
  * @param input - Uploaded file contents.
- * @returns One WebP version per width, never wider than the original.
+ * @returns One WebP file per width in IMAGE_WIDTHS; files of widths above
+ * the original keep the original width (never upscaled).
  * @throws AppError with a user message for invalid or oversized files.
  */
 export async function processProductImage(
@@ -53,11 +54,11 @@ export async function processProductImage(
     )
   }
 
-  const widths = IMAGE_WIDTHS.filter((w) => w <= originalWidth!)
-  if (widths.length === 0) widths.push(IMAGE_WIDTHS[0])
-
+  // Every width is always written, so pages can reference all of them in
+  // srcSet; smaller originals are never upscaled (the file keeps the
+  // original width).
   const variants: ImageVariant[] = []
-  for (const width of widths) {
+  for (const width of IMAGE_WIDTHS) {
     variants.push({ width, data: await toWebpUnderLimit(input, width) })
   }
   return variants
