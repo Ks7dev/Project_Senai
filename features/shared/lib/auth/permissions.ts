@@ -58,6 +58,11 @@ export const adminModules: AdminModule[] = [
     permission: "shipment:manage",
   },
   { href: "/admin/cotacoes", label: "Cotações", permission: "quote:read" },
+  {
+    href: "/admin/frete",
+    label: "Frete e cobertura",
+    permission: "setting:manage",
+  },
   { href: "/admin/clientes", label: "Clientes", permission: "customer:read" },
   {
     href: "/admin/financeiro",
