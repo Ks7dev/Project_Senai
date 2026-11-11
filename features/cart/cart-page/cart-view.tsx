@@ -20,7 +20,9 @@ import {
   saveProjectListSchema,
   type SaveProjectListInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
+import { CartLineExtras } from "@/features/cart/cart-page/cart-line-extras"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
+import type { CartExtrasRules } from "@/features/shared/lib/cart/cart-extras"
 import { MAX_LINE_QUANTITY } from "@/features/shared/lib/cart/cart-math"
 import type { CartLine, CartView } from "@/features/shared/lib/cart/cart-types"
 
@@ -34,19 +36,23 @@ type CartPageViewProps = {
   cart: CartView
   /** Whether the customer is logged in (only they keep project lists). */
   loggedIn: boolean
+  /** Engraving and additional service rules (RF51, RF52). */
+  rules: CartExtrasRules
 }
 
 /**
- * Cart page (#46, RF07): lines with quantity and removal, order
- * summary, shipping estimate by CEP and the option to save the cart as
- * a project list to resume later.
+ * Cart page (#46, RF07): lines with quantity and removal, laser
+ * engraving and additional services (#47, RF51, RF52), order summary
+ * with the extras cost and lead time, shipping estimate by CEP and the
+ * option to save the cart as a project list to resume later.
  *
- * @param props - Cart and login state.
+ * @param props - Cart, login state and extras rules.
  * @returns The page content.
  */
 export function CartPageView({
   cart: initialCart,
   loggedIn,
+  rules,
 }: CartPageViewProps) {
   const router = useRouter()
   const [cart, setCart] = useState(initialCart)
@@ -106,7 +112,12 @@ export function CartPageView({
                 <CartLineRow
                   key={line.id}
                   line={line}
+                  rules={rules}
                   pending={pending}
+                  onSaved={(updated) => {
+                    setCart(updated)
+                    router.refresh()
+                  }}
                   onQuantity={(quantity) =>
                     run(() => updateCartItem({ itemId: line.id, quantity }))
                   }
@@ -119,7 +130,16 @@ export function CartPageView({
           </section>
 
           <aside className="flex flex-col gap-lg">
-            <OrderSummary subtotal={cart.subtotal} total={cart.subtotal} />
+            <OrderSummary
+              subtotal={cart.subtotal}
+              services={cart.servicesTotal}
+              total={cart.total}
+              note={
+                cart.extraBusinessDays > 0
+                  ? `Personalização e serviços acrescentam ${cart.extraBusinessDays} ${cart.extraBusinessDays === 1 ? "dia útil" : "dias úteis"} ao prazo de entrega.`
+                  : undefined
+              }
+            />
             {purchasable.length > 0 && (
               <ShippingEstimate
                 key={purchasable
@@ -154,20 +174,25 @@ export function CartPageView({
 
 type CartLineRowProps = {
   line: CartLine
+  rules: CartExtrasRules
   pending: boolean
+  onSaved: (cart: CartView) => void
   onQuantity: (quantity: number) => void
   onRemove: () => void
 }
 
 /**
- * One cart line with the quantity stepper and the remove button.
+ * One cart line with the quantity stepper, the remove button and the
+ * personalization and services of the line.
  *
  * @param props - Line and handlers.
  * @returns The list item.
  */
 function CartLineRow({
   line,
+  rules,
   pending,
+  onSaved,
   onQuantity,
   onRemove,
 }: CartLineRowProps) {
@@ -199,6 +224,21 @@ function CartLineRow({
             Indisponível no momento: não entra no total.
           </span>
         )}
+        {line.purchasable && line.personalization && (
+          <span className="text-ink">
+            Gravação: “{line.personalization.text}” ·{" "}
+            {brl.format(Number(line.engravingTotal))}
+          </span>
+        )}
+        {line.purchasable &&
+          line.services.map((service) => (
+            <span key={service.key} className="text-ink">
+              {service.label} ·{" "}
+              {service.courtesy
+                ? "Cortesia"
+                : brl.format(Number(service.total))}
+            </span>
+          ))}
         <div className="mt-xs flex items-center gap-xs">
           <Button
             type="button"
@@ -239,6 +279,7 @@ function CartLineRow({
             <Trash2Icon />
           </Button>
         </div>
+        <CartLineExtras line={line} rules={rules} onSaved={onSaved} />
       </div>
       <strong className="text-body text-ink">
         {brl.format(Number(line.total))}

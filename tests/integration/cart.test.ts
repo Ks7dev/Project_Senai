@@ -29,8 +29,12 @@ const { signIn, signOut } =
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
 const { GUEST_CART_COOKIE, loadCurrentCart } =
   await import("@/features/shared/lib/cart/cart-store")
-const { removeCartItem, saveCartAsProjectList, updateCartItem } =
-  await import("@/features/cart/cart-page/action/cart-page-actions")
+const {
+  removeCartItem,
+  saveCartAsProjectList,
+  setCartItemExtras,
+  updateCartItem,
+} = await import("@/features/cart/cart-page/action/cart-page-actions")
 const { deleteProjectList, listMyProjectLists, resumeProjectList } =
   await import("@/features/cart/project-lists/action/project-list-actions")
 
@@ -281,5 +285,162 @@ describe("project lists (#46, RF07)", () => {
     expect((await deleteProjectList({ listId: saved.listId })).success).toBe(
       false
     )
+  })
+})
+
+describe("personalization and additional services (#47, RF51, RF52)", () => {
+  const engraving = {
+    type: "laser_engraving" as const,
+    text: "Diretoria Jurídica",
+    font: "serif" as const,
+  }
+
+  it("adds the engraving and services cost and extra days to the cart", async () => {
+    await addToCart({ skuCode: "PAP-CAD-A5-CAR", quantity: 2 })
+    await addToCart({ skuCode: "MOB-MES-REG-CAR", quantity: 1 })
+    const [notebook, desk] = (await loadCurrentCart()).lines
+
+    const engraved = await setCartItemExtras({
+      itemId: notebook!.id,
+      personalization: engraving,
+      services: ["institutional_packaging"],
+    })
+    expect(engraved.success).toBe(true)
+    const assembled = await setCartItemExtras({
+      itemId: desk!.id,
+      personalization: null,
+      services: ["assembly"],
+    })
+    if (!assembled.success) throw new Error(assembled.error)
+
+    const cart = assembled.cart
+    // 2 × 389.00 + 9800.00
+    expect(cart.subtotal).toBe("10578.00")
+    // Engraving 2 × 90.00 + packaging 2 × 35.00 + assembly 250.00
+    expect(cart.servicesTotal).toBe("500.00")
+    expect(cart.total).toBe("11078.00")
+    // Engraving 3 + packaging 1 on the notebook line
+    expect(cart.extraBusinessDays).toBe(4)
+    expect(cart.lines[0]?.personalization).toEqual(engraving)
+  })
+
+  it("reads prices and extra days from the settings table", async () => {
+    const original = await prisma.setting.findUniqueOrThrow({
+      where: { key: "personalization.engraving" },
+    })
+    await prisma.setting.update({
+      where: { key: "personalization.engraving" },
+      data: { value: { price: "0.00", extraBusinessDays: 5, maxLength: 30 } },
+    })
+    try {
+      await addToCart({ skuCode: "ESC-TIN-HER-M" })
+      const line = (await loadCurrentCart()).lines[0]!
+      const result = await setCartItemExtras({
+        itemId: line.id,
+        personalization: engraving,
+        services: [],
+      })
+      if (!result.success) throw new Error(result.error)
+      expect(result.cart.servicesTotal).toBe("0.00")
+      expect(result.cart.extraBusinessDays).toBe(5)
+    } finally {
+      await prisma.setting.update({
+        where: { key: "personalization.engraving" },
+        data: { value: original.value as object },
+      })
+    }
+  })
+
+  it("rejects engraving on products that do not accept it", async () => {
+    await addToCart({ skuCode: "ORG-MOD-NOG" })
+    const line = (await loadCurrentCart()).lines[0]!
+    expect(
+      await setCartItemExtras({
+        itemId: line.id,
+        personalization: engraving,
+        services: [],
+      })
+    ).toEqual({ success: false, error: "Este produto não aceita gravação." })
+  })
+
+  it("respects the configured engraving length", async () => {
+    await addToCart({ skuCode: "PAP-CAD-A5-GRA" })
+    const line = (await loadCurrentCart()).lines[0]!
+    expect(
+      await setCartItemExtras({
+        itemId: line.id,
+        personalization: { ...engraving, text: "x".repeat(31) },
+        services: [],
+      })
+    ).toEqual({
+      success: false,
+      error: "Use até 30 caracteres na gravação.",
+    })
+  })
+
+  it("rejects services the product is not eligible for", async () => {
+    await addToCart({ skuCode: "PAP-CAD-A5-GRA" })
+    const line = (await loadCurrentCart()).lines[0]!
+    for (const services of [["assembly"], ["nao_existe"]]) {
+      expect(
+        await setCartItemExtras({
+          itemId: line.id,
+          personalization: null,
+          services,
+        })
+      ).toEqual({
+        success: false,
+        error: "Serviço indisponível para este produto.",
+      })
+    }
+  })
+
+  it("never changes another customer's line", async () => {
+    await login(OTHER)
+    await addToCart({ skuCode: "PAP-CAD-A5-CAR" })
+    const foreign = (await loadCurrentCart()).lines[0]!
+    jar.clear()
+    await login(CUSTOMER)
+    expect(
+      await setCartItemExtras({
+        itemId: foreign.id,
+        personalization: engraving,
+        services: [],
+      })
+    ).toEqual({ success: false, error: "Item não encontrado no seu carrinho." })
+  })
+
+  it("keeps the engraving through login and project lists", async () => {
+    await addToCart({ skuCode: "PAP-CAD-A5-CAR" })
+    const line = (await loadCurrentCart()).lines[0]!
+    await setCartItemExtras({
+      itemId: line.id,
+      personalization: engraving,
+      services: ["institutional_packaging"],
+    })
+    await login(CUSTOMER)
+    const merged = (await loadCurrentCart()).lines[0]!
+    expect(merged.personalization).toEqual(engraving)
+    expect(merged.services.map((service) => service.key)).toEqual([
+      "institutional_packaging",
+    ])
+
+    const saved = await saveCartAsProjectList({ name: "Brindes" })
+    if (!saved.success) throw new Error(saved.error)
+    const listed = await listMyProjectLists()
+    expect(listed.success && listed.lists[0]?.servicesTotal).toBe("125.00")
+
+    // Removing the extras stores no personalization
+    const cleared = await setCartItemExtras({
+      itemId: merged.id,
+      personalization: null,
+      services: [],
+    })
+    expect(cleared.success && cleared.cart.servicesTotal).toBe("0.00")
+    const row = await prisma.cartItem.findUniqueOrThrow({
+      where: { id: merged.id },
+    })
+    expect(row.personalization).toBeNull()
+    expect(row.services).toBeNull()
   })
 })

@@ -1,7 +1,11 @@
 import { Suspense } from "react"
+import { connection } from "next/server"
 import { CartPageView } from "@/features/cart/cart-page/cart-view"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
-import { loadCurrentCart } from "@/features/shared/lib/cart/cart-store"
+import {
+  loadCartExtrasRules,
+  loadCurrentCart,
+} from "@/features/shared/lib/cart/cart-store"
 
 export const metadata = { title: "Carrinho — Atelier Bureau" }
 
@@ -12,8 +16,14 @@ export const metadata = { title: "Carrinho — Atelier Bureau" }
  * @returns The cart page.
  */
 async function CartContent() {
-  const [user, cart] = await Promise.all([getCurrentUser(), loadCurrentCart()])
-  return <CartPageView cart={cart} loggedIn={user !== null} />
+  // Request time only: the cart and its rules are never read in the build
+  await connection()
+  const [user, cart, rules] = await Promise.all([
+    getCurrentUser(),
+    loadCurrentCart(),
+    loadCartExtrasRules(),
+  ])
+  return <CartPageView cart={cart} loggedIn={user !== null} rules={rules} />
 }
 
 /**
