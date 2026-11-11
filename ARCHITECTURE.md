@@ -105,16 +105,19 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
 |---|---|---|---|
 | `proxy` | `caddy:2` | **80 e 443** | HTTPS na frente do app. O 80 só redireciona para o 443 (RNF06) |
 | `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
-| `db` | `mysql:8.4` | **3306** | MySQL com volume persistente `mysql-data` |
+| `db` | `mysql:8.4` | **3306**, só em `127.0.0.1` por padrão | MySQL com volume persistente `mysql-data` |
 | `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
 
 - **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
-- **Firewall do Windows:** libere 80, 443 e 3306 **só no perfil de rede Privada**, nunca em rede Pública.
+- **Firewall do Windows:** libere 80 e 443 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.
 - **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/`) em cada dispositivo para o navegador não mostrar aviso.
 - **Acesso ao MySQL por outros dispositivos:**
   - Só com usuários nomeados e senha forte, com host restrito à sub-rede (`'dev'@'192.168.0.%'`) e TLS obrigatório.
   - O `root` não tem acesso remoto.
   - O app usa um usuário próprio sem DDL. As migrations rodam com o usuário de migração.
+  - A porta 3306 é publicada só em `127.0.0.1` por padrão. No Docker Desktop, toda conexão que entra pela porta publicada chega ao MySQL com o IP do gateway do Docker, então o MySQL não consegue separar quem vem da LAN. Por isso, abrir o banco à rede é uma decisão explícita: `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env`, com o firewall no perfil Privado e senhas fortes em todos os usuários.
+  - As configurações do servidor (charset, fuso UTC, TLS e conexões) vão como flags do `mysqld` no `docker-compose.yml`. Um `.cnf` montado do Windows chega com permissão de escrita para todos, e o MySQL o ignora.
+  - O MySQL 8 autentica com `caching_sha2_password`. Sem TLS, o driver do app busca a chave pública RSA do servidor (`allowPublicKeyRetrieval`, em `features/shared/lib/db/connection-config.ts`).
 - **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, serviço opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago`. Se o webhook não chegar, uma reconciliação consulta `GET /v1/payments/{id}` (#57).
 - **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O app depende de a máquina servidora estar ligada e na rede, e o monitoramento fica na #80.
 - **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
