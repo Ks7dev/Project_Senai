@@ -3,11 +3,16 @@ import type { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import { AppError } from "@/features/shared/lib/errors/action-result"
 import { logger } from "@/features/shared/lib/logger/logger"
-import { getNumberSetting } from "@/features/shared/lib/settings/settings"
+import { correiosProvider } from "@/features/shared/lib/correios/correios"
+import {
+  getNumberSetting,
+  getSetting,
+} from "@/features/shared/lib/settings/settings"
 import { loadManualQuoteResponseDays } from "@/features/shared/lib/shipping/manual-quote"
 import {
   calculateShipping,
-  shippingStrategies,
+  createShippingStrategies,
+  notConfiguredProvider,
   type CoverageRegion,
   type ShippingQuote,
   type ShippingStrategy,
@@ -50,6 +55,33 @@ export async function loadShippingRules(
     correiosMaxDimensionsSumCm,
     cubageFactor,
   }
+}
+
+/**
+ * Modalities with the real API clients (RN20). The carrier aggregator
+ * client arrives with #42.
+ */
+const serverShippingStrategies = createShippingStrategies({
+  correios: correiosProvider,
+  carrier: notConfiguredProvider("carrier"),
+})
+
+/**
+ * CEP the orders ship from, from the settings table (never fixed in
+ * the code). An invalid value disables the API quotes, so the order
+ * goes to the manual quote instead of a wrong price.
+ *
+ * @param client - Prisma client or transaction.
+ * @returns The 8-digit CEP, or undefined when not configured.
+ */
+export async function loadOriginCep(
+  client: Client = prisma
+): Promise<string | undefined> {
+  const value = await getSetting("shipping.origin_cep", client).catch(
+    () => null
+  )
+  const cep = typeof value === "string" ? value.replace(/\D/g, "") : ""
+  return cep.length === 8 ? cep : undefined
 }
 
 /**
@@ -137,13 +169,14 @@ export async function quoteShippingForItems(
       }
     })
   )
-  const [rules, region] = await Promise.all([
+  const [rules, region, originCep] = await Promise.all([
     loadShippingRules(client),
     findCoverageRegion(input.cep, client),
+    loadOriginCep(client),
   ])
   const quote = await calculateShipping(
-    { cep: input.cep, volumes, rules, region },
-    options.strategies ?? shippingStrategies
+    { cep: input.cep, volumes, rules, region, originCep },
+    options.strategies ?? serverShippingStrategies
   )
   if (quote.status === "quoted") return quote
   return {

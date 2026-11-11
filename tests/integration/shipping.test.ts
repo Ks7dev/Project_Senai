@@ -32,6 +32,8 @@ const { saveAddress, deleteAddress } =
 
 const { quoteShipping } =
   await import("@/features/shared/lib/shipping/shipping-actions")
+const { resetCorreiosToken } =
+  await import("@/features/shared/lib/correios/correios")
 
 const { listShippingRegions, saveShippingRegion, toggleShippingRegion } =
   await import("@/features/shipping/regions/action/region-actions")
@@ -60,6 +62,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 afterAll(async () => {
@@ -194,6 +197,84 @@ describe("shipping strategies against MySQL (#40, RF25, RN20)", () => {
         reason: "no_option",
         responseBusinessDays: 2,
       },
+    })
+  })
+
+  it("quotes PAC and SEDEX in the Correios API for small volumes (#41)", async () => {
+    resetCorreiosToken()
+    vi.stubEnv("CORREIOS_USER", "usuario-teste")
+    vi.stubEnv("CORREIOS_ACCESS_CODE", "codigo-teste")
+    vi.stubEnv("CORREIOS_POSTAGE_CARD", "0000000000")
+    vi.stubEnv("CORREIOS_BASE_URL", "https://correios.test")
+    const urls: string[] = []
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input)
+        urls.push(url)
+        const sedex = url.includes("/03220")
+        const body = url.includes("/token/")
+          ? { token: "fake-token", expiraEm: "2099-01-01T00:00:00" }
+          : url.includes("/preco/")
+            ? { pcFinal: sedex ? "39,50" : "21,30" }
+            : { prazoEntrega: sedex ? 2 : 6 }
+        return new Response(JSON.stringify(body), { status: 200 })
+      })
+    )
+    const result = await quoteShipping({
+      cep: "70040-010",
+      items: [{ skuCode: "PAP-CAD-A5-CAR", quantity: 2 }],
+    })
+    expect(result).toEqual({
+      success: true,
+      quote: {
+        status: "quoted",
+        strategy: "correios",
+        options: [
+          {
+            method: "CORREIOS_PAC",
+            carrier: "Correios",
+            service: "PAC",
+            price: "42.60",
+            deliveryDays: 6,
+          },
+          {
+            method: "CORREIOS_SEDEX",
+            carrier: "Correios",
+            service: "SEDEX",
+            price: "79.00",
+            deliveryDays: 2,
+          },
+        ],
+        coverage: { ownDelivery: false, regionName: null },
+      },
+    })
+    // Origin from the settings table, weight from the product (450 g)
+    expect(urls.find((url) => url.includes("/preco/"))).toContain(
+      "cepOrigem=04538133"
+    )
+    expect(urls.find((url) => url.includes("/preco/"))).toContain(
+      "psObjeto=450"
+    )
+  })
+
+  it("falls back to the manual quote when the Correios API fails (#41)", async () => {
+    resetCorreiosToken()
+    vi.stubEnv("CORREIOS_USER", "usuario-teste")
+    vi.stubEnv("CORREIOS_ACCESS_CODE", "codigo-teste")
+    vi.stubEnv("CORREIOS_POSTAGE_CARD", "0000000000")
+    vi.stubEnv("CORREIOS_BASE_URL", "https://correios.test")
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 503 }))
+    )
+    const result = await quoteShipping({
+      cep: "70040-010",
+      items: [{ skuCode: "PAP-CAD-A5-CAR", quantity: 1 }],
+    })
+    expect(result).toMatchObject({
+      success: true,
+      quote: { status: "manual_quote", reason: "no_option" },
     })
   })
 
