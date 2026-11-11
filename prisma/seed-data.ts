@@ -65,6 +65,12 @@ export const settings: SettingSeed[] = [
     description: "Fator de cubagem: peso cubado = C × L × A (cm) ÷ fator (#40)",
   },
   {
+    key: "shipping.origin_cep",
+    value: "04538133",
+    description:
+      "CEP de origem dos envios, usado nas cotações dos Correios e da transportadora (fictício, RF25)",
+  },
+  {
     key: "shipping.manual_quote_response_business_days",
     value: 2,
     description:
