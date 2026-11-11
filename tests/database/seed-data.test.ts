@@ -97,9 +97,11 @@ describe("seed accounts", () => {
     expect(new Set(documents).size).toBe(documents.length)
   })
 
-  it("gives the multi-user corporate account an approver (RN08)", () => {
+  it("gives the multi-user corporate account an approver and an admin (RN08)", () => {
     expect(corporateAccount.members.length).toBeGreaterThan(1)
-    expect(corporateAccount.members.map((m) => m.role)).toContain("approver")
+    const roles = corporateAccount.members.flatMap((m) => m.role.split(","))
+    expect(roles).toContain("approver")
+    expect(roles).toContain("admin")
   })
 })
 

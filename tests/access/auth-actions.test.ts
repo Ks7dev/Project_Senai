@@ -14,6 +14,10 @@ const organizationCreate = vi.fn()
 const memberCreate = vi.fn()
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
+const lookupCnpj = vi.fn()
+vi.mock("@/features/shared/lib/brasilapi/cnpj", () => ({
+  lookupCnpj: (cnpj: string) => lookupCnpj(cnpj),
+}))
 vi.mock("@/features/shared/lib/auth/auth", () => ({ getAuth: () => ({ api }) }))
 vi.mock("@/features/shared/lib/db/prisma", () => ({
   prisma: {
@@ -57,6 +61,11 @@ beforeEach(() => {
   organizationFindUnique.mockResolvedValue(null)
   api.signUpEmail.mockResolvedValue({ user: { id: "user-1" } })
   organizationCreate.mockResolvedValue({ id: "org-1" })
+  lookupCnpj.mockResolvedValue({
+    status: "active",
+    legalName: "EMPRESA FICTICIA LTDA",
+    tradeName: null,
+  })
 })
 
 describe("signUp (RF39)", () => {
@@ -86,10 +95,33 @@ describe("signUp (RF39)", () => {
         data: expect.objectContaining({
           organizationId: "org-1",
           userId: "user-1",
-          role: "admin",
+          role: "approver,admin",
         }),
       })
     )
+  })
+
+  it("uses the legal name from the Receita and blocks inactive CNPJs (RF09)", async () => {
+    await signUp(pj)
+    expect(organizationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ legalName: "EMPRESA FICTICIA LTDA" }),
+      })
+    )
+    vi.clearAllMocks()
+    lookupCnpj.mockResolvedValue({
+      status: "inactive",
+      legalName: "X",
+      situation: "BAIXADA",
+    })
+    const result = await signUp(pj)
+    expect(result.success).toBe(false)
+    expect(api.signUpEmail).not.toHaveBeenCalled()
+  })
+
+  it("continues when the CNPJ API is unavailable", async () => {
+    lookupCnpj.mockResolvedValue({ status: "unavailable" })
+    expect(await signUp(pj)).toEqual({ success: true })
   })
 
   it("refuses a CPF that already has an account", async () => {
