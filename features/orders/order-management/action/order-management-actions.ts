@@ -66,6 +66,8 @@ export type AdminOrderRow = {
   createdAt: string
   /** Delivery and installation date scheduled at checkout (RN05), ISO. */
   scheduledDeliveryAt: string | null
+  /** Tracking code of the shipment (RF15), if any. */
+  trackingCode: string | null
   /** Latest payment with the Mercado Pago payment_id (RF32), if any. */
   payment: {
     /** Payment method label. */
@@ -121,6 +123,7 @@ export async function listAdminOrders(
         total: true,
         createdAt: true,
         scheduledDeliveryAt: true,
+        shipment: { select: { trackingCode: true } },
         user: { select: { name: true } },
         organization: { select: { name: true } },
         payments: {
@@ -152,6 +155,7 @@ export async function listAdminOrders(
         total: row.total.toFixed(2),
         createdAt: row.createdAt.toISOString(),
         scheduledDeliveryAt: row.scheduledDeliveryAt?.toISOString() ?? null,
+        trackingCode: row.shipment?.trackingCode ?? null,
         payment: row.payments[0]
           ? {
               method:
@@ -186,9 +190,12 @@ export async function listAdminOrders(
  * The life cycle refuses invalid transitions, the history records the
  * date and the responsible user and the audit log keeps before/after
  * (RNF12). A cancellation needs a reason and follows RN24 for
- * personalized items.
+ * personalized items. When the order ships, the tracking code is saved
+ * on the shipment before the status e-mail is queued, so the customer
+ * sees it in the e-mail and in the order tracking (RF15).
  *
- * @param input - Order, new status, note and cancellation reason.
+ * @param input - Order, new status, note, cancellation reason and
+ *   tracking code.
  * @returns `{ success: true, status }` or `{ success: false, error }`.
  */
 export async function updateOrderStatus(
@@ -242,6 +249,16 @@ export async function updateOrderStatus(
               .filter(Boolean)
               .join(": ")
           : data.note || null
+      const trackingCode =
+        data.to === "SHIPPED" && data.trackingCode
+          ? data.trackingCode.toUpperCase()
+          : null
+      if (trackingCode) {
+        await tx.shipment.updateMany({
+          where: { orderId: data.orderId },
+          data: { trackingCode },
+        })
+      }
       const done = await transitionOrder(tx, {
         orderId: data.orderId,
         to: data.to,
@@ -254,7 +271,7 @@ export async function updateOrderStatus(
         entity: "order",
         entityId: data.orderId,
         before: { status: done.from },
-        after: { status: done.to, note },
+        after: { status: done.to, note, trackingCode },
       })
       return done
     })

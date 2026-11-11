@@ -38,7 +38,8 @@ export type OrderFiltersInput = z.input<typeof orderFiltersSchema>
 
 /**
  * Status change made by hand in the back office (RF54): the new status,
- * an optional note and, for a cancellation, the reason.
+ * an optional note, for a cancellation the reason and, when the order
+ * ships, the tracking code shown to the customer (RF15).
  */
 export const updateOrderStatusSchema = z
   .object({
@@ -48,6 +49,16 @@ export const updateOrderStatusSchema = z
       .string()
       .trim()
       .max(255, "Use no máximo 255 caracteres.")
+      .optional()
+      .default(""),
+    trackingCode: z
+      .string()
+      .trim()
+      .max(64, "Use no máximo 64 caracteres.")
+      .regex(
+        /^[A-Za-z0-9-]*$/,
+        "Use apenas letras, números e hífen no código de rastreio."
+      )
       .optional()
       .default(""),
     cancellationReason: z.preprocess(
