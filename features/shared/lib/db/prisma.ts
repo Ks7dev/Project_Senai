@@ -16,14 +16,27 @@ function createPrismaClient() {
   return new PrismaClient({ adapter: new PrismaMariaDb(mariaDbConfig(url)) })
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma?: ReturnType<typeof createPrismaClient>
-}
+type Client = ReturnType<typeof createPrismaClient>
+
+const globalForPrisma = globalThis as unknown as { prisma?: Client }
 
 /**
- * Single Prisma client for the whole server. Reused across hot reloads
- * in development to avoid opening a new pool on every change.
+ * Returns the single Prisma client, creating it on first use. Lazy so
+ * that importing this module (e.g. during `next build`) needs no
+ * database. Reused across hot reloads in development.
+ *
+ * @returns The Prisma client.
  */
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+export function getPrisma(): Client {
+  if (!globalForPrisma.prisma) globalForPrisma.prisma = createPrismaClient()
+  return globalForPrisma.prisma
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+/** Single Prisma client for the whole server (created on first use). */
+export const prisma = new Proxy({} as Client, {
+  get(_target, property) {
+    const client = getPrisma()
+    const value = Reflect.get(client, property, client)
+    return typeof value === "function" ? value.bind(client) : value
+  },
+})
