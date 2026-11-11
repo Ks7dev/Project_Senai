@@ -10,6 +10,7 @@ import {
 import { PRODUCTS_CACHE_TAG } from "@/features/shared/lib/catalog/product-cache"
 import { CATEGORIES_CACHE_TAG } from "@/features/shared/lib/catalog/category-cache"
 import { prisma } from "@/features/shared/lib/db/prisma"
+import type { ComparisonProduct } from "@/features/shared/lib/catalog/comparison-rows"
 
 /** Product summary shown in cards (listing, search, favorites). */
 export type ProductCardData = {
@@ -342,4 +343,71 @@ export async function getProductCardsBySlugs(
   })
   const bySlug = new Map(rows.map((row) => [row.slug, toCard(row)]))
   return slugs.flatMap((slug) => bySlug.get(slug) ?? [])
+}
+
+/**
+ * Cards of the products a user favorited, newest first, skipping
+ * products that are no longer published (RF45). Not cached: it depends
+ * on the user, whose id must come from the session.
+ *
+ * @param userId - Logged-in user id, from the session.
+ * @returns Favorite product cards.
+ */
+export async function getFavoriteCards(
+  userId: string
+): Promise<ProductCardData[]> {
+  const rows = await prisma.favorite.findMany({
+    where: {
+      userId,
+      product: {
+        status: "ACTIVE",
+        deletedAt: null,
+        category: { active: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { product: { select: cardSelect } },
+  })
+  return rows.map((row) => toCard(row.product))
+}
+
+/**
+ * Products for the comparison page, in the given order (RF04). At most
+ * four slugs are used; unpublished products are skipped.
+ *
+ * @param slugs - Product slugs from the URL.
+ * @returns Products with their specifications.
+ */
+export async function getComparisonProducts(
+  slugs: string[]
+): Promise<ComparisonProduct[]> {
+  "use cache"
+  cacheTag(PRODUCTS_CACHE_TAG, CATEGORIES_CACHE_TAG)
+  cacheLife("minutes")
+  const wanted = [...new Set(slugs)].slice(0, 4)
+  if (wanted.length === 0) return []
+  const rows = await prisma.product.findMany({
+    where: {
+      slug: { in: wanted },
+      status: "ACTIVE",
+      deletedAt: null,
+      category: { active: true },
+    },
+    select: { ...cardSelect, warrantyMonths: true, specs: true },
+  })
+  const bySlug = new Map(
+    rows.map((row) => [
+      row.slug,
+      {
+        ...toCard(row),
+        warrantyMonths: row.warrantyMonths,
+        specs: Object.fromEntries(
+          Object.entries((row.specs ?? {}) as Record<string, unknown>).map(
+            ([label, value]) => [label, String(value)]
+          )
+        ),
+      },
+    ])
+  )
+  return wanted.flatMap((slug) => bySlug.get(slug) ?? [])
 }

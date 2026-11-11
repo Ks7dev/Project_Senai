@@ -8,10 +8,14 @@ import {
   MessageCircleIcon,
   ShieldCheckIcon,
 } from "lucide-react"
+import { MaterialSwatches } from "@/components/commerce/material-swatches"
+import { SpecAccordion } from "@/components/commerce/spec-accordion"
 import { PageContainer } from "@/components/layout/page-container"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import type { ProductPageData } from "@/features/catalog/product-page/load-product"
+import { CompareButton } from "@/features/shared/components/compare-controls"
+import { FavoriteButton } from "@/features/shared/components/favorite-button"
 import { cn } from "@/lib/utils"
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -108,9 +112,18 @@ export function ProductPageView({ product }: ProductPageViewProps) {
           {product.brand && (
             <p className="text-caps text-clay uppercase">{product.brand}</p>
           )}
-          <h1 className="text-headline-xl-mobile lg:text-headline-xl">
-            {product.name}
-          </h1>
+          <div className="flex items-start justify-between gap-md">
+            <h1 className="text-headline-xl-mobile lg:text-headline-xl">
+              {product.name}
+            </h1>
+            <div className="flex items-center gap-sm">
+              <FavoriteButton
+                productId={product.id}
+                productName={product.name}
+              />
+              <CompareButton slug={product.slug} name={product.name} />
+            </div>
+          </div>
           <div className="flex flex-wrap gap-sm">
             {product.limitedEdition && (
               <Badge variant="outline">
@@ -130,32 +143,16 @@ export function ProductPageView({ product }: ProductPageViewProps) {
           </p>
 
           {product.skus.length > 1 && (
-            <fieldset className="flex flex-col gap-sm">
-              <legend className="pb-xs text-label font-medium">Variação</legend>
-              <div className="flex flex-wrap gap-sm">
-                {product.skus.map((item) => (
-                  <label
-                    key={item.code}
-                    className={cn(
-                      "cursor-pointer rounded-full border px-md py-2 text-label-sm",
-                      item.code === skuCode
-                        ? "border-primary bg-primary-tint text-primary"
-                        : "border-line text-ink"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="sku"
-                      value={item.code}
-                      checked={item.code === skuCode}
-                      onChange={() => setSkuCode(item.code)}
-                      className="sr-only"
-                    />
-                    {item.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <MaterialSwatches
+              name="sku"
+              legend="Material e acabamento"
+              options={product.skus.map((item) => ({
+                value: item.code,
+                label: item.name,
+              }))}
+              value={skuCode}
+              onChange={setSkuCode}
+            />
           )}
 
           <p
@@ -219,22 +216,47 @@ export function ProductPageView({ product }: ProductPageViewProps) {
           <p className="text-body whitespace-pre-line text-ink">
             {product.description}
           </p>
-          {product.specs.length > 0 && (
-            <>
-              <h2 className="text-headline-md">Especificações técnicas</h2>
-              <dl className="divide-y divide-line-subtle border-y border-line-subtle">
-                {product.specs.map((spec) => (
-                  <div
-                    key={spec.label}
-                    className="grid grid-cols-2 gap-md py-sm text-body-sm"
-                  >
-                    <dt className="text-ink-muted">{spec.label}</dt>
-                    <dd className="text-ink">{spec.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          )}
+          <SpecAccordion
+            sections={[
+              ...(product.specs.length > 0
+                ? [
+                    {
+                      title: "Especificações técnicas",
+                      rows: product.specs,
+                      defaultOpen: true,
+                    },
+                  ]
+                : []),
+              {
+                title: "Garantia e cuidados",
+                rows: [
+                  {
+                    label: "Garantia",
+                    value: `${product.warrantyMonths} ${product.warrantyMonths === 1 ? "mês" : "meses"}${product.includesExtendedWarranty ? " (estendida incluída)" : ""}`,
+                  },
+                  {
+                    label: "Trocas e devoluções",
+                    value: "Mediante avaliação do produto.",
+                  },
+                ],
+              },
+              {
+                title: "Entrega",
+                rows: [
+                  {
+                    label: "Prazo de produção ou separação",
+                    value: `${product.leadTimeDays} dias úteis`,
+                  },
+                  {
+                    label: "Instalação",
+                    value: product.requiresInstallation
+                      ? "Agendada no checkout"
+                      : "Não necessária",
+                  },
+                ],
+              },
+            ]}
+          />
         </section>
 
         {(product.datasheets.length > 0 ||

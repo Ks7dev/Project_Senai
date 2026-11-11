@@ -3,6 +3,8 @@ import { ProductCard } from "@/components/commerce/product-card"
 import { PageContainer } from "@/components/layout/page-container"
 import { buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CompareButton } from "@/features/shared/components/compare-controls"
+import { FavoriteButton } from "@/features/shared/components/favorite-button"
 import {
   filtersToQuery,
   LEAD_TIME_OPTIONS,
@@ -201,7 +203,22 @@ export function ListingView({
             <ul className="grid grid-cols-2 gap-gutter-mobile md:grid-cols-3 md:gap-gutter-tablet lg:gap-gutter xl:grid-cols-4">
               {page.products.map((product) => (
                 <li key={product.id}>
-                  <ProductCard {...product} />
+                  <ProductCard
+                    {...product}
+                    actions={
+                      <>
+                        <FavoriteButton
+                          productId={product.id}
+                          productName={product.name}
+                          size="sm"
+                        />
+                        <CompareButton
+                          slug={product.slug}
+                          name={product.name}
+                        />
+                      </>
+                    }
+                  />
                 </li>
               ))}
             </ul>
