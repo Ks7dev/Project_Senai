@@ -4,7 +4,7 @@
 set -e
 
 echo "Applying database migrations..."
-node ./node_modules/prisma/build/index.js migrate deploy
+(cd ./migrate && node ./node_modules/prisma/build/index.js migrate deploy)
 
 echo "Starting Atelier Bureau..."
 exec node server.js

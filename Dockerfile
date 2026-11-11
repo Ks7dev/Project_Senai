@@ -15,6 +15,15 @@ COPY . .
 # public/ is optional in the repository but copied to the runtime image
 RUN mkdir -p public && npx prisma generate && npm run build
 
+# Prisma CLI with its full dependency tree, same version as the lock
+# file, isolated from the standalone server's traced node_modules
+FROM node:24-alpine AS migrate
+WORKDIR /migrate
+COPY --from=deps /app/node_modules/prisma/package.json /tmp/prisma.json
+RUN npm init -y > /dev/null     && npm install --omit=dev --no-audit --no-fund        "prisma@$(node -p "require('/tmp/prisma.json').version")"
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
@@ -29,10 +38,7 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
 
 # Prisma CLI, schema and migrations for `prisma migrate deploy` on start
-COPY --from=build --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=build --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=migrate --chown=nextjs:nodejs /migrate ./migrate
 COPY --chown=nextjs:nodejs deploy/app/entrypoint.sh ./entrypoint.sh
 
 USER nextjs
