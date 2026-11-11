@@ -127,6 +127,56 @@ export const settings: SettingSeed[] = [
     description:
       "Serviços adicionais do carrinho por unidade: preço ou cortesia, dias úteis a mais e produtos elegíveis (RF52)",
   },
+  {
+    key: "installation.min_business_days",
+    value: 2,
+    description:
+      "Antecedência mínima do agendamento de entrega e instalação, em dias úteis, somada ao prazo do frete e dos serviços (RN05)",
+  },
+  {
+    key: "installation.window_days",
+    value: 45,
+    description:
+      "Quantos dias corridos a agenda de entrega e instalação oferece a partir da primeira data (RN05)",
+  },
+  {
+    key: "installation.daily_capacity",
+    value: 3,
+    description:
+      "Entregas com instalação que a equipe atende por dia; com a agenda cheia, a data fica bloqueada (RN05)",
+  },
+  {
+    key: "installation.weekdays",
+    value: [1, 2, 3, 4, 5],
+    description:
+      "Dias da semana com equipe de instalação (0 = domingo … 6 = sábado) (RN05)",
+  },
+  {
+    key: "installation.blocked_dates",
+    value: [
+      "2026-11-20",
+      "2026-12-24",
+      "2026-12-25",
+      "2026-12-31",
+      "2027-01-01",
+      "2027-02-08",
+      "2027-02-09",
+      "2027-03-26",
+      "2027-04-21",
+      "2027-05-01",
+      "2027-05-27",
+      "2027-09-07",
+      "2027-10-12",
+      "2027-11-02",
+      "2027-11-15",
+      "2027-11-20",
+      "2027-12-24",
+      "2027-12-25",
+      "2027-12-31",
+    ],
+    description:
+      "Datas sem entrega e instalação, como feriados e recesso, no formato AAAA-MM-DD (RN05)",
+  },
 ]
 
 /** A CEP range of the delivery coverage. */

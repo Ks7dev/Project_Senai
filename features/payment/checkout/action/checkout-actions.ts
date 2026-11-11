@@ -25,6 +25,22 @@ import {
 } from "@/features/shared/lib/cart/cart-store"
 import type { CartView } from "@/features/shared/lib/cart/cart-types"
 import { writeAudit } from "@/features/shared/lib/db/audit"
+import {
+  addDaysToKey,
+  buildInstallationCalendar,
+  earliestInstallationDate,
+  installationLeadDays,
+  scheduledAtFromKey,
+  unavailableReason,
+  type DateKey,
+  type InstallationRules,
+  type ScheduleDay,
+} from "@/features/shared/lib/delivery/installation-calendar"
+import {
+  countScheduledByDate,
+  loadInstallationRules,
+  lockInstallationAgenda,
+} from "@/features/shared/lib/delivery/installation-schedule"
 import { getCorporateContext } from "@/features/shared/lib/db/corporate"
 import {
   FORBIDDEN_MESSAGE,
@@ -90,18 +106,35 @@ export type CheckoutContext = {
   approvalLimit: string | null
   /** Payment methods offered (RF29). */
   paymentMethods: CheckoutPaymentOption[]
+  /** Delivery and installation scheduling of the cart (RF16, RN05). */
+  installation: {
+    /** Whether a line needs installation, so a date is required. */
+    required: boolean
+    /** Products that need installation. */
+    products: string[]
+  }
 }
 
 /** A shipping option with the order total it gives. */
 export type CheckoutOption = ShippingOption & {
   /** Order total with this option, decimal string. */
   total: string
+  /**
+   * First installation date with this option (RN05), or null when the
+   * cart needs no installation.
+   */
+  earliestInstallationDate: DateKey | null
 }
 
 /** Shipping of the cart to the chosen address. */
 export type CheckoutQuote = {
   /** Delivery address, one line. */
   address: string
+  /**
+   * Delivery and installation calendar, with the blocked dates (RN05);
+   * null when the cart needs no installation.
+   */
+  schedule: ScheduleDay[] | null
 } & (
   | { status: "quoted"; options: CheckoutOption[] }
   | {
@@ -139,6 +172,14 @@ const UNAVAILABLE_LINE_MESSAGE =
 /** Message when prices or shipping moved since the review. */
 const PRICES_CHANGED_MESSAGE =
   "Os valores do pedido mudaram desde a revisão. Confira o novo total antes de confirmar."
+
+/** Message when an installation order has no date (RN05). */
+const INSTALLATION_DATE_REQUIRED_MESSAGE =
+  "Escolha a data de entrega e instalação para finalizar o pedido."
+
+/** Message when the chosen installation date is blocked (RN05). */
+const INSTALLATION_DATE_UNAVAILABLE_MESSAGE =
+  "A data de entrega e instalação escolhida não está disponível. Escolha outra data."
 
 /** How many times a conflicting order number is retried. */
 const ORDER_NUMBER_ATTEMPTS = 3
@@ -238,6 +279,56 @@ function assertCartReady(cart: CartView): void {
   }
   if (cart.lines.some((line) => !line.purchasable)) {
     throw new AppError(UNAVAILABLE_LINE_MESSAGE, "unavailable_line")
+  }
+}
+
+/**
+ * Products of the cart that need installation (RN05), without repeats.
+ *
+ * @param cart - Cart view.
+ * @returns The product names.
+ */
+function installationProducts(cart: CartView): string[] {
+  return [
+    ...new Set(
+      cart.lines
+        .filter((line) => line.purchasable && line.requiresInstallation)
+        .map((line) => line.productName)
+    ),
+  ]
+}
+
+/**
+ * Delivery and installation calendar of the cart (RN05), from the first
+ * date the preparation and the extras allow.
+ *
+ * @param cart - Cart view.
+ * @param now - Current time.
+ * @returns The rules and the calendar.
+ */
+async function loadInstallationCalendar(
+  cart: CartView,
+  now: Date
+): Promise<{ rules: InstallationRules; calendar: ScheduleDay[] }> {
+  const rules = await loadInstallationRules()
+  const leadBusinessDays = installationLeadDays(
+    rules,
+    cart.extraBusinessDays,
+    null
+  )
+  const first = earliestInstallationDate(now, leadBusinessDays)
+  const booked = await countScheduledByDate(
+    first,
+    addDaysToKey(first, rules.windowDays - 1)
+  )
+  return {
+    rules,
+    calendar: buildInstallationCalendar({
+      now,
+      leadBusinessDays,
+      rules,
+      booked,
+    }),
   }
 }
 
@@ -372,6 +463,10 @@ export async function getCheckout(): Promise<
         corporate: buyer.organizationId !== null,
         approvalLimit,
         paymentMethods,
+        installation: {
+          required: installationProducts(cart).length > 0,
+          products: installationProducts(cart),
+        },
       },
     }
   } catch (error) {
@@ -404,11 +499,17 @@ export async function quoteCheckoutShipping(
     assertCartReady(cart)
     const quote = await quoteCart(cart, address.cep)
     const base = toCents(cart.total)
+    const now = new Date()
+    const schedule =
+      installationProducts(cart).length > 0
+        ? await loadInstallationCalendar(cart, now)
+        : null
     if (quote.status === "manual_quote") {
       return {
         success: true,
         quote: {
           address: addressLine(address),
+          schedule: schedule?.calendar ?? null,
           status: "manual_quote",
           reason: quote.reason,
           responseBusinessDays:
@@ -421,10 +522,21 @@ export async function quoteCheckoutShipping(
       success: true,
       quote: {
         address: addressLine(address),
+        schedule: schedule?.calendar ?? null,
         status: "quoted",
         options: quote.options.map((option) => ({
           ...option,
           total: fromCents(base + toCents(option.price)),
+          earliestInstallationDate: schedule
+            ? earliestInstallationDate(
+                now,
+                installationLeadDays(
+                  schedule.rules,
+                  cart.extraBusinessDays,
+                  option.deliveryDays
+                )
+              )
+            : null,
         })),
       },
     }
@@ -444,8 +556,12 @@ export async function quoteCheckoutShipping(
  * - the payment (card, Pix, boleto), confirmed only by Mercado Pago;
  * - the company approval, above the approval limit (RN01);
  * - the sales team, when no shipping API answered (RN20).
+ * A cart with furniture that needs installation only goes on with a
+ * delivery and installation date that is still free (RF16, RN05); the
+ * agenda is locked so two orders never take the last slot of a date.
  *
- * @param input - Address, shipping option, payment method and amounts seen.
+ * @param input - Address, shipping option, payment method, amounts seen
+ *   and installation date.
  * @returns `{ success: true, order }` or `{ success: false, error }`.
  */
 export async function placeOrder(
@@ -469,6 +585,15 @@ export async function placeOrder(
     const address = await loadBuyerAddress(buyer, data.addressId)
     const preview = await loadBuyerCart(buyer.user.id)
     assertCartReady(preview.cart)
+    if (
+      installationProducts(preview.cart).length > 0 &&
+      !data.installationDate
+    ) {
+      throw new AppError(
+        INSTALLATION_DATE_REQUIRED_MESSAGE,
+        "installation_date_required"
+      )
+    }
     // The APIs are called outside the transaction, so no row stays
     // locked while they answer
     const quote = await quoteCart(preview.cart, address.cep)
@@ -507,6 +632,36 @@ export async function placeOrder(
         if (total !== data.expectedTotal) {
           throw new AppError(PRICES_CHANGED_MESSAGE, "prices_changed")
         }
+        let scheduledDeliveryAt: Date | null = null
+        if (installationProducts(cart).length > 0) {
+          const date = data.installationDate
+          if (!date) {
+            throw new AppError(
+              INSTALLATION_DATE_REQUIRED_MESSAGE,
+              "installation_date_required"
+            )
+          }
+          await lockInstallationAgenda(tx)
+          const rules = await loadInstallationRules(tx)
+          const reason = unavailableReason(date, {
+            now,
+            leadBusinessDays: installationLeadDays(
+              rules,
+              cart.extraBusinessDays,
+              chosen?.deliveryDays ?? null
+            ),
+            rules,
+            booked: await countScheduledByDate(date, date, tx),
+          })
+          if (reason) {
+            throw new AppError(
+              INSTALLATION_DATE_UNAVAILABLE_MESSAGE,
+              "installation_date_unavailable"
+            )
+          }
+          scheduledDeliveryAt = scheduledAtFromKey(date)
+        }
+
         const approvalLimit = await getNumberSetting("order.approval_limit", tx)
         const requiresApproval =
           buyer.organizationId !== null && Number(total) > approvalLimit
@@ -534,6 +689,7 @@ export async function placeOrder(
             shippingTotal: shipping,
             total,
             shippingAddress: address,
+            scheduledDeliveryAt,
             requiresApproval,
             createdAt: now,
             items: {
@@ -628,6 +784,7 @@ export async function placeOrder(
             shippingTotal: shipping,
             method: chosen?.method ?? "MANUAL_QUOTE",
             requiresApproval,
+            scheduledDeliveryAt: scheduledDeliveryAt?.toISOString() ?? null,
           },
         })
         return { orderId: order.id, number, status, total, manualQuote }
