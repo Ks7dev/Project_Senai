@@ -1,6 +1,5 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { PageContainer } from "@/components/layout/page-container"
 import { getSecurityStatus } from "@/features/access/security/action/two-factor"
 import { SecurityView } from "@/features/access/security/security-view"
 
@@ -24,7 +23,7 @@ async function SecuritySection() {
  */
 export default function SecurityPage() {
   return (
-    <PageContainer className="flex flex-col gap-lg py-xl">
+    <>
       <header>
         <p className="text-caps text-clay uppercase">Minha conta</p>
         <h1 className="text-headline-xl-mobile lg:text-headline-xl">
@@ -34,6 +33,6 @@ export default function SecurityPage() {
       <Suspense fallback={<p className="text-body">Carregando…</p>}>
         <SecuritySection />
       </Suspense>
-    </PageContainer>
+    </>
   )
 }
