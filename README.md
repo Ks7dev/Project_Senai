@@ -55,6 +55,12 @@ A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam
    sh deploy/export-root-cert.sh
    ```
 
+   No Windows, use `powershell -ExecutionPolicy Bypass -File deploy\export-root-cert.ps1`. Depois, confira o HTTPS e os headers de segurança a partir de outro dispositivo da rede:
+
+   ```bash
+   sh deploy/check-headers.sh <ip-do-servidor>
+   ```
+
 6. No Firewall do Windows, libere as portas 80 e 443 só no perfil de rede **Privada**. O MySQL (3306) fica só nesta máquina; para abri-lo à rede, defina `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env` e libere a 3306 também no perfil Privado.
 
 Serviços: `proxy` (Caddy, portas 80 e 443), `app` (Next.js, só na rede interna), `db` (MySQL 8.4, porta 3306 em `127.0.0.1`) e `backup` (`mysqldump` diário em `./backups`, 30 dias de retenção).
