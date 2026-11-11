@@ -35,6 +35,9 @@ services:
     environment:
       DATABASE_URL: mysql://atelier_app:${MYSQL_APP_PASSWORD}@db:3306/atelier_bureau
       MIGRATION_DATABASE_URL: mysql://atelier_migrate:${MYSQL_MIGRATE_PASSWORD}@db:3306/atelier_bureau
+    volumes:
+      # Uploaded product images, datasheets and attachments (#22)
+      - ./storage:/app/storage
     # Not published: only reachable through the proxy
     expose:
       - "3000"

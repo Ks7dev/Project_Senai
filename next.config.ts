@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   cacheComponents: true,
+  experimental: {
+    // Product images up to 10 MB plus multipart overhead (#22)
+    serverActions: { bodySizeLimit: "11mb" },
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
