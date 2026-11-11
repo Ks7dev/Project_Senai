@@ -48,8 +48,12 @@ services:
   db:
     image: mysql:8.4
     restart: unless-stopped
+    # Only this machine by default. Docker Desktop shows every connection
+    # through the published port as the Docker gateway, so MySQL cannot
+    # tell LAN clients apart: open it to the LAN only on purpose, with
+    # MYSQL_PUBLISH_ADDR=0.0.0.0 (ARCHITECTURE.md 5.1)
     ports:
-      - "3306:3306"
+      - "${MYSQL_PUBLISH_ADDR:-127.0.0.1}:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       # root only from inside the container, never remote
@@ -60,9 +64,16 @@ services:
       MYSQL_DEV_PASSWORD: ${MYSQL_DEV_PASSWORD:-}
       MYSQL_BACKUP_PASSWORD: ${MYSQL_BACKUP_PASSWORD:?set MYSQL_BACKUP_PASSWORD in .env}
       LAN_SUBNET: ${LAN_SUBNET:-192.168.0.%}
+    # Server settings as flags: a bind-mounted .cnf is world-writable on
+    # Windows hosts and MySQL ignores it
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --tls-version=TLSv1.2,TLSv1.3
+      - --max-connections=200
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./deploy/mysql/conf.d:/etc/mysql/conf.d:ro
       - ./deploy/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test:
