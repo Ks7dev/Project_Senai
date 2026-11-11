@@ -126,6 +126,28 @@ export function manualNextStatuses(
   })
 }
 
+/**
+ * Statuses in which the customer may change the delivery address with
+ * a new shipping quote (RN15, #45): before any payment, while the order
+ * is still in the checkout. After that the change goes through the
+ * customer service, which handles the price difference.
+ */
+export const ADDRESS_CHANGE_STATUSES: readonly OrderStatusKey[] = [
+  "AWAITING_SHIPPING_QUOTE",
+  "AWAITING_APPROVAL",
+  "AWAITING_PAYMENT",
+]
+
+/**
+ * Whether the customer may change the delivery address of the order.
+ *
+ * @param status - Current status.
+ * @returns True before the payment (RN15).
+ */
+export function canChangeAddress(status: OrderStatusKey): boolean {
+  return ADDRESS_CHANGE_STATUSES.includes(status)
+}
+
 /** Quote statuses (RF06). */
 export const QUOTE_STATUS: Record<string, string> = {
   REQUESTED: "Solicitada",
