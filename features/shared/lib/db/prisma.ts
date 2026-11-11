@@ -1,6 +1,7 @@
 import "server-only"
 import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 import { PrismaClient } from "@/generated/prisma/client"
+import { mariaDbConfig } from "@/features/shared/lib/db/connection-config"
 
 /**
  * Creates the Prisma client connected to MySQL 8 through the MariaDB
@@ -12,7 +13,7 @@ import { PrismaClient } from "@/generated/prisma/client"
 function createPrismaClient() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error("DATABASE_URL is not set")
-  return new PrismaClient({ adapter: new PrismaMariaDb(url) })
+  return new PrismaClient({ adapter: new PrismaMariaDb(mariaDbConfig(url)) })
 }
 
 type Client = ReturnType<typeof createPrismaClient>
