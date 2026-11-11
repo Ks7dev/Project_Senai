@@ -632,6 +632,8 @@ model Order {
   total               Decimal       @db.Decimal(12, 2)
   /// Address snapshot at checkout, so later edits do not change the order
   shippingAddress     Json          @map("shipping_address")
+  /// Delivery and installation date chosen at checkout (RN05): noon in
+  /// São Paulo of the scheduled day
   scheduledDeliveryAt DateTime?     @map("scheduled_delivery_at") @db.DateTime(3)
   /// Above the approval limit, waits for an approver (RN01)
   requiresApproval    Boolean       @default(false) @map("requires_approval")
@@ -654,6 +656,7 @@ model Order {
   @@index([status, createdAt])
   @@index([userId, createdAt])
   @@index([organizationId, status])
+  @@index([scheduledDeliveryAt])
   @@map("orders")
 }
 
