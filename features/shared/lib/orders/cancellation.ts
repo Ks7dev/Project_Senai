@@ -4,8 +4,10 @@ import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
 export const PRODUCTION_STARTED_STATUSES: readonly OrderStatusKey[] = [
   "IN_PRODUCTION",
   "SEPARATING",
+  "INVOICED",
   "SHIPPED",
   "DELIVERED",
+  "INSTALLED",
 ]
 
 /**
