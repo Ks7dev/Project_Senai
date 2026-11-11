@@ -134,6 +134,33 @@ async function reconcilePayment(
 }
 
 /**
+ * Reads one pending payment from Mercado Pago right away (#58), for the
+ * customer watching the payment page: the status changes there even
+ * when the webhook is late.
+ *
+ * @param paymentRowId - Our payment row id.
+ * @param options - Reference time and fetch implementation (tests).
+ * @returns The sync result, or null when nothing changed or the payment
+ * is no longer pending.
+ */
+export async function refreshPendingPayment(
+  paymentRowId: string,
+  options: { now?: Date; fetcher?: typeof fetch } = {}
+): Promise<PaymentSyncResult | null> {
+  if (!mercadoPagoConfig()) return null
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentRowId, status: "PENDING" },
+    select: { id: true, paymentId: true, createdAt: true },
+  })
+  if (!payment) return null
+  return reconcilePayment(
+    payment,
+    options.now ?? new Date(),
+    options.fetcher ?? fetch
+  )
+}
+
+/**
  * Reconciliation of the payments whose webhook did not arrive (#57):
  * reads the pending payments with `GET /v1/payments/{id}` (or by the
  * external reference) and applies them, least recently checked first.
