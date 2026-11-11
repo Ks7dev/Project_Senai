@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import { AppError } from "@/features/shared/lib/errors/action-result"
 import { logger } from "@/features/shared/lib/logger/logger"
+import { carrierProvider } from "@/features/shared/lib/carrier/carrier"
 import { correiosProvider } from "@/features/shared/lib/correios/correios"
 import {
   getNumberSetting,
@@ -12,7 +13,6 @@ import { loadManualQuoteResponseDays } from "@/features/shared/lib/shipping/manu
 import {
   calculateShipping,
   createShippingStrategies,
-  notConfiguredProvider,
   type CoverageRegion,
   type ShippingQuote,
   type ShippingStrategy,
@@ -58,12 +58,12 @@ export async function loadShippingRules(
 }
 
 /**
- * Modalities with the real API clients (RN20). The carrier aggregator
- * client arrives with #42.
+ * Modalities with the real API clients (RN20): Correios (#41) and the
+ * carrier aggregator (#42).
  */
 const serverShippingStrategies = createShippingStrategies({
   correios: correiosProvider,
-  carrier: notConfiguredProvider("carrier"),
+  carrier: carrierProvider,
 })
 
 /**
