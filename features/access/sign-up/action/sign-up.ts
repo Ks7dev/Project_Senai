@@ -8,6 +8,7 @@ import {
   type SignUpInput,
 } from "@/features/access/sign-up/schema/sign-up-schema"
 import { getAuth } from "@/features/shared/lib/auth/auth"
+import { mergeGuestCartAfterLogin } from "@/features/shared/lib/cart/cart-store"
 import { serializeRoles } from "@/features/shared/lib/auth/corporate-roles"
 import { lookupCnpj } from "@/features/shared/lib/brasilapi/cnpj"
 import { prisma } from "@/features/shared/lib/db/prisma"
@@ -116,6 +117,8 @@ export async function signUp(input: SignUpInput): Promise<ActionResult> {
       })
     }
 
+    // Sign-up logs in: the visitor cart is kept (#46, RF07)
+    if (result.token) await mergeGuestCartAfterLogin(result.user.id)
     return { success: true }
   } catch (error) {
     return toActionError(error, { action: "signUp" })
