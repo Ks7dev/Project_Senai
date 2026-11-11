@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { onlyDigits } from "@/features/shared/lib/validation/documents"
+import { cepSchema } from "@/features/shared/schema/cep-schema"
 
 /** Brazilian states (UF). */
 export const STATES = [
@@ -40,10 +40,7 @@ export const addressSchema = z.object({
   id: z.uuid().optional(),
   label: z.string().trim().min(2, "Dê um apelido (ex.: Matriz).").max(80),
   recipient: z.string().trim().min(3, "Informe quem recebe.").max(160),
-  cep: z
-    .string()
-    .transform(onlyDigits)
-    .refine((v) => v.length === 8, "CEP deve ter 8 números."),
+  cep: cepSchema,
   street: z.string().trim().min(2, "Informe a rua.").max(191),
   number: z.string().trim().min(1, "Informe o número (ou S/N).").max(20),
   complement: z.string().trim().max(120).optional().or(z.literal("")),
