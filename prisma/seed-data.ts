@@ -75,6 +75,37 @@ export const settings: SettingSeed[] = [
     value: [28, 56],
     description: "Vencimentos do pagamento faturado, em dias (RN03)",
   },
+  {
+    key: "personalization.engraving",
+    value: { price: "90.00", extraBusinessDays: 3, maxLength: 30 },
+    description:
+      "Gravação a laser por unidade: preço, dias úteis a mais no prazo e limite de caracteres (RF51)",
+  },
+  {
+    key: "cart.additional_services",
+    value: [
+      {
+        key: "institutional_packaging",
+        label: "Embalagem institucional",
+        description: "Caixa rígida com a identidade da empresa e cartão.",
+        price: "35.00",
+        courtesy: false,
+        extraBusinessDays: 1,
+        eligibility: "all",
+      },
+      {
+        key: "assembly",
+        label: "Montagem",
+        description: "Montagem no local por equipe própria ou parceira.",
+        price: "250.00",
+        courtesy: false,
+        extraBusinessDays: 0,
+        eligibility: "installation",
+      },
+    ],
+    description:
+      "Serviços adicionais do carrinho por unidade: preço ou cortesia, dias úteis a mais e produtos elegíveis (RF52)",
+  },
 ]
 
 /** A CEP range of the delivery coverage. */

@@ -1,5 +1,19 @@
 import { z } from "zod"
-import { cartQuantitySchema } from "@/features/shared/schema/cart-schema"
+import {
+  cartQuantitySchema,
+  lineServicesSchema,
+  personalizationSchema,
+} from "@/features/shared/schema/cart-schema"
+
+/** Laser engraving and additional services of a line (RF51, RF52). */
+export const setCartItemExtrasSchema = z.object({
+  itemId: z.uuid("Item inválido."),
+  personalization: personalizationSchema.nullable(),
+  services: lineServicesSchema,
+})
+
+/** Values of the extras form of a line. */
+export type SetCartItemExtrasInput = z.input<typeof setCartItemExtrasSchema>
 
 /** Changes the quantity of a cart line. */
 export const updateCartItemSchema = z.object({

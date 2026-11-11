@@ -6,6 +6,7 @@ import {
   addItemsToCart,
   cartItemInclude,
   getOrCreateActiveCartId,
+  loadCartExtrasRules,
   loadCartView,
   summarizeLines,
   toCartLine,
@@ -59,6 +60,7 @@ export async function listMyProjectLists(): Promise<
 > {
   try {
     const userId = await requireUserId()
+    const rules = await loadCartExtrasRules()
     const rows = await prisma.cart.findMany({
       where: { userId, kind: "PROJECT_LIST", deletedAt: null },
       orderBy: { updatedAt: "desc" },
@@ -72,7 +74,7 @@ export async function listMyProjectLists(): Promise<
         id: row.id,
         name: row.name ?? "Lista sem nome",
         updatedAt: row.updatedAt.toISOString(),
-        ...summarizeLines(row.items.map(toCartLine)),
+        ...summarizeLines(row.items.map((item) => toCartLine(item, rules))),
       })),
     }
   } catch (error) {
@@ -104,7 +106,10 @@ export async function resumeProjectList(
       },
     })
     if (!list) throw new AppError(LIST_NOT_FOUND, "not_found")
-    const available = list.items.filter((item) => toCartLine(item).purchasable)
+    const rules = await loadCartExtrasRules()
+    const available = list.items.filter(
+      (item) => toCartLine(item, rules).purchasable
+    )
     if (available.length === 0) {
       throw new AppError(
         "Nenhum produto desta lista está disponível no momento.",
