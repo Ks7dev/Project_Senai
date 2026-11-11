@@ -77,9 +77,17 @@ export function ProductsListView({
           </button>
         </form>
         {canCreate && (
-          <Link href="/admin/produtos/novo" className={buttonVariants()}>
-            Novo produto
-          </Link>
+          <div className="flex gap-sm">
+            <Link
+              href="/admin/produtos/importar"
+              className={buttonVariants({ variant: "ghost" })}
+            >
+              Importar CSV
+            </Link>
+            <Link href="/admin/produtos/novo" className={buttonVariants()}>
+              Novo produto
+            </Link>
+          </div>
         )}
       </div>
 
