@@ -109,6 +109,8 @@ export type ShippingQuote =
       status: "manual_quote"
       /** Why the sales team must quote. */
       reason: ManualQuoteReason
+      /** Return time promised to the customer, in business days (#44). */
+      responseBusinessDays?: number
       /** Coverage of the destination. */
       coverage: ShippingCoverage
     }

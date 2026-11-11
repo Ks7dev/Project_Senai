@@ -34,6 +34,18 @@ export function manualQuoteReasonMessage(reason: ManualQuoteReason): string {
 }
 
 /**
+ * Return time of the manual shipping quote, shown to the customer when
+ * the shipping cannot be calculated (RN20, #44).
+ *
+ * @param businessDays - Configured return time, in business days.
+ * @returns The notice, in Portuguese.
+ */
+export function manualQuoteResponseMessage(businessDays: number): string {
+  const days = businessDays === 1 ? "1 dia útil" : `${businessDays} dias úteis`
+  return `Nossa equipe comercial retorna com o valor e o prazo do frete em até ${days}.`
+}
+
+/**
  * Delivery time of a shipping option.
  *
  * @param option - Shipping option.

@@ -36,6 +36,11 @@ const { quoteShipping } =
 const { listShippingRegions, saveShippingRegion, toggleShippingRegion } =
   await import("@/features/shipping/regions/action/region-actions")
 
+const { notifyManualQuoteRequested, sendOrderToManualShippingQuote } =
+  await import("@/features/shared/lib/shipping/manual-quote")
+const { answerManualShippingQuote, listManualShippingQuotes } =
+  await import("@/features/shipping/manual-quotes/action/manual-quote-actions")
+
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 
 /**
@@ -184,7 +189,11 @@ describe("shipping strategies against MySQL (#40, RF25, RN20)", () => {
     })
     expect(result).toMatchObject({
       success: true,
-      quote: { status: "manual_quote", reason: "no_option" },
+      quote: {
+        status: "manual_quote",
+        reason: "no_option",
+        responseBusinessDays: 2,
+      },
     })
   })
 
@@ -282,6 +291,7 @@ describe("own delivery regions in the back office (#43, RF27, RF50, RN16)", () =
           status: "manual_quote",
           reason: "assembly_outside_coverage",
           coverage: { ownDelivery: false, regionName: null },
+          responseBusinessDays: 2,
         },
       })
     } finally {
@@ -324,5 +334,271 @@ describe("own delivery regions in the back office (#43, RF27, RF50, RN16)", () =
     expect(
       await prisma.shippingRegion.count({ where: { name: "Sem permissão" } })
     ).toBe(0)
+  })
+})
+
+describe("manual shipping quote queue (#44, RN16, RN20)", () => {
+  const created: string[] = []
+
+  /**
+   * Creates an order as the checkout will, with one desk line.
+   *
+   * @param input - Buyer e-mail, company and subtotal.
+   * @returns The order id and number.
+   */
+  async function createOrder(input: {
+    email: string
+    organizationSlug?: string
+    subtotal: string
+  }) {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: input.email },
+      select: { id: true },
+    })
+    const organization = input.organizationSlug
+      ? await prisma.organization.findUniqueOrThrow({
+          where: { slug: input.organizationSlug },
+          select: { id: true },
+        })
+      : null
+    const sku = await prisma.sku.findUniqueOrThrow({
+      where: { code: "MOB-MES-REG-CAR" },
+      select: { id: true, code: true, product: { select: { name: true } } },
+    })
+    const order = await prisma.order.create({
+      data: {
+        number: `AB-T-${Date.now().toString().slice(-9)}${created.length}`,
+        userId: user.id,
+        organizationId: organization?.id ?? null,
+        status: "AWAITING_PAYMENT",
+        paymentMethod: "PIX",
+        subtotal: input.subtotal,
+        total: input.subtotal,
+        shippingAddress: { cep: "70040010", city: "Brasília", state: "DF" },
+        items: {
+          create: {
+            skuId: sku.id,
+            productName: sku.product.name,
+            skuCode: sku.code,
+            quantity: 1,
+            unitPrice: input.subtotal,
+            total: input.subtotal,
+          },
+        },
+      },
+      select: { id: true, number: true, userId: true },
+    })
+    created.push(order.id)
+    return order
+  }
+
+  afterAll(async () => {
+    await prisma.order.deleteMany({ where: { id: { in: created } } })
+  })
+
+  it("sends the order to the sales queue and gives the customer the return time", async () => {
+    const order = await createOrder({
+      email: "cliente.pf@atelierbureau.test",
+      subtotal: "4890.00",
+    })
+    // Friday 12:00 in São Paulo → 2 business days → Tuesday
+    const now = new Date("2026-11-13T15:00:00.000Z")
+    const queued = await prisma.$transaction((tx) =>
+      sendOrderToManualShippingQuote(tx, {
+        orderId: order.id,
+        reason: "assembly_outside_coverage",
+        changedById: order.userId,
+        now,
+      })
+    )
+    expect(queued).toEqual({
+      businessDays: 2,
+      respondBy: new Date("2026-11-17T15:00:00.000Z"),
+    })
+    const stored = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: {
+        status: true,
+        shipment: { select: { method: true, quoteData: true } },
+        statusHistory: { select: { toStatus: true } },
+      },
+    })
+    expect(stored).toEqual({
+      status: "AWAITING_SHIPPING_QUOTE",
+      shipment: {
+        method: "MANUAL_QUOTE",
+        quoteData: {
+          reason: "assembly_outside_coverage",
+          requestedAt: now.toISOString(),
+          respondBy: "2026-11-17T15:00:00.000Z",
+        },
+      },
+      statusHistory: [{ toStatus: "AWAITING_SHIPPING_QUOTE" }],
+    })
+
+    await expect(
+      notifyManualQuoteRequested({
+        to: "cliente.pf@atelierbureau.test",
+        name: "Cliente Pessoa Física",
+        orderNumber: order.number,
+        reason: "assembly_outside_coverage",
+        businessDays: queued.businessDays,
+        respondBy: queued.respondBy,
+      })
+    ).resolves.toBeUndefined()
+
+    await login("comercial@atelierbureau.test")
+    const queue = await listManualShippingQuotes()
+    expect(queue.success).toBe(true)
+    const row = queue.success
+      ? queue.orders.find((item) => item.id === order.id)
+      : undefined
+    expect(row).toMatchObject({
+      number: order.number,
+      customer: "Cliente Pessoa Física",
+      company: null,
+      respondBy: "2026-11-17T15:00:00.000Z",
+      reason: "assembly_outside_coverage",
+      destination: "CEP 70040-010 · Brasília/DF",
+      subtotal: "4890.00",
+      items: [
+        expect.objectContaining({
+          skuCode: "MOB-MES-REG-CAR",
+          quantity: 1,
+          requiresAssembly: true,
+        }),
+      ],
+    })
+  })
+
+  it("refuses to queue an order that already left the checkout", async () => {
+    const order = await createOrder({
+      email: "cliente.pf@atelierbureau.test",
+      subtotal: "100.00",
+    })
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: "PAID" },
+    })
+    await expect(
+      prisma.$transaction((tx) =>
+        sendOrderToManualShippingQuote(tx, {
+          orderId: order.id,
+          reason: "no_option",
+          changedById: order.userId,
+        })
+      )
+    ).rejects.toThrow(
+      "Este pedido não pode mais seguir para a cotação de frete."
+    )
+  })
+
+  it("lets the sales team quote the shipping and moves the order to payment", async () => {
+    const order = await createOrder({
+      email: "cliente.pf@atelierbureau.test",
+      subtotal: "4890.00",
+    })
+    await prisma.$transaction((tx) =>
+      sendOrderToManualShippingQuote(tx, {
+        orderId: order.id,
+        reason: "assembly_outside_coverage",
+        changedById: order.userId,
+      })
+    )
+    const answer = {
+      orderId: order.id,
+      method: "CARRIER" as const,
+      carrier: "Transportadora Fictícia",
+      service: "Rodoviário com montagem terceirizada",
+      price: "350,90",
+      deliveryDays: "7",
+      note: "Cotado por telefone (teste)",
+    }
+
+    await login("cliente.pf@atelierbureau.test")
+    expect((await answerManualShippingQuote(answer)).success).toBe(false)
+    expect((await listManualShippingQuotes()).success).toBe(false)
+
+    await login("comercial@atelierbureau.test")
+    expect(await answerManualShippingQuote(answer)).toEqual({
+      success: true,
+      status: "AWAITING_PAYMENT",
+    })
+    const stored = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: {
+        status: true,
+        shippingTotal: true,
+        total: true,
+        shipment: {
+          select: {
+            method: true,
+            carrier: true,
+            price: true,
+            deliveryDays: true,
+          },
+        },
+        statusHistory: {
+          select: { toStatus: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    })
+    expect(stored.status).toBe("AWAITING_PAYMENT")
+    expect(stored.shippingTotal.toFixed(2)).toBe("350.90")
+    expect(stored.total.toFixed(2)).toBe("5240.90")
+    expect(stored.shipment).toMatchObject({
+      method: "CARRIER",
+      carrier: "Transportadora Fictícia",
+      deliveryDays: 7,
+    })
+    expect(stored.shipment?.price.toFixed(2)).toBe("350.90")
+    expect(stored.statusHistory.map((item) => item.toStatus)).toEqual([
+      "AWAITING_SHIPPING_QUOTE",
+      "AWAITING_PAYMENT",
+    ])
+    expect(
+      await prisma.auditLog.count({
+        where: { entityId: order.id, action: "order.shipping_quote.answer" },
+      })
+    ).toBe(1)
+
+    // A second answer for the same order is refused
+    expect(await answerManualShippingQuote(answer)).toEqual({
+      success: false,
+      error: "Este pedido não está aguardando cotação de frete.",
+    })
+  })
+
+  it("sends a corporate order above the approval limit to approval (RN01)", async () => {
+    const order = await createOrder({
+      email: "solicitante@empresa-ficticia.test",
+      organizationSlug: "empresa-ficticia",
+      subtotal: "9900.00",
+    })
+    await prisma.$transaction((tx) =>
+      sendOrderToManualShippingQuote(tx, {
+        orderId: order.id,
+        reason: "no_option",
+        changedById: order.userId,
+      })
+    )
+    await login("comercial@atelierbureau.test")
+    expect(
+      await answerManualShippingQuote({
+        orderId: order.id,
+        method: "OWN_DELIVERY",
+        carrier: "Atelier Bureau",
+        service: "Entrega própria com montagem",
+        price: "200",
+        deliveryDays: "",
+      })
+    ).toEqual({ success: true, status: "AWAITING_APPROVAL" })
+    const stored = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: { requiresApproval: true, total: true },
+    })
+    expect(stored.requiresApproval).toBe(true)
+    expect(stored.total.toFixed(2)).toBe("10100.00")
   })
 })
