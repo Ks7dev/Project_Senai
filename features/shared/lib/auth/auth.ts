@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma"
 import { nextCookies } from "better-auth/next-js"
 import { organization, twoFactor } from "better-auth/plugins"
 import { getPrisma } from "@/features/shared/lib/db/prisma"
+import { sendEmail } from "@/features/shared/lib/email/mailer"
 
 /**
  * Builds the Better Auth server instance: e-mail and password with
@@ -19,6 +20,21 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
+      // Reset token expires in 1 hour and is consumed on use (RF40)
+      resetPasswordTokenExpiresIn: 60 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Redefinição de senha — Atelier Bureau",
+          text: [
+            `Olá, ${user.name}.`,
+            "Recebemos um pedido para redefinir a senha da sua conta.",
+            `Use este link em até 1 hora: ${url}`,
+            "Se não foi você, ignore este e-mail; a senha continua a mesma.",
+          ].join("\n\n"),
+        })
+      },
     },
     user: {
       additionalFields: {
