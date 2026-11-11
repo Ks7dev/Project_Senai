@@ -12,6 +12,7 @@ import {
   canChangeAddress,
   type OrderStatusKey,
 } from "@/features/shared/lib/orders/order-status"
+import { OPEN_QUOTE_STATUSES } from "@/features/shared/lib/quotes/quote-status"
 
 /** A link of the account menu. */
 export type AccountLink = { href: string; label: string }
@@ -153,8 +154,8 @@ export async function listAccountOrders(
 }
 
 /**
- * Counts open quotes visible to the user (requested, in review or
- * answered).
+ * Counts open quotes visible to the user (requested, in review,
+ * answered or accepted).
  *
  * @param context - Account context.
  * @returns Number of open quotes.
@@ -168,7 +169,7 @@ export async function countOpenQuotes(
       ...("organizationId" in scope
         ? { organizationId: scope.organizationId as string }
         : { userId: context.userId }),
-      status: { in: ["REQUESTED", "IN_REVIEW", "ANSWERED"] },
+      status: { in: [...OPEN_QUOTE_STATUSES] },
     },
   })
 }

@@ -471,6 +471,7 @@ model Sku {
   stockMovements StockMovement[]
   cartItems      CartItem[]
   orderItems     OrderItem[]
+  quoteItems     QuoteItem[]
 
   @@index([productId])
   @@map("skus")
@@ -587,14 +588,20 @@ model QuoteItem {
   id          String   @id @default(uuid(7)) @db.Char(36)
   quoteId     String   @map("quote_id") @db.Char(36)
   productId   String   @map("product_id") @db.Char(36)
+  /// Variation asked by the customer, so the quote converts into an
+  /// order line (RF05, RF20)
+  skuId       String?  @map("sku_id") @db.Char(36)
   description String   @db.VarChar(255)
   quantity    Int
+  /// Catalog price when asked; the negotiated price after the answer
   unitPrice   Decimal? @map("unit_price") @db.Decimal(12, 2)
   quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku         Sku?     @relation(fields: [skuId], references: [id], onDelete: Restrict)
 
   @@index([quoteId])
   @@index([productId])
+  @@index([skuId])
   @@map("quote_items")
 }
 
