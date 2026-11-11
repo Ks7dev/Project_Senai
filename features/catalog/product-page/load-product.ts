@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache"
 import { CATEGORIES_CACHE_TAG } from "@/features/shared/lib/catalog/category-cache"
 import { PRODUCTS_CACHE_TAG } from "@/features/shared/lib/catalog/product-cache"
 import { prisma } from "@/features/shared/lib/db/prisma"
+import { availableQuantity } from "@/features/shared/lib/stock/stock-math"
 
 /** Everything the product page shows (RF03). */
 export type ProductPageData = {
@@ -100,10 +101,7 @@ export async function loadProductPage(
       code: sku.code,
       name: sku.name,
       price: (sku.price ?? product.basePrice).toFixed(2),
-      available: Math.max(
-        0,
-        (sku.stock?.onHand ?? 0) - (sku.stock?.reserved ?? 0)
-      ),
+      available: availableQuantity(sku.stock),
     })),
   }
 }
