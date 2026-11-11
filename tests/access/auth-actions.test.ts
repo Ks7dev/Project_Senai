@@ -19,6 +19,10 @@ vi.mock("@/features/shared/lib/brasilapi/cnpj", () => ({
   lookupCnpj: (cnpj: string) => lookupCnpj(cnpj),
 }))
 vi.mock("@/features/shared/lib/auth/auth", () => ({ getAuth: () => ({ api }) }))
+const sendEmail = vi.fn()
+vi.mock("@/features/shared/lib/email/mailer", () => ({
+  sendEmail: (message: unknown) => sendEmail(message),
+}))
 vi.mock("@/features/shared/lib/db/prisma", () => ({
   prisma: {
     user: { findUnique: (a: unknown) => userFindUnique(a) },
@@ -71,6 +75,13 @@ beforeEach(() => {
 describe("signUp (RF39)", () => {
   it("creates a PF account with the CPF digits as document", async () => {
     expect(await signUp(pf)).toEqual({ success: true })
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "cliente@exemplo.test",
+        template: "account.welcome",
+        subject: "Boas-vindas ao Atelier Bureau",
+      })
+    )
     expect(api.signUpEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({

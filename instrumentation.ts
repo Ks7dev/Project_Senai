@@ -1,6 +1,6 @@
 /**
  * Next.js server start hook: schedules the background jobs (order
- * expiration, RN14) on the Node.js runtime only, never during
+ * expiration, RN14, and the e-mail queue, RF53) on the Node.js runtime only, never during
  * `next build`.
  */
 export async function register(): Promise<void> {
