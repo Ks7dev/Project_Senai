@@ -12,7 +12,8 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && npm run build
+# public/ is optional in the repository but copied to the runtime image
+RUN mkdir -p public && npx prisma generate && npm run build
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
