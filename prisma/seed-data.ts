@@ -410,7 +410,7 @@ export const accounts: AccountSeed[] = [
 export const corporateAccount = {
   name: "Empresa Fictícia Ltda.",
   slug: "empresa-ficticia",
-  cnpj: "00000000000191",
+  cnpj: "98765432000198",
   legalName: "Empresa Fictícia Ltda. (dados fictícios)",
   creditLimit: "50000.00",
   members: [
