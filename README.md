@@ -26,6 +26,7 @@ O site abre em `http://localhost:3000`.
 | `npm run typecheck` | Checagem de tipos (`tsc --noEmit`) |
 | `npm run format` / `npm run format:check` | Prettier |
 | `npm test` | Testes (Vitest) |
+| `npm run test:integration` | Testes de integração das actions contra o MySQL (precisa do banco com migrations e seed) |
 | `npm run db:migrate` | Cria e aplica migrations em desenvolvimento |
 | `npm run db:deploy` | Aplica as migrations pendentes (servidor) |
 | `npm run db:seed` | Carrega configurações, catálogo e contas fictícias |

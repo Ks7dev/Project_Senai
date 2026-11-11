@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 
@@ -17,6 +18,8 @@ export type ProductCardProps = {
   imageAlt: string
   /** Whether there is stock available now. */
   available: boolean
+  /** Buttons over the image (favorite, compare), outside the link. */
+  actions?: ReactNode
 }
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -27,7 +30,8 @@ const brl = new Intl.NumberFormat("pt-BR", {
 /**
  * Product card used in listings, search and favorites. Images come in
  * responsive WebP sizes (RNF04); products without stock show "Sob
- * encomenda" instead of hiding.
+ * encomenda" instead of hiding. Actions sit outside the link, so the
+ * buttons are not nested inside it.
  *
  * @param props - Product summary.
  * @returns The card.
@@ -40,9 +44,10 @@ export function ProductCard({
   imageKey,
   imageAlt,
   available,
+  actions,
 }: ProductCardProps) {
   return (
-    <article className="group flex flex-col gap-sm">
+    <article className="group relative flex flex-col gap-sm">
       <Link
         href={`/produto/${slug}`}
         className="flex flex-col gap-sm rounded-lg transition-shadow hover:shadow-1"
@@ -80,6 +85,11 @@ export function ProductCard({
           </p>
         </div>
       </Link>
+      {actions && (
+        <div className="absolute top-sm right-sm flex flex-col items-end gap-xs">
+          {actions}
+        </div>
+      )}
     </article>
   )
 }

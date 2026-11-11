@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
+import { CompareBar } from "@/features/shared/components/compare-controls"
 import { getMenuCategoryLinks } from "@/features/app/shell/store-navigation"
 import {
   categoryLinks,
@@ -71,6 +72,7 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
       >
         <StoreFooter />
       </Suspense>
+      <CompareBar />
     </>
   )
 }
