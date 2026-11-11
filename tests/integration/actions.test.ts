@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto"
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
 import { jar } from "./next-headers-stub"
 
 try {
@@ -29,10 +37,18 @@ const { saveCategory, toggleCategory } =
   await import("@/features/catalog/categories/action/category-actions")
 const { getTeam } =
   await import("@/features/access/corporate-members/action/members-actions")
+const { queryCatalog, searchSuggestions } =
+  await import("@/features/shared/lib/catalog/catalog-query")
+const { parseCatalogFilters } =
+  await import("@/features/shared/lib/catalog/catalog-filters")
 
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 const run = randomUUID().slice(0, 8)
-const created = { emails: [] as string[], categorySlugs: [] as string[] }
+const created = {
+  emails: [] as string[],
+  categorySlugs: [] as string[],
+  productSlugs: [] as string[],
+}
 
 /**
  * Logs in with a seed account through the real sign-in action.
@@ -70,6 +86,9 @@ beforeEach(() => {
 
 afterAll(async () => {
   await prisma.user.deleteMany({ where: { email: { in: created.emails } } })
+  await prisma.product.deleteMany({
+    where: { slug: { in: created.productSlugs } },
+  })
   await prisma.category.deleteMany({
     where: { slug: { in: created.categorySlugs } },
   })
@@ -250,5 +269,85 @@ describe("back office and corporate permissions against MySQL", () => {
     await login("solicitante@empresa-ficticia.test")
     const result = await getTeam()
     expect(result.success).toBe(false)
+  })
+})
+
+describe("product search against MySQL (#25, RF02)", () => {
+  const productData = (slug: string, categoryId: string) => ({
+    categoryId,
+    slug,
+    description: "Produto fictício de teste da busca.",
+    basePrice: "1290.00",
+    weightKg: "0.500",
+    lengthCm: "20.00",
+    widthCm: "15.00",
+    heightCm: "3.00",
+  })
+
+  beforeAll(async () => {
+    const categorySlug = `busca-${run}`
+    created.categorySlugs.push(categorySlug)
+    const category = await prisma.category.create({
+      data: { name: `Busca ${run}`, slug: categorySlug, active: true },
+    })
+    const published = `agenda-onix-${run}`
+    const inactive = `agenda-onix-antiga-${run}`
+    created.productSlugs.push(published, inactive)
+    await prisma.product.create({
+      data: {
+        ...productData(published, category.id),
+        name: `Agenda Ônix ${run}`,
+        brand: `Marca ${run}`,
+        specs: { Acabamento: `Têxtil ${run}`, Folhas: "240" },
+        status: "ACTIVE",
+      },
+    })
+    await prisma.product.create({
+      data: {
+        ...productData(inactive, category.id),
+        name: `Agenda Ônix ${run} antiga`,
+        specs: { Acabamento: `Têxtil ${run}` },
+        status: "INACTIVE",
+      },
+    })
+  })
+
+  const slugsFor = async (params: Record<string, string>) =>
+    (await queryCatalog(parseCatalogFilters(params))).products.map(
+      (product) => product.slug
+    )
+
+  it("ignores accents and case in the product name", async () => {
+    expect(await slugsFor({ q: `AGENDA ONIX ${run}` })).toEqual([
+      `agenda-onix-${run}`,
+    ])
+  })
+
+  it("finds products by a technical specification value", async () => {
+    expect(await slugsFor({ q: `textil ${run}` })).toEqual([
+      `agenda-onix-${run}`,
+    ])
+  })
+
+  it("matches % and _ literally", async () => {
+    expect(await slugsFor({ q: `%${run}` })).toEqual([])
+  })
+
+  it("never shows inactive products, in results or suggestions", async () => {
+    expect(await slugsFor({ q: `antiga ${run}` })).toEqual([])
+    const suggestions = await searchSuggestions(`onix ${run}`)
+    expect(suggestions.products.map((product) => product.slug)).toEqual([
+      `agenda-onix-${run}`,
+    ])
+  })
+
+  it("applies the listing filters to the results", async () => {
+    expect(
+      await slugsFor({ q: `textil ${run}`, marca: `Marca ${run}` })
+    ).toEqual([`agenda-onix-${run}`])
+    expect(
+      await slugsFor({ q: `textil ${run}`, marca: "Outra marca" })
+    ).toEqual([])
+    expect(await slugsFor({ q: `textil ${run}`, max: "100" })).toEqual([])
   })
 })
