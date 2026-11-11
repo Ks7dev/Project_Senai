@@ -1,4 +1,6 @@
 import { Suspense } from "react"
+import { unstable_rethrow } from "next/navigation"
+import { connection } from "next/server"
 import { CartDrawer } from "@/components/commerce/cart-drawer"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
@@ -20,7 +22,10 @@ import {
  * @returns The drawer.
  */
 async function HeaderCart() {
+  // Request time only: the cart is never read during the build
+  await connection()
   const cart = await loadCurrentCart().catch((error: unknown) => {
+    unstable_rethrow(error)
     logger.error("header cart unavailable", { error })
     return null
   })
