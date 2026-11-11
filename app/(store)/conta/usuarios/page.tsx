@@ -1,6 +1,5 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { PageContainer } from "@/components/layout/page-container"
 import { getTeam } from "@/features/access/corporate-members/action/members-actions"
 import { TeamView } from "@/features/access/corporate-members/team-view"
 
@@ -33,7 +32,7 @@ async function TeamSection() {
  */
 export default function TeamPage() {
   return (
-    <PageContainer className="flex flex-col gap-lg py-xl">
+    <>
       <header>
         <p className="text-caps text-clay uppercase">Minha conta</p>
         <h1 className="text-headline-xl-mobile lg:text-headline-xl">
@@ -43,6 +42,6 @@ export default function TeamPage() {
       <Suspense fallback={<p className="text-body">Carregando…</p>}>
         <TeamSection />
       </Suspense>
-    </PageContainer>
+    </>
   )
 }
