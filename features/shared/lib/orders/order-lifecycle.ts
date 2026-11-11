@@ -1,6 +1,7 @@
 import "server-only"
 import type { Prisma } from "@/generated/prisma/client"
 import { AppError } from "@/features/shared/lib/errors/action-result"
+import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
 import {
   canTransition,
   ORDER_STATUS,
@@ -66,7 +67,9 @@ export function invalidTransitionMessage(
  *    approved, release when it is canceled (RF43, RN14);
  * 4. stamps the shipment dates when it ships or is delivered;
  * 5. writes the status history with the date and who did it (null for
- *    the system: payment webhook, expiration job).
+ *    the system: payment webhook, expiration job);
+ * 6. queues the customer or approver e-mail of the new status (RF53),
+ *    so it is sent only if the change is saved.
  *
  * @param tx - Prisma transaction.
  * @param input - Order, new status, responsible user, note and the
@@ -139,5 +142,6 @@ export async function transitionOrder(
       createdAt: now,
     },
   })
+  await enqueueOrderStatusEmails(tx, { orderId: input.orderId, to: input.to })
   return { orderId: input.orderId, number: order.number, from, to: input.to }
 }

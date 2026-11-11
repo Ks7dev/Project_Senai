@@ -98,6 +98,12 @@ enum PaymentStatus {
   PARTIALLY_REFUNDED
 }
 
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum ShippingMethod {
   CORREIOS_PAC
   CORREIOS_SEDEX
@@ -816,4 +822,28 @@ model CreditLimitChange {
   @@index([organizationId, createdAt])
   @@index([changedById])
   @@map("credit_limit_changes")
+}
+
+/// Transactional e-mail queue (RF53): written in the same transaction
+/// as the event, delivered by the background job with retries
+model EmailOutbox {
+  id            String      @id @default(uuid(7)) @db.Char(36)
+  /// Template key, e.g. "order.paid"
+  template      String      @db.VarChar(64)
+  recipient     String      @db.VarChar(191)
+  subject       String      @db.VarChar(255)
+  text          String      @db.Text
+  html          String      @db.MediumText
+  status        EmailStatus @default(PENDING)
+  attempts      Int         @default(0)
+  nextAttemptAt DateTime    @default(now()) @map("next_attempt_at") @db.DateTime(3)
+  /// Error code of the last failed attempt (never the payload)
+  lastError     String?     @map("last_error") @db.VarChar(120)
+  sentAt        DateTime?   @map("sent_at") @db.DateTime(3)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+  @@map("email_outbox")
 }
