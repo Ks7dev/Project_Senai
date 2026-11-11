@@ -30,6 +30,9 @@ const { lookupAddressByCep } =
 const { saveAddress, deleteAddress } =
   await import("@/features/account/addresses/action/address-actions")
 
+const { quoteShipping } =
+  await import("@/features/shared/lib/shipping/shipping-actions")
+
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 
 /**
@@ -124,5 +127,79 @@ describe("address lookup by CEP (#39, RF22–RF24, RF38, RN21)", () => {
       expect(await deleteAddress({ id: saved.id })).toEqual({ success: true })
       await prisma.address.delete({ where: { id: saved.id } })
     }
+  })
+})
+
+describe("shipping strategies against MySQL (#40, RF25, RN20)", () => {
+  it("prices own delivery with assembly inside the RMSP by billable weight", async () => {
+    // Desk: 62 kg real, 160 × 80 × 12 cm (25.6 kg cubed) → 100 kg rate
+    const result = await quoteShipping({
+      cep: "01310-100",
+      items: [{ skuCode: "MOB-MES-REG-CAR", quantity: 1 }],
+    })
+    expect(result).toEqual({
+      success: true,
+      quote: {
+        status: "quoted",
+        strategy: "own_delivery",
+        options: [
+          {
+            method: "OWN_DELIVERY",
+            carrier: "Atelier Bureau",
+            service: "Entrega própria com montagem",
+            price: "240.00",
+            deliveryDays: null,
+          },
+        ],
+        coverage: {
+          ownDelivery: true,
+          regionName: "Região Metropolitana de São Paulo",
+        },
+      },
+    })
+  })
+
+  it("sends assembly outside the coverage area to the manual quote", async () => {
+    const result = await quoteShipping({
+      cep: "70040-010",
+      items: [{ skuCode: "MOB-MES-REG-CAR", quantity: 1 }],
+    })
+    expect(result).toMatchObject({
+      success: true,
+      quote: {
+        status: "manual_quote",
+        reason: "assembly_outside_coverage",
+        coverage: { ownDelivery: false },
+      },
+    })
+  })
+
+  it("falls back to the manual quote while the Correios API is not wired", async () => {
+    const result = await quoteShipping({
+      cep: "01310-100",
+      items: [{ skuCode: "PAP-CAD-A5-CAR", quantity: 2 }],
+    })
+    expect(result).toMatchObject({
+      success: true,
+      quote: { status: "manual_quote", reason: "no_option" },
+    })
+  })
+
+  it("refuses unknown products and invalid CEPs", async () => {
+    expect(
+      await quoteShipping({
+        cep: "01310100",
+        items: [{ skuCode: "NAO-EXISTE", quantity: 1 }],
+      })
+    ).toEqual({
+      success: false,
+      error: "Um dos produtos não está disponível para calcular o frete.",
+    })
+    expect(
+      await quoteShipping({
+        cep: "123",
+        items: [{ skuCode: "PAP-CAD-A5-CAR", quantity: 1 }],
+      })
+    ).toEqual({ success: false, error: "CEP deve ter 8 números." })
   })
 })
