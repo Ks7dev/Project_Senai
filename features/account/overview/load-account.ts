@@ -107,6 +107,8 @@ export type AccountOrder = {
   buyer: string
   /** Whether the user may change the delivery address (RN15, #45). */
   addressChangeable: boolean
+  /** Whether the user placed the order (and so sees its payment, RF31). */
+  ownOrder: boolean
 }
 
 /**
@@ -146,6 +148,7 @@ export async function listAccountOrders(
     buyer: row.user.name,
     addressChangeable:
       row.userId === context.userId && canChangeAddress(row.status),
+    ownOrder: row.userId === context.userId,
   }))
 }
 
