@@ -4,6 +4,7 @@ import { prisma } from "@/features/shared/lib/db/prisma"
 import { sendEmail } from "@/features/shared/lib/email/mailer"
 import { AppError } from "@/features/shared/lib/errors/action-result"
 import { logger } from "@/features/shared/lib/logger/logger"
+import { transitionOrder } from "@/features/shared/lib/orders/order-lifecycle"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import { addBusinessDays } from "@/features/shared/lib/shipping/business-days"
 import {
@@ -14,6 +15,10 @@ import type { ManualQuoteReason } from "@/features/shared/lib/shipping/strategie
 
 /** Statuses an order may leave to wait for the manual shipping quote. */
 const QUEUEABLE_STATUSES = ["AWAITING_APPROVAL", "AWAITING_PAYMENT"] as const
+
+/** Message shown when the order already left the checkout. */
+const NOT_QUEUEABLE_MESSAGE =
+  "Este pedido não pode mais seguir para a cotação de frete."
 
 /** What the shipment keeps while the sales team quotes (RN20). */
 export type ManualQuoteData = {
@@ -79,10 +84,7 @@ export async function sendOrderToManualShippingQuote(
   })
   if (!order) throw new AppError("Pedido não encontrado.", "not_found")
   if (!(QUEUEABLE_STATUSES as readonly string[]).includes(order.status)) {
-    throw new AppError(
-      "Este pedido não pode mais seguir para a cotação de frete.",
-      "invalid_status"
-    )
+    throw new AppError(NOT_QUEUEABLE_MESSAGE, "invalid_status")
   }
 
   const now = input.now ?? new Date()
@@ -102,23 +104,19 @@ export async function sendOrderToManualShippingQuote(
     quoteData,
   }
 
-  await tx.order.update({
-    where: { id: input.orderId },
-    data: { status: "AWAITING_SHIPPING_QUOTE" },
+  await transitionOrder(tx, {
+    orderId: input.orderId,
+    to: "AWAITING_SHIPPING_QUOTE",
+    changedById: input.changedById,
+    note: "Frete sem cálculo automático: enviado à cotação do comercial.",
+    expectedFrom: QUEUEABLE_STATUSES,
+    unexpectedMessage: NOT_QUEUEABLE_MESSAGE,
+    now,
   })
   await tx.shipment.upsert({
     where: { orderId: input.orderId },
     create: { orderId: input.orderId, ...shipment },
     update: shipment,
-  })
-  await tx.orderStatusHistory.create({
-    data: {
-      orderId: input.orderId,
-      fromStatus: order.status,
-      toStatus: "AWAITING_SHIPPING_QUOTE",
-      changedById: input.changedById,
-      note: "Frete sem cálculo automático: enviado à cotação do comercial.",
-    },
   })
   return { respondBy, businessDays }
 }

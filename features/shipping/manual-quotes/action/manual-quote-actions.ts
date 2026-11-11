@@ -9,6 +9,7 @@ import {
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
+import { transitionOrder } from "@/features/shared/lib/orders/order-lifecycle"
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import { notifyManualQuoteAnswered } from "@/features/shared/lib/shipping/manual-quote"
@@ -240,17 +241,20 @@ export async function answerManualShippingQuote(
           ? "AWAITING_APPROVAL"
           : "AWAITING_PAYMENT"
 
-      // Only one answer wins when two people quote the same order
-      const moved = await tx.order.updateMany({
-        where: { id: order.id, status: "AWAITING_SHIPPING_QUOTE" },
-        data: { status, shippingTotal: price, total, requiresApproval },
+      // The order row is locked: only one answer wins when two people
+      // quote the same order (RF54)
+      await transitionOrder(tx, {
+        orderId: order.id,
+        to: status,
+        changedById: user.id,
+        note: "Frete cotado pelo comercial.",
+        expectedFrom: ["AWAITING_SHIPPING_QUOTE"],
+        unexpectedMessage: "Este pedido não está aguardando cotação de frete.",
       })
-      if (moved.count !== 1) {
-        throw new AppError(
-          "Este pedido não está aguardando cotação de frete.",
-          "invalid_status"
-        )
-      }
+      await tx.order.update({
+        where: { id: order.id },
+        data: { shippingTotal: price, total, requiresApproval },
+      })
       const previous = quoteDataSchema.safeParse(
         order.shipment?.quoteData ?? {}
       )
@@ -271,15 +275,6 @@ export async function answerManualShippingQuote(
         where: { orderId: order.id },
         create: { orderId: order.id, ...shipment },
         update: shipment,
-      })
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: order.id,
-          fromStatus: "AWAITING_SHIPPING_QUOTE",
-          toStatus: status,
-          changedById: user.id,
-          note: "Frete cotado pelo comercial.",
-        },
       })
       await writeAudit(tx, {
         userId: user.id,
