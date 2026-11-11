@@ -29,9 +29,10 @@ describe("card data never reaches the backend (#54, RN19)", () => {
       formData: brickCard,
     })
     expect(parsed.success).toBe(true)
-    expect(parsed.data?.formData.payer?.identification?.number).toBe(
-      "12345678909"
-    )
+    expect(parsed.data?.method).toBe("CARD")
+    expect(parsed.data?.formData).toMatchObject({
+      payer: { identification: { number: "12345678909" } },
+    })
     // The amount of the browser is ignored: the server uses the order's
     expect(parsed.data?.formData).not.toHaveProperty("transaction_amount")
   })

@@ -24,6 +24,12 @@ vi.mock("next/cache", () => ({
   cacheLife: vi.fn(),
 }))
 
+// Every test places orders from the same "IP": the action rate limit is
+// covered by its own unit tests
+vi.mock("@/features/shared/lib/rate-limit/action-limit", () => ({
+  enforceActionRateLimit: vi.fn(async () => undefined),
+}))
+
 const { prisma } = await import("@/features/shared/lib/db/prisma")
 const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
@@ -33,6 +39,8 @@ const { getCheckout, placeOrder, quoteCheckoutShipping } =
   await import("@/features/payment/checkout/action/checkout-actions")
 const { getOrderPayment, payOrder } =
   await import("@/features/payment/order-payment/action/payment-actions")
+const { expireUnpaidOrders } =
+  await import("@/features/shared/lib/orders/order-expiration")
 
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 const fixtures = orderFixtures(prisma)
@@ -112,6 +120,24 @@ function stubApis() {
               mercadoPago.status === "approved"
                 ? new Date().toISOString()
                 : null,
+            point_of_interaction:
+              body.payment_method_id === "pix"
+                ? {
+                    transaction_data: {
+                      qr_code: "00020126580014br.gov.bcb.pix-teste",
+                      qr_code_base64: "iVBORw0KGgo=",
+                    },
+                  }
+                : null,
+            transaction_details: String(body.payment_method_id).startsWith(
+              "bol"
+            )
+              ? {
+                  external_resource_url: "https://boleto.test/123.pdf",
+                  digitable_line:
+                    "23793380296000000000000000000000000000000000000",
+                }
+              : null,
             three_ds_info: mercadoPago.threeDs
               ? {
                   external_resource_url: "https://acs.test/challenge",
@@ -191,7 +217,11 @@ async function emptyCart(email: string) {
  * @param input - Units on hand and in the cart.
  * @returns The order, the SKU and the address.
  */
-async function placeCardOrder(input: { onHand?: number; quantity?: number }) {
+async function placeCardOrder(input: {
+  onHand?: number
+  quantity?: number
+  paymentMethod?: "CARD" | "PIX" | "BOLETO"
+}) {
   const sku = await sellableSku(input.onHand ?? 10)
   const user = await prisma.user.findUniqueOrThrow({
     where: { email: customer },
@@ -214,7 +244,7 @@ async function placeCardOrder(input: { onHand?: number; quantity?: number }) {
     option: { method: "CORREIOS_PAC", carrier: pac.carrier, service: "PAC" },
     expectedShippingPrice: pac.price,
     expectedTotal: pac.total,
-    paymentMethod: "CARD",
+    paymentMethod: input.paymentMethod ?? "CARD",
   })
   if (!placed.success) throw new Error(placed.error)
   placedOrders.push(placed.order.orderId)
@@ -287,7 +317,13 @@ describe("checkout (#54, RF25, RF43)", () => {
     expect(result.context.addresses.map((address) => address.id)).toContain(
       addressId
     )
-    expect(result.context.paymentMethods.map((m) => m.method)).toEqual(["CARD"])
+    expect(result.context.paymentMethods.map((m) => m.method)).toEqual([
+      "CARD",
+      "PIX",
+      "BOLETO",
+    ])
+    expect(result.context.paymentMethods[1].note).toContain("30 minutos")
+    expect(result.context.paymentMethods[2].note).toContain("3 dias úteis")
     expect(result.context.corporate).toBe(false)
   })
 
@@ -589,5 +625,185 @@ describe("card payment with the Payment Brick (#54, RF35, RF36, RN13)", () => {
     expect(
       await prisma.payment.count({ where: { orderId: order.orderId } })
     ).toBe(0)
+  })
+})
+
+/** Boleto data the Payment Brick hands to the action. */
+const brickBoleto = {
+  payment_method_id: "bolbradesco",
+  transaction_amount: 1,
+  payer: {
+    email: "comprador@teste.test",
+    first_name: "Cliente",
+    last_name: "Fictício",
+    identification: { type: "CPF" as const, number: "123.456.789-09" },
+    address: {
+      zip_code: "70040-010",
+      federal_unit: "df",
+      city: "Brasília",
+      neighborhood: "Zona Cívico-Administrativa",
+      street_name: "Esplanada dos Ministérios",
+      street_number: "10",
+    },
+  },
+}
+
+describe("Pix and boleto with expiration (#55, RF29, RN14)", () => {
+  it("issues the Pix with the configured expiration and shows the QR Code", async () => {
+    const { order } = await placeCardOrder({ paymentMethod: "PIX" })
+    mercadoPago = {
+      kind: "answer",
+      status: "pending",
+      detail: "pending_waiting_transfer",
+    }
+    const before = Date.now()
+    const result = await payOrder({
+      orderId: order.orderId,
+      method: "PIX",
+      formData: { payment_method_id: "pix" },
+    })
+    expect(result).toMatchObject({
+      success: true,
+      attempt: {
+        orderStatus: "AWAITING_PAYMENT",
+        payment: {
+          status: "PENDING",
+          pix: {
+            qrCode: "00020126580014br.gov.bcb.pix-teste",
+            qrCodeImage: "iVBORw0KGgo=",
+          },
+        },
+      },
+    })
+    const [request] = mercadoPagoRequests
+    expect(request.body).toMatchObject({
+      payment_method_id: "pix",
+      transaction_amount: 291.8,
+    })
+    expect(request.body).not.toHaveProperty("token")
+    const expiresAt = new Date(String(request.body.date_of_expiration))
+    expect(expiresAt.getTime() - before).toBeGreaterThanOrEqual(
+      30 * 60_000 - 5_000
+    )
+    expect(expiresAt.getTime() - before).toBeLessThanOrEqual(
+      30 * 60_000 + 5_000
+    )
+
+    const context = await getOrderPayment({ orderId: order.orderId })
+    expect(context).toMatchObject({
+      success: true,
+      context: {
+        canPay: false,
+        payments: [{ pix: { qrCodeImage: "iVBORw0KGgo=" } }],
+      },
+    })
+  })
+
+  it("issues the boleto with the digitable line and the PDF", async () => {
+    const { order } = await placeCardOrder({ paymentMethod: "BOLETO" })
+    mercadoPago = {
+      kind: "answer",
+      status: "pending",
+      detail: "pending_waiting_payment",
+    }
+    const result = await payOrder({
+      orderId: order.orderId,
+      method: "BOLETO",
+      formData: brickBoleto,
+    })
+    expect(result).toMatchObject({
+      success: true,
+      attempt: {
+        payment: {
+          status: "PENDING",
+          boleto: {
+            url: "https://boleto.test/123.pdf",
+            line: "23793380296000000000000000000000000000000000000",
+          },
+        },
+      },
+    })
+    const [request] = mercadoPagoRequests
+    expect(request.body).toMatchObject({
+      payment_method_id: "bolbradesco",
+      payer: {
+        first_name: "Cliente",
+        identification: { type: "CPF", number: "12345678909" },
+        address: { zip_code: "70040010", federal_unit: "DF" },
+      },
+    })
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.orderId },
+    })
+    // 3 business days ahead, never on a weekend
+    const days = (payment.expiresAt!.getTime() - Date.now()) / 86_400_000
+    expect(days).toBeGreaterThan(2.9)
+    expect(days).toBeLessThan(5.1)
+  })
+
+  it("refuses a Pix for an order paid by card", async () => {
+    const { order } = await placeCardOrder({ paymentMethod: "CARD" })
+    expect(
+      await payOrder({
+        orderId: order.orderId,
+        method: "PIX",
+        formData: { payment_method_id: "pix" },
+      })
+    ).toEqual({ success: false, error: "Forma de pagamento inválida." })
+  })
+
+  it("cancels the order and releases the reservation when the Pix expires", async () => {
+    const { order, sku } = await placeCardOrder({
+      onHand: 10,
+      quantity: 2,
+      paymentMethod: "PIX",
+    })
+    mercadoPago = {
+      kind: "answer",
+      status: "pending",
+      detail: "pending_waiting_transfer",
+    }
+    await payOrder({
+      orderId: order.orderId,
+      method: "PIX",
+      formData: { payment_method_id: "pix" },
+    })
+    expect(await fixtures.counters(sku.id)).toEqual({
+      onHand: 10,
+      reserved: 2,
+    })
+
+    const early = await expireUnpaidOrders(new Date(Date.now() + 10 * 60_000))
+    expect(early).not.toContain(order.orderId)
+    const late = await expireUnpaidOrders(new Date(Date.now() + 31 * 60_000))
+    expect(late).toContain(order.orderId)
+
+    const saved = await prisma.order.findUniqueOrThrow({
+      where: { id: order.orderId },
+      select: { status: true, payments: { select: { status: true } } },
+    })
+    expect(saved).toEqual({
+      status: "CANCELED",
+      payments: [{ status: "EXPIRED" }],
+    })
+    expect(await fixtures.counters(sku.id)).toEqual({
+      onHand: 10,
+      reserved: 0,
+    })
+  })
+
+  it("cancels a Pix order whose payment was never issued in time", async () => {
+    const { order, sku } = await placeCardOrder({
+      onHand: 5,
+      quantity: 1,
+      paymentMethod: "PIX",
+    })
+    expect(
+      await expireUnpaidOrders(new Date(Date.now() + 10 * 60_000))
+    ).not.toContain(order.orderId)
+    expect(
+      await expireUnpaidOrders(new Date(Date.now() + 31 * 60_000))
+    ).toContain(order.orderId)
+    expect(await fixtures.counters(sku.id)).toEqual({ onHand: 5, reserved: 0 })
   })
 })

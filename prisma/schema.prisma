@@ -709,7 +709,11 @@ model Payment {
   /// Pix and boleto expiration (RN14); invoiced due date
   expiresAt      DateTime?     @map("expires_at") @db.DateTime(3)
   pixQrCode      String?       @map("pix_qr_code") @db.Text
+  /// Pix QR Code image (PNG in base64) returned by Mercado Pago (#55)
+  pixQrCodeImage String?       @map("pix_qr_code_image") @db.MediumText
   boletoUrl      String?       @map("boleto_url") @db.Text
+  /// Boleto digitable line (linha digitável) (#55)
+  boletoLine     String?       @map("boleto_line") @db.VarChar(64)
   paidAt         DateTime?     @map("paid_at") @db.DateTime(3)
   createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
