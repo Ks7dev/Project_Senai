@@ -59,6 +59,8 @@ const STATUS_DETAIL_MESSAGES: Record<string, string> = {
     "O pagamento está em conferência pela nossa equipe financeira.",
   provider_refused:
     "O Mercado Pago recusou os dados do pagamento. Revise e tente novamente.",
+  provider_not_found:
+    "O Mercado Pago não registrou este pagamento. Você pode tentar de novo.",
   provider_unconfirmed:
     "Estamos confirmando o pagamento com o Mercado Pago. Acompanhe o status nesta página.",
 }
