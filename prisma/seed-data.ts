@@ -77,6 +77,21 @@ export const settings: SettingSeed[] = [
       "Prazo de retorno da cotação manual de frete, em dias úteis (RN20)",
   },
   {
+    key: "payment.installment_rules",
+    value: [
+      { profile: "PF", minTotal: "0.00", maxInstallments: 1 },
+      { profile: "PF", minTotal: "300.00", maxInstallments: 3 },
+      { profile: "PF", minTotal: "1000.00", maxInstallments: 6 },
+      { profile: "PF", minTotal: "3000.00", maxInstallments: 10 },
+      { profile: "PJ", minTotal: "0.00", maxInstallments: 1 },
+      { profile: "PJ", minTotal: "1000.00", maxInstallments: 3 },
+      { profile: "PJ", minTotal: "5000.00", maxInstallments: 6 },
+      { profile: "PJ", minTotal: "10000.00", maxInstallments: 10 },
+    ],
+    description:
+      "Máximo de parcelas no cartão por faixa de valor do pedido e por perfil de cliente (RF14)",
+  },
+  {
     key: "payment.invoiced_due_days",
     value: [28, 56],
     description: "Vencimentos do pagamento faturado, em dias (RN03)",

@@ -39,8 +39,10 @@ import {
   paymentExpiresAt,
   toMercadoPagoDate,
 } from "@/features/shared/lib/payments/payment-deadlines"
+import { loadInstallmentRules } from "@/features/shared/lib/payments/installment-rules"
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+import { maxInstallmentsFor } from "@/features/shared/schema/installment-schema"
 
 /** Methods paid online through the Payment Brick (RF29). */
 const ONLINE_METHODS = ["CARD", "PIX", "BOLETO"] as const
@@ -193,6 +195,7 @@ async function sessionUserId(): Promise<string> {
 const orderSelect = {
   id: true,
   number: true,
+  organizationId: true,
   status: true,
   paymentMethod: true,
   total: true,
@@ -253,12 +256,27 @@ function blockedReason(order: PayableOrder): string | null {
 }
 
 /**
- * Most installments allowed for the order (RF14).
+ * Most card installments allowed for the order (RF14): by the order
+ * total and the customer profile (company orders and PJ customers use
+ * the PJ rules), from the settings table.
  *
+ * @param order - The order.
+ * @param client - Prisma client or transaction.
  * @returns The maximum.
  */
-async function maxInstallmentsFor(): Promise<number> {
-  return 1
+async function allowedInstallments(
+  order: PayableOrder,
+  client: Pick<Prisma.TransactionClient, "setting"> = prisma
+): Promise<number> {
+  const profile =
+    order.organizationId !== null || order.user.personType === "PJ"
+      ? "PJ"
+      : "PF"
+  return maxInstallmentsFor(
+    await loadInstallmentRules(client),
+    profile,
+    order.total.toFixed(2)
+  )
 }
 
 /**
@@ -292,7 +310,7 @@ export async function getOrderPayment(input: {
         payerEmail: order.user.email,
         canPay: reason === null && publicKey !== null,
         blockedReason: reason ?? (publicKey ? null : PAYMENT_OFF_MESSAGE),
-        maxInstallments: await maxInstallmentsFor(),
+        maxInstallments: await allowedInstallments(order),
         payments: order.payments.map(toPaymentView),
       },
     }
@@ -421,6 +439,15 @@ export async function payOrder(
       if (reason) throw new AppError(reason, "not_payable")
       if (order.paymentMethod !== data.method) {
         throw new AppError("Forma de pagamento inválida.", "invalid_method")
+      }
+      if (
+        data.method === "CARD" &&
+        data.formData.installments > (await allowedInstallments(order, tx))
+      ) {
+        throw new AppError(
+          "Este pedido não pode ser parcelado nesse número de vezes. Escolha menos parcelas.",
+          "installments_not_allowed"
+        )
       }
       const expiresAt =
         data.method === "CARD"

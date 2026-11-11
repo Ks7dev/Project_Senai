@@ -68,6 +68,11 @@ export const adminModules: AdminModule[] = [
     label: "Frete e cobertura",
     permission: "setting:manage",
   },
+  {
+    href: "/admin/parcelamento",
+    label: "Parcelamento",
+    permission: "setting:manage",
+  },
   { href: "/admin/clientes", label: "Clientes", permission: "customer:read" },
   {
     href: "/admin/financeiro",
