@@ -266,6 +266,8 @@ async function placeCardOrder(input: {
   if (!quote.success || quote.quote.status !== "quoted") {
     throw new Error("quote failed")
   }
+  // #43: the checkout quote says whether own delivery covers the address
+  expect(typeof quote.quote.coverage.ownDelivery).toBe("boolean")
   const pac = quote.quote.options.find((option) => option.service === "PAC")!
   const placed = await placeOrder({
     addressId,
