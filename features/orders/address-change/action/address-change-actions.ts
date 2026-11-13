@@ -14,6 +14,21 @@ import {
 } from "@/features/shared/lib/addresses/address-snapshot"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { writeAudit } from "@/features/shared/lib/db/audit"
+import {
+  addDaysToKey,
+  buildInstallationCalendar,
+  earliestInstallationDate,
+  installationLeadDays,
+  scheduledAtFromKey,
+  toDateKey,
+  unavailableReason,
+  type ScheduleDay,
+} from "@/features/shared/lib/delivery/installation-calendar"
+import {
+  countScheduledByDate,
+  loadInstallationRules,
+  lockInstallationAgenda,
+} from "@/features/shared/lib/delivery/installation-schedule"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import {
@@ -104,6 +119,11 @@ export type AddressChangeQuote = {
   currentTotal: string
   /** New address, one line. */
   newAddress: string
+  /**
+   * Calendar to schedule the delivery and installation again (RN05);
+   * null when the order has no scheduled installation.
+   */
+  schedule: ScheduleDay[] | null
 } & (
   | { status: "quoted"; options: RequotedOption[] }
   | {
@@ -126,6 +146,14 @@ const NOT_CHANGEABLE_MESSAGE =
 /** Message for orders with a payment in progress. */
 const PAYMENT_IN_PROGRESS_MESSAGE =
   "Este pedido já tem um pagamento em andamento. Fale com o atendimento para alterar o endereço."
+
+/** Message when the order needs a new installation date (RN05). */
+const INSTALLATION_DATE_REQUIRED_MESSAGE =
+  "Escolha a nova data de entrega e instalação para confirmar a alteração."
+
+/** Message when the chosen installation date is blocked (RN05). */
+const INSTALLATION_DATE_UNAVAILABLE_MESSAGE =
+  "A data escolhida não está mais disponível. Escolha outra data de entrega e instalação."
 
 /** Message when the price moved between the quote and the confirmation. */
 const QUOTE_CHANGED_MESSAGE =
@@ -157,6 +185,8 @@ const orderSelect = {
   shippingAddress: true,
   requiresApproval: true,
   approvedAt: true,
+  scheduledDeliveryAt: true,
+  extraLeadBusinessDays: true,
   user: { select: { name: true, email: true } },
   items: { select: { skuCode: true, quantity: true } },
   shipment: {
@@ -289,6 +319,59 @@ async function requote(
 }
 
 /**
+ * Deliveries already scheduled per date, without the order's own
+ * booking, so the customer may keep the date they already have.
+ *
+ * @param order - The order being changed.
+ * @param from - First date.
+ * @param to - Last date.
+ * @param client - Prisma client or transaction.
+ * @returns Number of other orders per date.
+ */
+async function bookedWithoutOrder(
+  order: Pick<ChangeOrder, "scheduledDeliveryAt">,
+  from: string,
+  to: string,
+  client?: Prisma.TransactionClient
+) {
+  const booked = await countScheduledByDate(from, to, client)
+  if (order.scheduledDeliveryAt) {
+    const own = toDateKey(order.scheduledDeliveryAt)
+    const count = booked.get(own)
+    if (count) booked.set(own, count - 1)
+  }
+  return booked
+}
+
+/**
+ * Calendar to schedule the installation of the order again, from the
+ * first date the lead time allows (RN05).
+ *
+ * @param order - The order being changed.
+ * @param now - Current time.
+ * @returns The dates, or null when the order has no installation.
+ */
+async function loadRescheduleCalendar(
+  order: ChangeOrder,
+  now: Date
+): Promise<ScheduleDay[] | null> {
+  if (!order.scheduledDeliveryAt) return null
+  const rules = await loadInstallationRules()
+  const leadBusinessDays = installationLeadDays(
+    rules,
+    order.extraLeadBusinessDays,
+    null
+  )
+  const first = earliestInstallationDate(now, leadBusinessDays)
+  const booked = await bookedWithoutOrder(
+    order,
+    first,
+    addDaysToKey(first, rules.windowDays - 1)
+  )
+  return buildInstallationCalendar({ now, leadBusinessDays, rules, booked })
+}
+
+/**
  * Whether two options are the same carrier service.
  *
  * @param a - Option.
@@ -391,6 +474,7 @@ export async function quoteAddressChange(
       currentShipping: fromCents(current),
       currentTotal: order.total.toFixed(2),
       newAddress: describeAddress(address),
+      schedule: await loadRescheduleCalendar(order, new Date()),
     }
     if (quote.status === "manual_quote") {
       return {
@@ -491,6 +575,38 @@ export async function confirmAddressChange(
       let requiresApproval = locked.requiresApproval
       let manualQuote: { respondBy: Date; businessDays: number } | null = null
 
+      // RN05: an order with installation keeps a valid date; the
+      // customer schedules it again for the new address
+      let scheduledDeliveryAt: Date | null = null
+      if (locked.scheduledDeliveryAt) {
+        const date = data.installationDate
+        if (!date) {
+          throw new AppError(
+            INSTALLATION_DATE_REQUIRED_MESSAGE,
+            "installation_date_required"
+          )
+        }
+        await lockInstallationAgenda(tx)
+        const rules = await loadInstallationRules(tx)
+        const reason = unavailableReason(date, {
+          now,
+          leadBusinessDays: installationLeadDays(
+            rules,
+            locked.extraLeadBusinessDays,
+            chosen?.deliveryDays ?? null
+          ),
+          rules,
+          booked: await bookedWithoutOrder(locked, date, date, tx),
+        })
+        if (reason) {
+          throw new AppError(
+            INSTALLATION_DATE_UNAVAILABLE_MESSAGE,
+            "installation_date_unavailable"
+          )
+        }
+        scheduledDeliveryAt = scheduledAtFromKey(date)
+      }
+
       if (chosen) {
         const approvalLimit = await getNumberSetting("order.approval_limit", tx)
         const aboveLimit =
@@ -583,8 +699,8 @@ export async function confirmAddressChange(
           shippingTotal: price,
           total,
           requiresApproval,
-          // The delivery date is scheduled again for the new address
-          scheduledDeliveryAt: null,
+          // The delivery date chosen again for the new address (RN05)
+          scheduledDeliveryAt,
         },
       })
       await writeAudit(tx, {

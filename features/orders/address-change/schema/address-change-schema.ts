@@ -34,6 +34,12 @@ export const confirmAddressChangeSchema = addressChangeQuoteSchema.extend({
   expectedShippingPrice: z
     .string("Confirme o valor do novo frete.")
     .regex(/^\d{1,10}\.\d{2}$/, "Valor de frete inválido."),
+  /** New delivery and installation date (RN05), when the order has one. */
+  installationDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data de entrega inválida.")
+    .nullable()
+    .optional(),
 })
 
 /** Values of the confirmation. */
