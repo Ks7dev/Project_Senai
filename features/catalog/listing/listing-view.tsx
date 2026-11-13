@@ -126,6 +126,9 @@ export function ListingView({
             {filters.prazo && (
               <input type="hidden" name="prazo" value={filters.prazo} />
             )}
+            {filters.ordem && (
+              <input type="hidden" name="ordem" value={filters.ordem} />
+            )}
             <div className="flex gap-sm">
               <label className="sr-only" htmlFor="preco-min">
                 Preço mínimo
