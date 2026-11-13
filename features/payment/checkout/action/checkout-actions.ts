@@ -69,6 +69,7 @@ import {
   fromCents,
   toCents,
   type ManualQuoteReason,
+  type ShippingCoverage,
   type ShippingOption,
   type ShippingQuote,
 } from "@/features/shared/lib/shipping/strategies"
@@ -135,6 +136,8 @@ export type CheckoutQuote = {
    * null when the cart needs no installation.
    */
   schedule: ScheduleDay[] | null
+  /** Whether the address is inside the own delivery area (RF27). */
+  coverage: ShippingCoverage
 } & (
   | { status: "quoted"; options: CheckoutOption[] }
   | {
@@ -510,6 +513,7 @@ export async function quoteCheckoutShipping(
         quote: {
           address: addressLine(address),
           schedule: schedule?.calendar ?? null,
+          coverage: quote.coverage,
           status: "manual_quote",
           reason: quote.reason,
           responseBusinessDays:
@@ -523,6 +527,7 @@ export async function quoteCheckoutShipping(
       quote: {
         address: addressLine(address),
         schedule: schedule?.calendar ?? null,
+        coverage: quote.coverage,
         status: "quoted",
         options: quote.options.map((option) => ({
           ...option,
