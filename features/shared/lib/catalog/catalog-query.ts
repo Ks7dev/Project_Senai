@@ -213,7 +213,8 @@ function toCard(
 
 /**
  * Ids of a category and all its descendants, so a parent category
- * lists the products of its subcategories.
+ * lists the products of its subcategories. Also returns the parent and
+ * the direct subcategories, so the store can link to them (RF01).
  *
  * @param slug - Category slug.
  * @returns The category and its subtree ids, or null if not found.
@@ -223,6 +224,8 @@ export async function getCategoryWithSubtree(slug: string): Promise<{
   name: string
   slug: string
   ids: string[]
+  parent: { name: string; slug: string } | null
+  children: Array<{ name: string; slug: string }>
 } | null> {
   "use cache"
   cacheTag(CATEGORIES_CACHE_TAG)
@@ -230,6 +233,7 @@ export async function getCategoryWithSubtree(slug: string): Promise<{
   const all = await prisma.category.findMany({
     where: { active: true },
     select: { id: true, parentId: true, name: true, slug: true },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
   })
   const root = all.find((category) => category.slug === slug)
   if (!root) return null
@@ -237,7 +241,17 @@ export async function getCategoryWithSubtree(slug: string): Promise<{
   for (let i = 0; i < ids.length; i++) {
     for (const child of all) if (child.parentId === ids[i]) ids.push(child.id)
   }
-  return { id: root.id, name: root.name, slug: root.slug, ids }
+  const parent = all.find((category) => category.id === root.parentId)
+  return {
+    id: root.id,
+    name: root.name,
+    slug: root.slug,
+    ids,
+    parent: parent ? { name: parent.name, slug: parent.slug } : null,
+    children: all
+      .filter((category) => category.parentId === root.id)
+      .map(({ name, slug }) => ({ name, slug })),
+  }
 }
 
 /**
