@@ -204,14 +204,16 @@ export async function getAdminProduct(
  * The extended warranty flag follows the configured threshold (RN06).
  * New SKUs start with the informed stock; stock of existing SKUs is
  * changed only in the stock module (#64). Saved products stay as they
- * are: publishing is a separate step that checks RN09.
+ * are: publishing is a separate step that checks RN09. A published
+ * product that stops meeting RN09 after the edit (certification now
+ * required and no document, or no active SKU) goes back to draft.
  *
  * @param input - Product form values.
- * @returns `{ success: true, id }` or `{ success: false, error }`.
+ * @returns `{ success: true, id, unpublished }` or `{ success: false, error }`.
  */
 export async function saveProduct(
   input: ProductFormInput
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; unpublished: string | null }>> {
   try {
     const parsed = productFormSchema.safeParse(input)
     if (!parsed.success) {
@@ -227,7 +229,7 @@ export async function saveProduct(
       throw new AppError("Há códigos de SKU repetidos.", "duplicate_sku")
     }
 
-    const id = await prisma.$transaction(async (tx) => {
+    const saved = await prisma.$transaction(async (tx) => {
       const threshold = await getNumberSetting(
         "product.extended_warranty_threshold",
         tx
@@ -322,11 +324,41 @@ export async function saveProduct(
         before,
         after: product,
       })
-      return product.id
+
+      // RN09 also applies to edits of a published product
+      let unpublished: string | null = null
+      if (product.status === "ACTIVE") {
+        const [certificationDocuments, activeSkus] = await Promise.all([
+          tx.productDocument.count({
+            where: { productId: product.id, kind: "CERTIFICATION" },
+          }),
+          tx.sku.count({ where: { productId: product.id, active: true } }),
+        ])
+        unpublished = publishBlocker({
+          requiresCertification: product.requiresCertification,
+          certificationDocuments,
+          activeSkus,
+        })
+        if (unpublished) {
+          await tx.product.update({
+            where: { id: product.id },
+            data: { status: "DRAFT" },
+          })
+          await writeAudit(tx, {
+            userId: user.id,
+            action: "product.status",
+            entity: "product",
+            entityId: product.id,
+            before: { status: "ACTIVE" },
+            after: { status: "DRAFT", reason: unpublished },
+          })
+        }
+      }
+      return { id: product.id, unpublished }
     })
 
     revalidateTag(PRODUCTS_CACHE_TAG, "max")
-    return { success: true, id }
+    return { success: true, ...saved }
   } catch (error) {
     return toActionError(error, { action: "saveProduct" })
   }
