@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   adminModules,
   hasPermission,
+  PENDING_ADMIN_ROUTES,
   visibleAdminModules,
 } from "@/features/shared/lib/auth/permissions"
 import { permissions as seededPermissions, roles } from "@/prisma/seed-data"
@@ -54,17 +55,27 @@ describe("admin modules by profile (RF55)", () => {
     }
   })
 
-  it("shows every module to the administrator", () => {
-    expect(visibleAdminModules(rolePermissions("admin"))).toHaveLength(
-      adminModules.length
+  it("shows every delivered module to the administrator", () => {
+    const visible = visibleAdminModules(rolePermissions("admin"))
+    expect(visible).toHaveLength(
+      adminModules.length - PENDING_ADMIN_ROUTES.size
     )
+    expect(visible.map((m) => m.href)).toContain("/admin/usuarios")
+    for (const item of visible) {
+      expect(PENDING_ADMIN_ROUTES.has(item.href)).toBe(false)
+    }
+  })
+
+  it("only marks existing modules as pending", () => {
+    const hrefs = adminModules.map((m) => m.href)
+    for (const href of PENDING_ADMIN_ROUTES) expect(hrefs).toContain(href)
   })
 
   it("keeps finance out of products and settings", () => {
     const labels = visibleAdminModules(rolePermissions("finance")).map(
       (m) => m.label
     )
-    expect(labels).toContain("Financeiro")
+    expect(labels).toContain("Pedidos")
     expect(labels).not.toContain("Produtos")
     expect(labels).not.toContain("Configurações")
   })
