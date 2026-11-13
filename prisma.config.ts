@@ -20,5 +20,9 @@ export default defineConfig({
       process.env.MIGRATION_DATABASE_URL ??
       process.env.DATABASE_URL ??
       "mysql://placeholder:placeholder@localhost:3306/atelier_bureau",
+    // `prisma migrate dev` replays the migrations in this database. The
+    // migration user of the Docker MySQL cannot create databases, so the
+    // init script creates `atelier_bureau_shadow` for it.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL || undefined,
   },
 })

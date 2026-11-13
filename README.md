@@ -43,11 +43,17 @@ A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam
    docker compose up -d
    ```
 
-4. Carregue os dados fictícios (só na primeira vez):
+4. Carregue os dados fictícios (só na primeira vez). O seed roda nesta máquina, fora do container, e usa o `MIGRATION_DATABASE_URL` do `.env` (`localhost:3306`):
 
    ```bash
-   docker compose exec app node ./node_modules/prisma/build/index.js db seed
+   npm ci
    ```
+
+   ```bash
+   npm run db:seed
+   ```
+
+   A imagem do app não leva o seed: ela só aplica as migrations ao iniciar.
 
 5. Exporte o certificado raiz do HTTPS local e instale em cada dispositivo:
 
