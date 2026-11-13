@@ -74,6 +74,8 @@ export type OrderTracking = {
   address: string
   /** Delivery and installation date (RN05), ISO string. */
   scheduledDeliveryAt: string | null
+  /** Business days added by engraving and services (RF08). */
+  extraLeadBusinessDays: number
   /** Who placed the order. */
   buyer: string
   /** Whether the user placed the order (and so sees its payment). */
@@ -138,6 +140,7 @@ export async function getOrderTracking(
         paymentMethod: true,
         shippingAddress: true,
         scheduledDeliveryAt: true,
+        extraLeadBusinessDays: true,
         requiresApproval: true,
         userId: true,
         user: { select: { name: true } },
@@ -182,6 +185,7 @@ export async function getOrderTracking(
           PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod,
         address: addressLine(order.shippingAddress),
         scheduledDeliveryAt: order.scheduledDeliveryAt?.toISOString() ?? null,
+        extraLeadBusinessDays: order.extraLeadBusinessDays,
         buyer: order.user.name,
         ownOrder: order.userId === user.id,
         items: order.items.map((item) => ({
