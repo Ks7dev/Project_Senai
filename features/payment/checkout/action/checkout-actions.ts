@@ -695,6 +695,7 @@ export async function placeOrder(
             total,
             shippingAddress: address,
             scheduledDeliveryAt,
+            extraLeadBusinessDays: cart.extraBusinessDays,
             requiresApproval,
             createdAt: now,
             items: {
