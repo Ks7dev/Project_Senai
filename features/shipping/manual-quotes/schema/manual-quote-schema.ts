@@ -1,15 +1,8 @@
 import { z } from "zod"
-
-/** Shipping methods the sales team may quote (everything but manual). */
-export const QUOTED_METHODS = {
-  CORREIOS_PAC: "Correios PAC",
-  CORREIOS_SEDEX: "Correios SEDEX",
-  CARRIER: "Transportadora",
-  OWN_DELIVERY: "Entrega própria com montagem",
-} as const
-
-/** A quoted shipping method key. */
-export type QuotedMethod = keyof typeof QUOTED_METHODS
+import {
+  QUOTED_METHODS,
+  type QuotedMethod,
+} from "@/features/shared/lib/shipping/quoted-methods"
 
 /**
  * Shipping quoted by hand by the sales team for an order in the queue

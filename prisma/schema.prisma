@@ -139,7 +139,8 @@ model User {
   userRoles          UserRole[]
   addresses          Address[]
   carts              Cart[]
-  quotes             Quote[]
+  quotes             Quote[]              @relation("QuoteCustomer")
+  answeredQuotes     Quote[]              @relation("QuoteAnswerer")
   orders             Order[]              @relation("OrderCustomer")
   approvedOrders     Order[]              @relation("OrderApprover")
   orderStatusChanges OrderStatusHistory[]
@@ -571,9 +572,15 @@ model Quote {
   discount       Decimal           @default(0) @db.Decimal(12, 2)
   shippingTotal  Decimal           @default(0) @map("shipping_total") @db.Decimal(12, 2)
   total          Decimal           @default(0) @db.Decimal(12, 2)
+  /// Message of the sales team to the customer with the answer (RF20)
+  answerNote     String?           @map("answer_note") @db.Text
+  /// Who answered with the negotiated values (RF20)
+  answeredById   String?           @map("answered_by_id") @db.VarChar(36)
+  answeredAt     DateTime?         @map("answered_at") @db.DateTime(3)
   createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
-  user           User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user           User              @relation("QuoteCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  answeredBy     User?             @relation("QuoteAnswerer", fields: [answeredById], references: [id], onDelete: SetNull)
   organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   items          QuoteItem[]
   attachments    QuoteAttachment[]
@@ -582,6 +589,7 @@ model Quote {
   @@index([status, validUntil])
   @@index([userId])
   @@index([organizationId])
+  @@index([answeredById])
   @@map("quotes")
 }
 

@@ -2,12 +2,15 @@
 
 import {
   customerQuoteSchema,
+  decideQuoteSchema,
   quoteAttachmentSchema,
   revalidateQuoteSchema,
   type CustomerQuoteInput,
+  type DecideQuoteInput,
   type QuoteAttachmentInput,
   type RevalidateQuoteInput,
 } from "@/features/cart/customer-quotes/schema/customer-quotes-schema"
+import { writeAudit } from "@/features/shared/lib/db/audit"
 import { FORBIDDEN_MESSAGE } from "@/features/shared/lib/db/permissions"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import {
@@ -22,7 +25,11 @@ import {
   readQuoteAttachment,
   type AttachmentDownload,
 } from "@/features/shared/lib/quotes/quote-access"
-import { revalidateExpiredQuote } from "@/features/shared/lib/quotes/quote-revalidation"
+import {
+  assertQuotePricesValid,
+  lockQuote,
+  revalidateExpiredQuote,
+} from "@/features/shared/lib/quotes/quote-revalidation"
 import type { QuoteStatusKey } from "@/features/shared/lib/quotes/quote-status"
 import { effectiveQuoteStatus } from "@/features/shared/lib/quotes/quote-validity"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
@@ -78,6 +85,10 @@ export type CustomerQuoteAttachment = {
 export type CustomerQuote = CustomerQuoteRow & {
   /** Customer notes. */
   notes: string | null
+  /** Message of the sales team sent with the answer (RF20). */
+  answerNote: string | null
+  /** Order generated from the quote, if any (RF20). */
+  order: { id: string; number: string } | null
   /** Lines. */
   lines: CustomerQuoteLine[]
   /** Attached files. */
@@ -93,6 +104,11 @@ export type CustomerQuote = CustomerQuoteRow & {
    * revalidation of its prices (RN02).
    */
   canRevalidate: boolean
+  /**
+   * Whether the quote was answered, is still valid and this customer
+   * may approve or refuse the proposal (RF20).
+   */
+  canDecide: boolean
 }
 
 /** Fields of the quote list and page. */
@@ -186,6 +202,12 @@ export async function getMyQuote(
       select: {
         ...rowSelect,
         notes: true,
+        answerNote: true,
+        orders: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, number: true },
+        },
         subtotal: true,
         discount: true,
         shippingTotal: true,
@@ -211,7 +233,10 @@ export async function getMyQuote(
       quote: {
         ...row,
         canRevalidate: row.status === "EXPIRED" && customer.canRequest,
+        canDecide: row.status === "ANSWERED" && customer.canRequest,
         notes: quote.notes,
+        answerNote: quote.answerNote,
+        order: quote.orders[0] ?? null,
         subtotal: quote.subtotal.toFixed(2),
         discount: quote.discount.toFixed(2),
         shippingTotal: quote.shippingTotal.toFixed(2),
@@ -278,6 +303,67 @@ export async function revalidateMyQuote(
     }
   } catch (error) {
     return toActionError(error, { action: "revalidateMyQuote" })
+  }
+}
+
+/**
+ * Approves or refuses the proposal of an answered quote (RF20). Only
+ * who may request quotes decides, only quotes they follow and only
+ * while the prices are valid (RN02). An approved quote waits for the
+ * sales team to turn it into an order with the negotiated values. The
+ * decision is audited (RNF12).
+ *
+ * @param input - Quote id and decision.
+ * @returns `{ success: true, status }` or `{ success: false, error }`.
+ */
+export async function decideMyQuote(
+  input: DecideQuoteInput
+): Promise<ActionResult<{ status: QuoteStatusKey }>> {
+  try {
+    const parsed = decideQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? QUOTE_NOT_FOUND_MESSAGE,
+        "invalid"
+      )
+    }
+    const customer = await loadQuoteCustomer()
+    if (!customer.canRequest) {
+      throw new AppError(FORBIDDEN_MESSAGE, "forbidden")
+    }
+    const owned = await prisma.quote.findFirst({
+      where: { id: parsed.data.quoteId, ...customerQuoteScope(customer) },
+      select: { id: true },
+    })
+    if (!owned) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const status: QuoteStatusKey =
+      parsed.data.decision === "accept" ? "ACCEPTED" : "REJECTED"
+    await prisma.$transaction(async (tx) => {
+      await lockQuote(tx, owned.id)
+      const quote = await tx.quote.findUniqueOrThrow({
+        where: { id: owned.id },
+        select: { status: true, validUntil: true, total: true },
+      })
+      assertQuotePricesValid(quote, new Date())
+      if (quote.status !== "ANSWERED") {
+        throw new AppError(
+          "Esta cotação não está aguardando a sua aprovação.",
+          "invalid_status"
+        )
+      }
+      await tx.quote.update({ where: { id: owned.id }, data: { status } })
+      await writeAudit(tx, {
+        userId: customer.user.id,
+        action: status === "ACCEPTED" ? "quote.accept" : "quote.reject",
+        entity: "quote",
+        entityId: owned.id,
+        before: { status: quote.status },
+        after: { status, total: quote.total },
+      })
+    })
+    return { success: true, status }
+  } catch (error) {
+    return toActionError(error, { action: "decideMyQuote" })
   }
 }
 
