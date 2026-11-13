@@ -1,0 +1,929 @@
+"use server"
+
+import type { Prisma } from "@/generated/prisma/client"
+import { quoteEmail } from "@/emails/templates"
+import {
+  adminQuoteAttachmentSchema,
+  adminQuoteSchema,
+  answerQuoteSchema,
+  convertQuoteSchema,
+  quoteQueueSchema,
+  type AdminQuoteAttachmentInput,
+  type AdminQuoteInput,
+  type AnswerQuoteInput,
+  type ConvertQuoteInput,
+  type QuoteQueueFilter,
+  type QuoteQueueInput,
+} from "@/features/cart/quote-management/schema/quote-management-schema"
+import {
+  addressLine,
+  toAddressSnapshot,
+} from "@/features/shared/lib/addresses/address-snapshot"
+import { moneyToCents } from "@/features/shared/lib/cart/cart-math"
+import { purchasableSkuWhere } from "@/features/shared/lib/cart/cart-store"
+import { writeAudit } from "@/features/shared/lib/db/audit"
+import { requirePermission } from "@/features/shared/lib/db/permissions"
+import { prisma } from "@/features/shared/lib/db/prisma"
+import {
+  installationLeadDays,
+  scheduledAtFromKey,
+  unavailableReason,
+  UNAVAILABLE_REASON_LABEL,
+} from "@/features/shared/lib/delivery/installation-calendar"
+import {
+  countScheduledByDate,
+  loadInstallationRules,
+  lockInstallationAgenda,
+} from "@/features/shared/lib/delivery/installation-schedule"
+import { enqueueEmail } from "@/features/shared/lib/email/mailer"
+import { siteUrl } from "@/features/shared/lib/email/site-url"
+import {
+  AppError,
+  toActionError,
+  type ActionResult,
+} from "@/features/shared/lib/errors/action-result"
+import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
+import {
+  isRetryableOrderError,
+  nextOrderNumber,
+} from "@/features/shared/lib/orders/order-number"
+import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
+import {
+  QUOTE_NOT_FOUND_MESSAGE,
+  readQuoteAttachment,
+  type AttachmentDownload,
+} from "@/features/shared/lib/quotes/quote-access"
+import { loadQuoteValidityDays } from "@/features/shared/lib/quotes/quote-expiration"
+import {
+  catalogUnitPrice,
+  quoteTotals,
+} from "@/features/shared/lib/quotes/quote-pricing"
+import {
+  assertQuotePricesValid,
+  lockQuote,
+  revalidateExpiredQuote,
+} from "@/features/shared/lib/quotes/quote-revalidation"
+import {
+  OPEN_QUOTE_STATUSES,
+  type QuoteStatusKey,
+} from "@/features/shared/lib/quotes/quote-status"
+import {
+  effectiveQuoteStatus,
+  EXPIRABLE_QUOTE_STATUSES,
+  quoteValidUntil,
+} from "@/features/shared/lib/quotes/quote-validity"
+import { getNumberSetting } from "@/features/shared/lib/settings/settings"
+import { reserveStock } from "@/features/shared/lib/stock/stock-service"
+
+/** A quote of the sales queue. */
+export type AdminQuoteRow = {
+  /** Quote id. */
+  id: string
+  /** Readable number (RF06). */
+  number: string
+  /** Status shown: past its validity reads as expired (RN02). */
+  status: QuoteStatusKey
+  /** Who asked for the quote. */
+  customer: string
+  /** Company name, for corporate quotes. */
+  company: string | null
+  /** Request date, ISO. */
+  createdAt: string
+  /** End of the validity, ISO, when set (RN02). */
+  validUntil: string | null
+  /** Number of lines. */
+  lines: number
+  /** Total, decimal string. */
+  total: string
+}
+
+/** A line of a quote, with what the sales team needs to negotiate. */
+export type AdminQuoteLine = {
+  /** Line id. */
+  id: string
+  /** Product and variation. */
+  description: string
+  /** SKU code, or null when the variation is gone. */
+  skuCode: string | null
+  /** Units. */
+  quantity: number
+  /** Unit price of the quote (reference, then negotiated). */
+  unitPrice: string | null
+  /** Current catalog price, or null when the item left the catalog. */
+  catalogPrice: string | null
+  /** Whether the product needs installation (RN05). */
+  requiresInstallation: boolean
+}
+
+/** A delivery address the converted order may use. */
+export type AdminQuoteAddress = {
+  /** Address id. */
+  id: string
+  /** Nickname. */
+  label: string
+  /** One-line address. */
+  line: string
+}
+
+/** What the quote page of the back office shows (RF20). */
+export type AdminQuote = AdminQuoteRow & {
+  /** Customer e-mail. */
+  customerEmail: string
+  /** Customer notes. */
+  notes: string | null
+  /** Message of the sales team sent with the answer. */
+  answerNote: string | null
+  /** Who answered, when answered. */
+  answeredBy: string | null
+  /** When it was answered, ISO. */
+  answeredAt: string | null
+  /** Sum of the lines, decimal string. */
+  subtotal: string
+  /** Discount, decimal string. */
+  discount: string
+  /** Shipping, decimal string. */
+  shippingTotal: string
+  /** Lines. */
+  items: AdminQuoteLine[]
+  /** Attached files (RF08). */
+  attachments: Array<{
+    id: string
+    name: string
+    mimeType: string
+    sizeBytes: number
+  }>
+  /** Saved addresses of the customer (of the company for PJ). */
+  addresses: AdminQuoteAddress[]
+  /** Order generated by the conversion, if any. */
+  order: { id: string; number: string } | null
+}
+
+/** The order generated from a quote. */
+export type ConvertedOrder = {
+  /** Order id. */
+  orderId: string
+  /** Readable order number. */
+  number: string
+  /** Status after the conversion. */
+  status: OrderStatusKey
+  /** Order total, decimal string: the negotiated total of the quote. */
+  total: string
+}
+
+/** Statuses the sales team may answer (again, before the acceptance). */
+const ANSWERABLE_STATUSES: readonly QuoteStatusKey[] = [
+  "REQUESTED",
+  "IN_REVIEW",
+  "ANSWERED",
+]
+
+/** How many times a conflicting order number is retried. */
+const ORDER_NUMBER_ATTEMPTS = 3
+
+/** Message when the quote is not in a status the action accepts. */
+const INVALID_STATUS_MESSAGE =
+  "A situação desta cotação mudou. Atualize a página e confira."
+
+/**
+ * Where clause of a queue filter. A quote past its validity counts as
+ * expired even before the background job updates it (RN02).
+ *
+ * @param filter - Queue filter.
+ * @param now - Reference time.
+ * @returns The where clause.
+ */
+function queueWhere(
+  filter: QuoteQueueFilter,
+  now: Date
+): Prisma.QuoteWhereInput {
+  const stillValid: Prisma.QuoteWhereInput = {
+    OR: [{ validUntil: null }, { validUntil: { gt: now } }],
+  }
+  if (filter === "ALL") return {}
+  if (filter === "OPEN") {
+    return { status: { in: [...OPEN_QUOTE_STATUSES] }, ...stillValid }
+  }
+  if (filter === "EXPIRED") {
+    return {
+      OR: [
+        { status: "EXPIRED" },
+        {
+          status: { in: [...EXPIRABLE_QUOTE_STATUSES] },
+          validUntil: { lte: now },
+        },
+      ],
+    }
+  }
+  return EXPIRABLE_QUOTE_STATUSES.includes(filter)
+    ? { status: filter, ...stillValid }
+    : { status: filter }
+}
+
+/**
+ * Sales queue of quotes with their status (RF20): the open ones by
+ * default, oldest first, so the longest wait is answered first; a
+ * status or every quote on demand, filtered by number, customer or
+ * company.
+ *
+ * @param input - Queue filter and search text.
+ * @returns `{ success: true, quotes }` or `{ success: false, error }`.
+ */
+export async function listAdminQuotes(
+  input: QuoteQueueInput = {}
+): Promise<ActionResult<{ quotes: AdminQuoteRow[] }>> {
+  try {
+    const parsed = quoteQueueSchema.safeParse(input)
+    const { filter, search } = parsed.success
+      ? parsed.data
+      : { filter: "OPEN" as const, search: "" }
+    await requirePermission("quote:read")
+    const now = new Date()
+    const rows = await prisma.quote.findMany({
+      where: {
+        AND: [
+          queueWhere(filter, now),
+          search
+            ? {
+                OR: [
+                  { number: { contains: search } },
+                  { user: { name: { contains: search } } },
+                  { organization: { name: { contains: search } } },
+                ],
+              }
+            : {},
+        ],
+      },
+      orderBy: { createdAt: filter === "OPEN" ? "asc" : "desc" },
+      take: 200,
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        createdAt: true,
+        validUntil: true,
+        total: true,
+        user: { select: { name: true } },
+        organization: { select: { name: true } },
+        _count: { select: { items: true } },
+      },
+    })
+    return {
+      success: true,
+      quotes: rows.map((row) => ({
+        id: row.id,
+        number: row.number,
+        status: effectiveQuoteStatus(row, now),
+        customer: row.user.name,
+        company: row.organization?.name ?? null,
+        createdAt: row.createdAt.toISOString(),
+        validUntil: row.validUntil?.toISOString() ?? null,
+        lines: row._count.items,
+        total: row.total.toFixed(2),
+      })),
+    }
+  } catch (error) {
+    return toActionError(error, { action: "listAdminQuotes" })
+  }
+}
+
+/**
+ * Loads one quote for the sales team (RF20): customer, lines with the
+ * current catalog price beside the quoted one, totals, attachments,
+ * the customer's delivery addresses and the generated order.
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true, quote }` or `{ success: false, error }`.
+ */
+export async function getAdminQuote(
+  input: AdminQuoteInput
+): Promise<ActionResult<{ quote: AdminQuote }>> {
+  try {
+    const parsed = adminQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    await requirePermission("quote:read")
+    const row = await prisma.quote.findUnique({
+      where: { id: parsed.data.quoteId },
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        createdAt: true,
+        validUntil: true,
+        notes: true,
+        answerNote: true,
+        answeredAt: true,
+        subtotal: true,
+        discount: true,
+        shippingTotal: true,
+        total: true,
+        userId: true,
+        organizationId: true,
+        user: { select: { name: true, email: true } },
+        organization: { select: { name: true } },
+        answeredBy: { select: { name: true } },
+        items: {
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            unitPrice: true,
+            skuId: true,
+            product: { select: { requiresInstallation: true } },
+            sku: { select: { code: true } },
+          },
+        },
+        attachments: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, mimeType: true, sizeBytes: true },
+        },
+        orders: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, number: true },
+        },
+      },
+    })
+    if (!row) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const [catalog, addresses] = await Promise.all([
+      prisma.sku.findMany({
+        where: {
+          ...purchasableSkuWhere(),
+          id: { in: row.items.flatMap((item) => item.skuId ?? []) },
+        },
+        select: {
+          id: true,
+          price: true,
+          product: { select: { basePrice: true } },
+        },
+      }),
+      prisma.address.findMany({
+        where: customerAddressScope(row),
+        orderBy: [{ isDefault: "desc" }, { label: "asc" }],
+      }),
+    ])
+    const catalogPrices = new Map(
+      catalog.map((sku) => [sku.id, catalogUnitPrice(sku)])
+    )
+    return {
+      success: true,
+      quote: {
+        id: row.id,
+        number: row.number,
+        status: effectiveQuoteStatus(row, new Date()),
+        customer: row.user.name,
+        customerEmail: row.user.email,
+        company: row.organization?.name ?? null,
+        createdAt: row.createdAt.toISOString(),
+        validUntil: row.validUntil?.toISOString() ?? null,
+        lines: row.items.length,
+        notes: row.notes,
+        answerNote: row.answerNote,
+        answeredBy: row.answeredBy?.name ?? null,
+        answeredAt: row.answeredAt?.toISOString() ?? null,
+        subtotal: row.subtotal.toFixed(2),
+        discount: row.discount.toFixed(2),
+        shippingTotal: row.shippingTotal.toFixed(2),
+        total: row.total.toFixed(2),
+        items: row.items.map((item) => ({
+          id: item.id,
+          description: item.description,
+          skuCode: item.sku?.code ?? null,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice?.toFixed(2) ?? null,
+          catalogPrice:
+            (item.skuId ? catalogPrices.get(item.skuId) : undefined) ?? null,
+          requiresInstallation: item.product.requiresInstallation,
+        })),
+        attachments: row.attachments,
+        addresses: addresses.map((address) => ({
+          id: address.id,
+          label: address.label,
+          line: addressLine(address),
+        })),
+        order: row.orders[0] ?? null,
+      },
+    }
+  } catch (error) {
+    return toActionError(error, { action: "getAdminQuote" })
+  }
+}
+
+/**
+ * Addresses a converted order may be delivered to: of the company for
+ * corporate quotes (RF26), of the customer otherwise.
+ *
+ * @param quote - Customer and company of the quote.
+ * @returns The where clause.
+ */
+function customerAddressScope(quote: {
+  userId: string
+  organizationId: string | null
+}): Prisma.AddressWhereInput {
+  return {
+    deletedAt: null,
+    ...(quote.organizationId
+      ? { organizationId: quote.organizationId }
+      : { userId: quote.userId }),
+  }
+}
+
+/**
+ * Downloads an attachment of a quote for the sales team (RF08, RF20).
+ * Files live in the private storage and only leave through this check.
+ *
+ * @param input - Attachment id.
+ * @returns `{ success: true, file }` or `{ success: false, error }`.
+ */
+export async function downloadAdminQuoteAttachment(
+  input: AdminQuoteAttachmentInput
+): Promise<ActionResult<{ file: AttachmentDownload }>> {
+  try {
+    const parsed = adminQuoteAttachmentSchema.safeParse(input)
+    if (!parsed.success) throw new AppError("Anexo inválido.", "invalid")
+    await requirePermission("quote:read")
+    const attachment = await prisma.quoteAttachment.findUnique({
+      where: { id: parsed.data.attachmentId },
+      select: { name: true, mimeType: true, storageKey: true },
+    })
+    if (!attachment) {
+      throw new AppError("Anexo não encontrado.", "not_found")
+    }
+    return { success: true, file: await readQuoteAttachment(attachment) }
+  } catch (error) {
+    return toActionError(error, { action: "downloadAdminQuoteAttachment" })
+  }
+}
+
+/**
+ * Loads and locks a quote inside a transaction, for the actions that
+ * change it.
+ *
+ * @param tx - Prisma transaction.
+ * @param quoteId - Quote id.
+ * @returns The quote with its lines and customer.
+ * @throws AppError("not_found").
+ */
+async function loadLockedQuote(tx: Prisma.TransactionClient, quoteId: string) {
+  await lockQuote(tx, quoteId)
+  const quote = await tx.quote.findUnique({
+    where: { id: quoteId },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      validUntil: true,
+      userId: true,
+      organizationId: true,
+      subtotal: true,
+      discount: true,
+      shippingTotal: true,
+      total: true,
+      user: { select: { name: true, email: true } },
+      items: {
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          description: true,
+          quantity: true,
+          unitPrice: true,
+          skuId: true,
+          product: { select: { requiresInstallation: true } },
+        },
+      },
+    },
+  })
+  if (!quote) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+  return quote
+}
+
+/**
+ * Takes a requested quote for analysis (RF20): the customer sees "Em
+ * análise" and the queue shows that someone is on it.
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true }` or `{ success: false, error }`.
+ */
+export async function startQuoteReview(
+  input: AdminQuoteInput
+): Promise<ActionResult> {
+  try {
+    const parsed = adminQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    const { user } = await requirePermission("quote:answer")
+    await prisma.$transaction(async (tx) => {
+      const quote = await loadLockedQuote(tx, parsed.data.quoteId)
+      assertQuotePricesValid(quote, new Date())
+      if (quote.status !== "REQUESTED") {
+        throw new AppError(INVALID_STATUS_MESSAGE, "invalid_status")
+      }
+      await tx.quote.update({
+        where: { id: quote.id },
+        data: { status: "IN_REVIEW" },
+      })
+      await writeAudit(tx, {
+        userId: user.id,
+        action: "quote.review",
+        entity: "quote",
+        entityId: quote.id,
+        before: { status: quote.status },
+        after: { status: "IN_REVIEW" },
+      })
+    })
+    return { success: true }
+  } catch (error) {
+    return toActionError(error, { action: "startQuoteReview" })
+  }
+}
+
+/**
+ * Answers a quote with the negotiated values (RF20): the unit price of
+ * every line, the discount and the shipping. In one transaction the
+ * lines and totals are saved, the validity restarts (RN02), the
+ * customer gets the "quote answered" e-mail (RF53) and the audit log
+ * keeps the values before and after (RNF12). An expired quote must
+ * have its prices revalidated first.
+ *
+ * @param input - Quote, line prices, discount, shipping and message.
+ * @returns `{ success: true, total, validUntil }` or `{ success: false, error }`.
+ */
+export async function answerQuote(
+  input: AnswerQuoteInput
+): Promise<ActionResult<{ total: string; validUntil: string }>> {
+  try {
+    const parsed = answerQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? "Revise a resposta da cotação.",
+        "invalid"
+      )
+    }
+    const { user } = await requirePermission("quote:answer")
+    const answer = parsed.data
+    const now = new Date()
+    const result = await prisma.$transaction(async (tx) => {
+      const quote = await loadLockedQuote(tx, answer.quoteId)
+      assertQuotePricesValid(quote, now)
+      if (!ANSWERABLE_STATUSES.includes(quote.status)) {
+        throw new AppError(INVALID_STATUS_MESSAGE, "invalid_status")
+      }
+      const prices = new Map(
+        answer.lines.map((line) => [line.itemId, line.unitPrice])
+      )
+      if (
+        prices.size !== quote.items.length ||
+        quote.items.some((item) => !prices.has(item.id))
+      ) {
+        throw new AppError(
+          "Informe o preço de todos os itens da cotação.",
+          "invalid_lines"
+        )
+      }
+      const lines = quote.items.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        unitPrice: prices.get(item.id)!,
+      }))
+      const subtotalCents = lines.reduce(
+        (sum, line) => sum + moneyToCents(line.unitPrice) * line.quantity,
+        0
+      )
+      if (moneyToCents(answer.discount) > subtotalCents) {
+        throw new AppError(
+          "O desconto não pode ser maior que a soma dos itens.",
+          "invalid_discount"
+        )
+      }
+      const totals = quoteTotals(lines, {
+        discount: answer.discount,
+        shippingTotal: answer.shippingTotal,
+      })
+      const validUntil = quoteValidUntil(now, await loadQuoteValidityDays(tx))
+      for (const line of lines) {
+        await tx.quoteItem.update({
+          where: { id: line.id },
+          data: { unitPrice: line.unitPrice },
+        })
+      }
+      await tx.quote.update({
+        where: { id: quote.id },
+        data: {
+          status: "ANSWERED",
+          subtotal: totals.subtotal,
+          discount: totals.discount,
+          shippingTotal: totals.shippingTotal,
+          total: totals.total,
+          validUntil,
+          answerNote: answer.note || null,
+          answeredById: user.id,
+          answeredAt: now,
+        },
+      })
+      const email = quoteEmail({
+        name: quote.user.name,
+        number: quote.number,
+        stage: "answered",
+        validUntil: new Intl.DateTimeFormat("pt-BR", {
+          dateStyle: "short",
+          timeZone: "America/Sao_Paulo",
+        }).format(validUntil),
+        url: `${siteUrl()}/conta/cotacoes/${quote.id}`,
+      })
+      await enqueueEmail(tx, { to: quote.user.email, ...email }, now)
+      await writeAudit(tx, {
+        userId: user.id,
+        action: "quote.answer",
+        entity: "quote",
+        entityId: quote.id,
+        before: {
+          status: quote.status,
+          subtotal: quote.subtotal,
+          discount: quote.discount,
+          shippingTotal: quote.shippingTotal,
+          total: quote.total,
+          lines: quote.items.map((item) => ({
+            id: item.id,
+            unitPrice: item.unitPrice,
+          })),
+        },
+        after: {
+          status: "ANSWERED",
+          ...totals,
+          validUntil,
+          lines: lines.map(({ id, unitPrice }) => ({ id, unitPrice })),
+        },
+      })
+      return { total: totals.total, validUntil }
+    })
+    return {
+      success: true,
+      total: result.total,
+      validUntil: result.validUntil.toISOString(),
+    }
+  } catch (error) {
+    return toActionError(error, { action: "answerQuote" })
+  }
+}
+
+/**
+ * Revalidates the prices of an expired quote from the back office
+ * (RN02): the lines get the current catalog prices and the quote
+ * returns to the queue as requested, to be answered again.
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true, total }` or `{ success: false, error }`.
+ */
+export async function revalidateQuote(
+  input: AdminQuoteInput
+): Promise<ActionResult<{ total: string }>> {
+  try {
+    const parsed = adminQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    const { user } = await requirePermission("quote:answer")
+    const exists = await prisma.quote.findUnique({
+      where: { id: parsed.data.quoteId },
+      select: { id: true },
+    })
+    if (!exists) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const result = await prisma.$transaction((tx) =>
+      revalidateExpiredQuote(tx, {
+        quoteId: exists.id,
+        userId: user.id,
+        now: new Date(),
+      })
+    )
+    return { success: true, total: result.total }
+  } catch (error) {
+    return toActionError(error, { action: "revalidateQuote" })
+  }
+}
+
+/**
+ * Converts a quote accepted by the customer into an order that keeps
+ * the negotiated values (RF20): the unit price of every line, the
+ * discount, the shipping and the total are copied from the quote, never
+ * read from the catalog again. In one transaction it locks the quote
+ * (so it converts only once), refuses an expired one (RN02), numbers
+ * the order, reserves the stock with `SELECT ... FOR UPDATE`, stores
+ * the shipment, schedules the installation when a line needs it
+ * (RN05), records the first status, marks the quote as converted and
+ * writes the audit log (RNF12). The order waits for the company
+ * approval above the limit (RN01) or for the payment, which only
+ * Mercado Pago confirms (RN13).
+ *
+ * @param input - Quote, delivery address, payment and shipping method.
+ * @returns `{ success: true, order }` or `{ success: false, error }`.
+ */
+export async function convertQuoteToOrder(
+  input: ConvertQuoteInput
+): Promise<ActionResult<{ order: ConvertedOrder }>> {
+  try {
+    const parsed = convertQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? "Revise a conversão.",
+        "invalid"
+      )
+    }
+    const { user } = await requirePermission("quote:answer")
+    const data = parsed.data
+    const now = new Date()
+
+    const run = () =>
+      prisma.$transaction(async (tx) => {
+        const quote = await loadLockedQuote(tx, data.quoteId)
+        assertQuotePricesValid(quote, now)
+        if (quote.status !== "ACCEPTED") {
+          throw new AppError(
+            quote.status === "CONVERTED"
+              ? "Esta cotação já foi convertida em pedido."
+              : "Só uma cotação aprovada pelo cliente pode virar pedido.",
+            "invalid_status"
+          )
+        }
+        const address = await tx.address.findFirst({
+          where: { id: data.addressId, ...customerAddressScope(quote) },
+        })
+        if (!address) {
+          throw new AppError(
+            "Escolha um dos endereços cadastrados pelo cliente.",
+            "address_not_found"
+          )
+        }
+        const skus = await tx.sku.findMany({
+          where: {
+            ...purchasableSkuWhere(),
+            id: { in: quote.items.flatMap((item) => item.skuId ?? []) },
+          },
+          select: { id: true, code: true },
+        })
+        const codes = new Map(skus.map((sku) => [sku.id, sku.code]))
+        const lines = quote.items.map((item) => {
+          const skuCode = item.skuId ? codes.get(item.skuId) : undefined
+          if (!item.skuId || !skuCode || !item.unitPrice) {
+            throw new AppError(
+              "Há itens desta cotação que não estão mais disponíveis no catálogo.",
+              "unavailable_line"
+            )
+          }
+          return {
+            skuId: item.skuId,
+            skuCode,
+            productName: item.description.slice(0, 191),
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toFixed(2),
+            requiresInstallation: item.product.requiresInstallation,
+          }
+        })
+        // The order keeps the negotiated values: the totals are those
+        // of the quote, and must still be the sum of its lines
+        const totals = quoteTotals(lines, {
+          discount: quote.discount.toFixed(2),
+          shippingTotal: quote.shippingTotal.toFixed(2),
+        })
+        if (totals.total !== quote.total.toFixed(2)) {
+          throw new AppError(
+            "Os valores desta cotação estão inconsistentes. Responda a cotação de novo antes de converter.",
+            "inconsistent_totals"
+          )
+        }
+
+        let scheduledDeliveryAt: Date | null = null
+        if (lines.some((line) => line.requiresInstallation)) {
+          const date = data.installationDate
+          if (!date) {
+            throw new AppError(
+              "Informe a data de entrega e instalação combinada com o cliente.",
+              "installation_date_required"
+            )
+          }
+          await lockInstallationAgenda(tx)
+          const rules = await loadInstallationRules(tx)
+          const reason = unavailableReason(date, {
+            now,
+            leadBusinessDays: installationLeadDays(rules, 0, data.deliveryDays),
+            rules,
+            booked: await countScheduledByDate(date, date, tx),
+          })
+          if (reason) {
+            throw new AppError(
+              `A data de entrega e instalação não está disponível: ${UNAVAILABLE_REASON_LABEL[reason]}.`,
+              "installation_date_unavailable"
+            )
+          }
+          scheduledDeliveryAt = scheduledAtFromKey(date)
+        }
+
+        const approvalLimit = await getNumberSetting("order.approval_limit", tx)
+        const requiresApproval =
+          quote.organizationId !== null && Number(totals.total) > approvalLimit
+        const status: OrderStatusKey = requiresApproval
+          ? "AWAITING_APPROVAL"
+          : "AWAITING_PAYMENT"
+        const number = await nextOrderNumber(tx, now)
+        const order = await tx.order.create({
+          data: {
+            number,
+            userId: quote.userId,
+            organizationId: quote.organizationId,
+            quoteId: quote.id,
+            status,
+            paymentMethod: data.paymentMethod,
+            subtotal: totals.subtotal,
+            discount: totals.discount,
+            shippingTotal: totals.shippingTotal,
+            total: totals.total,
+            shippingAddress: toAddressSnapshot(address),
+            scheduledDeliveryAt,
+            requiresApproval,
+            createdAt: now,
+            items: {
+              create: lines.map((line) => ({
+                skuId: line.skuId,
+                productName: line.productName,
+                skuCode: line.skuCode,
+                quantity: line.quantity,
+                unitPrice: line.unitPrice,
+                total: quoteTotals([line]).subtotal,
+              })),
+            },
+          },
+          select: { id: true },
+        })
+        await reserveStock(tx, {
+          orderId: order.id,
+          items: lines.map(({ skuId, quantity }) => ({ skuId, quantity })),
+          userId: user.id,
+        })
+        await tx.shipment.create({
+          data: {
+            orderId: order.id,
+            method: data.shippingMethod,
+            carrier: data.carrier || null,
+            price: totals.shippingTotal,
+            deliveryDays: data.deliveryDays,
+            quoteData: {
+              source: "quote",
+              quoteNumber: quote.number,
+              convertedAt: now.toISOString(),
+              convertedById: user.id,
+            },
+          },
+        })
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            fromStatus: null,
+            toStatus: status,
+            changedById: user.id,
+            note: `Pedido gerado a partir da cotação ${quote.number}.`,
+            createdAt: now,
+          },
+        })
+        await enqueueOrderStatusEmails(tx, { orderId: order.id, to: status })
+        await tx.quote.update({
+          where: { id: quote.id },
+          data: { status: "CONVERTED" },
+        })
+        await writeAudit(tx, {
+          userId: user.id,
+          action: "quote.convert",
+          entity: "quote",
+          entityId: quote.id,
+          before: { status: quote.status },
+          after: {
+            status: "CONVERTED",
+            orderId: order.id,
+            orderNumber: number,
+            orderStatus: status,
+            paymentMethod: data.paymentMethod,
+            shippingMethod: data.shippingMethod,
+            ...totals,
+            requiresApproval,
+            scheduledDeliveryAt: scheduledDeliveryAt?.toISOString() ?? null,
+          },
+        })
+        return { orderId: order.id, number, status, total: totals.total }
+      })
+
+    let order: ConvertedOrder | undefined
+    for (let attempt = 1; !order; attempt += 1) {
+      try {
+        order = await run()
+      } catch (error) {
+        if (attempt >= ORDER_NUMBER_ATTEMPTS || !isRetryableOrderError(error)) {
+          throw error
+        }
+      }
+    }
+    return { success: true, order }
+  } catch (error) {
+    return toActionError(error, { action: "convertQuoteToOrder" })
+  }
+}

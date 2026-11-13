@@ -80,6 +80,18 @@ describe("admin modules by profile (RF55)", () => {
     expect(labels).not.toContain("Configurações")
   })
 
+  it("shows the quotes module to sales and hides it from stock (#50)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/cotacoes")).toBe(false)
+    const sales = rolePermissions("sales")
+    expect(visibleAdminModules(sales).map((m) => m.href)).toContain(
+      "/admin/cotacoes"
+    )
+    expect(hasPermission(sales, "quote:answer")).toBe(true)
+    expect(
+      visibleAdminModules(rolePermissions("stock")).map((m) => m.href)
+    ).not.toContain("/admin/cotacoes")
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)
