@@ -11,7 +11,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON atelier_bureau.* TO 'atelier_app'@'%';
 -- Migration user: DDL on the app schema, used by prisma migrate deploy.
 CREATE USER IF NOT EXISTS 'atelier_migrate'@'%' IDENTIFIED BY '${MYSQL_MIGRATE_PASSWORD}';
 GRANT ALL PRIVILEGES ON atelier_bureau.* TO 'atelier_migrate'@'%';
--- Prisma shadow databases are not used in deploy (migrate deploy only).
+-- Shadow database for `prisma migrate dev` (development only): the
+-- migration user cannot create databases, so it gets a fixed one.
+CREATE DATABASE IF NOT EXISTS atelier_bureau_shadow CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+GRANT ALL PRIVILEGES ON atelier_bureau_shadow.* TO 'atelier_migrate'@'%';
 
 -- Backup user: read-only dump.
 CREATE USER IF NOT EXISTS 'atelier_backup'@'%' IDENTIFIED BY '${MYSQL_BACKUP_PASSWORD}';
