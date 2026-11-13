@@ -66,6 +66,26 @@ export function hasCorporatePermission(
   return roles.some((role) => ROLE_PERMISSIONS[role].includes(permission))
 }
 
+/**
+ * Whether a member may approve or refuse an order above the approval
+ * limit (RF11, RN01): they hold the approver role and are not the
+ * requester. The only exception is the single-user account, whose
+ * holder accumulates the approver role (RN08) and has nobody else to
+ * ask.
+ *
+ * @param input - Member roles, whether they placed the order and how
+ * many members the account has.
+ * @returns True when the member may decide.
+ */
+export function canDecideOrderApproval(input: {
+  roles: CorporateRole[]
+  isRequester: boolean
+  memberCount: number
+}): boolean {
+  if (!hasCorporatePermission(input.roles, "order:approve")) return false
+  return !input.isRequester || input.memberCount <= 1
+}
+
 /** A member and their roles, used to validate RN08. */
 export type MemberRoles = { userId: string; roles: CorporateRole[] }
 
