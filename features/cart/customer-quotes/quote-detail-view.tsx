@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { DownloadIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { DownloadIcon, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   downloadMyQuoteAttachment,
+  revalidateMyQuote,
   type CustomerQuote,
 } from "@/features/cart/customer-quotes/action/customer-quotes-actions"
 import { QuoteStatusBadge } from "@/features/shared/components/quote-status-badge"
@@ -34,7 +36,9 @@ function money(value: string | null): string {
 
 /**
  * Quote page of the customer area (#48, RF05, RF06, RF08): status,
- * lines with prices, totals, notes and the attached files.
+ * validity, lines with prices, totals, notes and the attached files.
+ * An expired quote says its prices no longer hold and offers the
+ * revalidation (#49, RN02).
  *
  * @param props - Quote and whether it was just requested.
  * @returns The quote content.
@@ -48,6 +52,19 @@ export function QuoteDetailView({
 }) {
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
+  const [revalidationError, setRevalidationError] = useState<string>()
+  const [revalidated, setRevalidated] = useState(false)
+  const router = useRouter()
+  const expired = quote.status === "EXPIRED"
+
+  const revalidate = () =>
+    startTransition(async () => {
+      setRevalidationError(undefined)
+      const result = await revalidateMyQuote({ quoteId: quote.id })
+      if (!result.success) return setRevalidationError(result.error)
+      setRevalidated(true)
+      router.refresh()
+    })
 
   const download = (attachmentId: string) =>
     startTransition(async () => {
@@ -64,6 +81,38 @@ export function QuoteDetailView({
           Solicitação enviada. Guarde o número {quote.number} para acompanhar a
           cotação; você também recebe a confirmação por e-mail.
         </p>
+      )}
+      {revalidated && !expired && (
+        <p role="status" className="rounded bg-primary-tint p-sm text-body-sm">
+          Preços revalidados com os valores atuais do catálogo. A cotação voltou
+          para a análise da equipe comercial.
+        </p>
+      )}
+      {expired && (
+        <section
+          aria-labelledby="cotacao-vencida"
+          className="flex flex-col items-start gap-sm rounded-lg border border-error p-md"
+        >
+          <h2 id="cotacao-vencida" className="text-headline-sm">
+            Cotação vencida
+          </h2>
+          <p className="text-body-sm">
+            A validade desta cotação terminou e os preços abaixo não valem mais.
+            {quote.canRevalidate
+              ? " Revalide os preços para atualizar os itens com os valores atuais do catálogo e devolver a cotação à equipe comercial; descontos e frete negociados antes precisam ser respondidos de novo."
+              : " Peça a quem solicita cotações na sua empresa para revalidar os preços."}
+          </p>
+          {quote.canRevalidate && (
+            <Button type="button" disabled={pending} onClick={revalidate}>
+              <RefreshCwIcon aria-hidden /> Revalidar preços
+            </Button>
+          )}
+          {revalidationError && (
+            <p role="alert" className="text-body-sm text-error">
+              {revalidationError}
+            </p>
+          )}
+        </section>
       )}
       <dl className="grid gap-md text-body-sm lg:grid-cols-4 sm:grid-cols-2">
         <div>
