@@ -20,6 +20,11 @@ export type ProductCardData = {
   name: string
   brand: string | null
   price: string
+  /**
+   * Catalog price when the customer price table lowers it (RF21);
+   * absent or null otherwise.
+   */
+  listPrice?: string | null
   imageKey: string | null
   imageAlt: string
   available: boolean
