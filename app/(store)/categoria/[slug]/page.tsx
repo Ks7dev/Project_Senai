@@ -10,6 +10,7 @@ import {
 } from "@/features/shared/lib/catalog/catalog-query"
 import { siteUrl } from "@/features/shared/lib/email/site-url"
 import { STORE_NAME } from "@/features/shared/lib/seo/product-json-ld"
+import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
 
 type Params = { slug: string }
 type Search = Record<string, string | string[] | undefined>
@@ -61,7 +62,12 @@ async function CategoryListing({
   const category = await getCategoryWithSubtree(slug)
   if (!category) notFound()
   const filters = parseCatalogFilters(search)
-  const page = await queryCatalog(filters, category.ids)
+  const catalog = await queryCatalog(filters, category.ids)
+  // Price of the logged-in customer table, applied after the shared cache
+  const page = {
+    ...catalog,
+    products: await priceCardsForCurrentCustomer(catalog.products),
+  }
   return (
     <ListingView
       basePath={`/categoria/${category.slug}`}

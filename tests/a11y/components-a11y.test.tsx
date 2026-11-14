@@ -81,6 +81,9 @@ const product = {
   brand: "Atelier",
   category: { name: "Escrita fina", slug: "escrita-fina" },
   price: "1890.00",
+  listPrice: null,
+  priceTableName: null,
+  volumeTiers: [],
   specs: [{ label: "Material", value: "Ébano" }],
   warrantyMonths: 12,
   includesExtendedWarranty: false,
@@ -97,8 +100,20 @@ const product = {
   manuals: [],
   certifications: [],
   skus: [
-    { code: "CT-1", name: "Nogueira", price: "1890.00", available: 2 },
-    { code: "CT-2", name: "Grafite", price: "1990.00", available: 0 },
+    {
+      code: "CT-1",
+      name: "Nogueira",
+      price: "1890.00",
+      listPrice: null,
+      available: 2,
+    },
+    {
+      code: "CT-2",
+      name: "Grafite",
+      price: "1990.00",
+      listPrice: null,
+      available: 0,
+    },
   ],
 }
 
@@ -116,9 +131,19 @@ const checkoutContext = {
     ],
     count: 1,
     subtotal: "1890.00",
+    discount: "0.00",
+    volumeDiscounts: [],
+    priceTableName: null,
     servicesTotal: "0.00",
     total: "1890.00",
     extraBusinessDays: 0,
+  },
+  promotions: {
+    discount: "0.00",
+    total: "1890.00",
+    applied: [],
+    couponCode: null,
+    couponMessage: null,
   },
   addresses: [
     { id: "a1", label: "Escritório", line: "Av. Paulista, 1000, São Paulo" },
