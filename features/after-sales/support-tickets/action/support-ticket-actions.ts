@@ -19,6 +19,7 @@ import {
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import {
   readQuoteAttachment,
   type AttachmentDownload,
@@ -51,6 +52,7 @@ import {
   isPersonalizedItem,
   isReturnKind,
   purchasePersonType,
+  WITHDRAWAL_DAYS_SETTING,
   withdrawalDeadline,
 } from "@/features/shared/lib/support/return-policy"
 import {
@@ -186,6 +188,7 @@ export async function getTicketForm(
   try {
     const source = ticketFormSourceSchema.parse(input ?? {})
     const customer = await loadSupportCustomer()
+    const withdrawalDays = await getNumberSetting(WITHDRAWAL_DAYS_SETTING)
     const rows = await prisma.order.findMany({
       where: {
         ...supportOrderScope(customer),
@@ -231,7 +234,7 @@ export async function getTicketForm(
         personType,
         withdrawalUntil:
           personType === "PF" && deliveredAt
-            ? withdrawalDeadline(deliveredAt).toISOString()
+            ? withdrawalDeadline(deliveredAt, withdrawalDays).toISOString()
             : null,
         items: row.items.map((item) => ({
           id: item.id,
@@ -262,7 +265,8 @@ export async function getTicketForm(
  * ticket for an item of a delivered order (RF17, RN12, RN22), with
  * photos or documents of the problem. Exchanges, returns and
  * withdrawals are checked against the commercial policy: PF withdrawal
- * within 7 days of the receipt; PJ personalized items only for a
+ * within the configured withdrawal days of the receipt (never below the
+ * legal 7 days); PJ personalized items only for a
  * manufacturing defect; everything else goes to the technical
  * evaluation. Checks the order scope of the session user, stores the files in the
  * private storage and, in one transaction, numbers the ticket, records
@@ -342,6 +346,7 @@ export async function openSupportTicket(
           history: item.order.statusHistory,
         }),
         now: new Date(),
+        withdrawalDays: await getNumberSetting(WITHDRAWAL_DAYS_SETTING),
       })
       if (!eligibility.allowed) {
         throw new AppError(eligibility.message, "return_not_allowed")

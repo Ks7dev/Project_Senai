@@ -7,6 +7,7 @@ import {
   paymentStatusAfterRefund,
   refundableCents,
   refundNeedsApproval,
+  withdrawalDeadline,
   type RefundContext,
 } from "@/features/shared/lib/refunds/refund-rules"
 
@@ -149,6 +150,51 @@ describe("refund rules (RF34, RN07, RN18, RN22)", () => {
         now
       ).ok
     ).toBe(false)
+  })
+
+  it("accepts a withdrawal asked in time but refunded after the deadline", () => {
+    const late = context({
+      deliveredAt: new Date(now.getTime() - 12 * DAY),
+      withdrawalRequestedAt: new Date(now.getTime() - 6 * DAY),
+    })
+    expect(
+      decideRefund(late, { reason: "WITHDRAWAL", kind: "FULL" }, settings, now)
+        .ok
+    ).toBe(true)
+    const askedLate = context({
+      deliveredAt: new Date(now.getTime() - 12 * DAY),
+      withdrawalRequestedAt: new Date(now.getTime() - 2 * DAY),
+    })
+    expect(
+      decideRefund(
+        askedLate,
+        { reason: "WITHDRAWAL", kind: "FULL" },
+        settings,
+        now
+      ).ok
+    ).toBe(false)
+  })
+
+  it("uses the same calendar deadline as the withdrawal ticket", () => {
+    // Received on 10/11 at 15:00 in São Paulo: the right lasts until the
+    // end of 17/11, in the ticket and in the refund alike
+    const deliveredAt = new Date("2026-11-10T18:00:00.000Z")
+    expect(withdrawalDeadline(deliveredAt, 7).toISOString()).toBe(
+      "2026-11-18T03:00:00.000Z"
+    )
+    const onLastDay = new Date("2026-11-18T02:30:00.000Z")
+    expect(
+      decideRefund(
+        context({ deliveredAt }),
+        { reason: "WITHDRAWAL", kind: "FULL" },
+        settings,
+        onLastDay
+      ).ok
+    ).toBe(true)
+    // The configured days never go below the legal 7 days
+    expect(withdrawalDeadline(deliveredAt, 3).toISOString()).toBe(
+      "2026-11-18T03:00:00.000Z"
+    )
   })
 
   it("keeps the withdrawal outside the Mercado Pago deadline", () => {
@@ -690,6 +736,39 @@ describe("refund actions (#59)", () => {
     expect(result.success).toBe(false)
     expect(db.refund.create).not.toHaveBeenCalled()
     expect(createMercadoPagoRefund).not.toHaveBeenCalled()
+  })
+
+  it("refunds a withdrawal whose ticket was opened within the deadline", async () => {
+    db.$queryRaw.mockResolvedValue([{ id: orderId }])
+    db.order.findUniqueOrThrow.mockResolvedValue(
+      order({
+        shipment: { deliveredAt: new Date(Date.now() - 12 * DAY) },
+        supportTickets: [{ createdAt: new Date(Date.now() - 6 * DAY) }],
+      })
+    )
+    db.refund.create.mockResolvedValue({ id: refundId })
+    db.refund.findUnique
+      .mockResolvedValueOnce(processingRefund())
+      .mockResolvedValueOnce(processingRefund())
+    db.payment.findUniqueOrThrow.mockResolvedValue({
+      amount: decimal("1000.00"),
+      refundedAmount: decimal("0.00"),
+    })
+    db.refund.aggregate.mockResolvedValue({ _sum: { amount: null } })
+    createMercadoPagoRefund.mockResolvedValue({
+      id: "556",
+      amount: "1000.00",
+      status: "approved",
+    })
+
+    const result = await requestRefund(withdrawal)
+
+    expect(result).toMatchObject({ success: true, status: "COMPLETED" })
+    expect(db.refund.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reason: "WITHDRAWAL" }),
+      })
+    )
   })
 })
 

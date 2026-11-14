@@ -101,7 +101,7 @@ export const settings: SettingSeed[] = [
     key: "refund.withdrawal_days",
     value: 7,
     description:
-      "Prazo do direito de arrependimento de PF, em dias corridos do recebimento, com reembolso integral (RN22)",
+      "Prazo do direito de arrependimento de PF, em dias corridos do recebimento, com reembolso integral; nunca abaixo dos 7 dias do CDC (RN22)",
   },
   {
     key: "refund.max_days_after_payment",
