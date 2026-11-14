@@ -93,9 +93,15 @@ describe("checkout schema (#54)", () => {
     expect(
       placeOrderSchema.safeParse({ ...valid, expectedTotal: "635,8" }).success
     ).toBe(false)
+    // The invoiced purchase is a checkout method since #60; the action
+    // offers it only to approved accounts with credit (RN03, RN10)
+    expect(
+      placeOrderSchema.safeParse({ ...valid, paymentMethod: "INVOICED" })
+        .success
+    ).toBe(true)
     const noMethod = placeOrderSchema.safeParse({
       ...valid,
-      paymentMethod: "INVOICED",
+      paymentMethod: "FINANCING",
     })
     expect(noMethod.success).toBe(false)
     expect(noMethod.error?.issues[0]?.message).toBe(

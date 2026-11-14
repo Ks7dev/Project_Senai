@@ -53,13 +53,14 @@ export async function loadAccountContext(): Promise<AccountContext | null> {
     { href: "/conta", label: "Painel" },
     { href: "/conta/pedidos", label: "Pedidos" },
     { href: "/conta/cotacoes", label: "Cotações" },
+    { href: "/conta/chamados", label: "Chamados" },
     { href: "/conta/enderecos", label: "Endereços" },
     { href: "/conta/favoritos", label: "Favoritos" },
     { href: "/conta/listas", label: "Listas de projeto" },
     { href: "/conta/seguranca", label: "Dados e segurança" },
   ]
   if (corporate && hasCorporatePermission(roles, "member:manage")) {
-    links.splice(4, 0, { href: "/conta/usuarios", label: "Usuários" })
+    links.splice(5, 0, { href: "/conta/usuarios", label: "Usuários" })
   }
   if (corporate && hasCorporatePermission(roles, "order:approve")) {
     links.splice(2, 0, { href: "/conta/aprovacoes", label: "Aprovações" })
