@@ -15,6 +15,17 @@ import {
 import type { CartLine, CartView } from "@/features/shared/lib/cart/cart-types"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import { logger } from "@/features/shared/lib/logger/logger"
+import {
+  loadCustomerPricing,
+  loadVolumeRules,
+} from "@/features/shared/lib/pricing/customer-pricing"
+import {
+  computeVolumeDiscounts,
+  customerUnitCents,
+  LIST_PRICING,
+  type CustomerPricing,
+  type VolumeRule,
+} from "@/features/shared/lib/pricing/pricing-math"
 import { getSetting } from "@/features/shared/lib/settings/settings"
 import {
   engravingRuleSchema,
@@ -281,7 +292,7 @@ export const cartItemInclude = {
     include: {
       product: {
         include: {
-          category: { select: { active: true } },
+          category: { select: { id: true, name: true, active: true } },
           images: {
             orderBy: { position: "asc" },
             take: 1,
@@ -319,21 +330,26 @@ export async function loadCartExtrasRules(
 }
 
 /**
- * Builds a cart line with the current catalog price and the priced
- * extras. Prices are never stored in the cart: they are always read
- * from the catalog and the settings table.
+ * Builds a cart line with the current price of the customer table
+ * (RF21) and the priced extras. Prices are never stored in the cart:
+ * they are always read from the catalog, the customer table and the
+ * settings table.
  *
  * @param item - Loaded cart item.
  * @param rules - Engraving and service rules.
+ * @param pricing - Price table of the cart owner (catalog price when
+ *   omitted).
  * @returns The line.
  */
 export function toCartLine(
   item: LoadedCartItem,
-  rules: CartExtrasRules
+  rules: CartExtrasRules,
+  pricing: CustomerPricing = LIST_PRICING
 ): CartLine {
   const { sku } = item
   const { product } = sku
-  const unitCents = moneyToCents((sku.price ?? product.basePrice).toFixed(2))
+  const listCents = moneyToCents((sku.price ?? product.basePrice).toFixed(2))
+  const unitCents = customerUnitCents(listCents, pricing, product.id)
   const extras = priceLineExtras(
     {
       quantity: item.quantity,
@@ -351,8 +367,11 @@ export function toCartLine(
     productName: product.name,
     productSlug: product.slug,
     imageKey: product.images[0]?.storageKey ?? null,
+    categoryId: product.category.id,
+    categoryName: product.category.name,
     quantity: item.quantity,
     unitPrice: centsToMoney(unitCents),
+    listUnitPrice: unitCents < listCents ? centsToMoney(listCents) : null,
     total: centsToMoney(unitCents * item.quantity),
     purchasable:
       sku.active &&
@@ -365,14 +384,28 @@ export function toCartLine(
   }
 }
 
+/** Pricing context of a cart summary. */
+export type CartPricingOptions = {
+  /** Active volume discount rules (RN04); none when omitted. */
+  volumeRules?: VolumeRule[]
+  /** Name of the customer price table (RF21), or null. */
+  priceTableName?: string | null
+}
+
 /**
- * Sums the purchasable lines with their extras (RF51, RF52). Lines that
- * left the catalog stay visible but do not count.
+ * Sums the purchasable lines with their extras (RF51, RF52) and applies
+ * the automatic volume discounts of each category (RN04) over the
+ * product amounts; engraving and services are never discounted. Lines
+ * that left the catalog stay visible but do not count.
  *
  * @param lines - Cart lines.
+ * @param options - Volume rules and price table name.
  * @returns The cart view.
  */
-export function summarizeLines(lines: CartLine[]): CartView {
+export function summarizeLines(
+  lines: CartLine[],
+  options: CartPricingOptions = {}
+): CartView {
   const purchasable = lines.filter((line) => line.purchasable)
   const subtotal = purchasable.reduce(
     (sum, line) => sum + moneyToCents(line.total),
@@ -382,12 +415,29 @@ export function summarizeLines(lines: CartLine[]): CartView {
     (sum, line) => sum + moneyToCents(line.extrasTotal),
     0
   )
+  const volume = computeVolumeDiscounts(
+    purchasable.map((line) => ({
+      categoryId: line.categoryId,
+      quantity: line.quantity,
+      totalCents: moneyToCents(line.total),
+    })),
+    options.volumeRules ?? []
+  )
+  const discount = volume.reduce((sum, item) => sum + item.discountCents, 0)
   return {
     lines,
     count: purchasable.reduce((sum, line) => sum + line.quantity, 0),
     subtotal: centsToMoney(subtotal),
+    discount: centsToMoney(discount),
+    volumeDiscounts: volume.map((item) => ({
+      categoryName: item.categoryName,
+      basisPoints: item.basisPoints,
+      quantity: item.quantity,
+      amount: centsToMoney(item.discountCents),
+    })),
+    priceTableName: options.priceTableName ?? null,
     servicesTotal: centsToMoney(services),
-    total: centsToMoney(subtotal + services),
+    total: centsToMoney(subtotal - discount + services),
     // Lines are produced in parallel: the order waits for the longest
     extraBusinessDays: Math.max(
       0,
@@ -397,7 +447,34 @@ export function summarizeLines(lines: CartLine[]): CartView {
 }
 
 /**
- * Loads a cart or list with its lines.
+ * Prices loaded cart items for their owner: the customer table (RF21)
+ * on each line and the volume discounts (RN04) on the totals.
+ *
+ * @param items - Loaded cart items.
+ * @param context - Extras rules, customer pricing and volume rules.
+ * @returns The cart view.
+ */
+export function buildCartView(
+  items: LoadedCartItem[],
+  context: {
+    rules: CartExtrasRules
+    pricing: CustomerPricing
+    volumeRules: VolumeRule[]
+  }
+): CartView {
+  return summarizeLines(
+    items.map((item) => toCartLine(item, context.rules, context.pricing)),
+    {
+      volumeRules: context.volumeRules,
+      priceTableName: context.pricing.tableName,
+    }
+  )
+}
+
+/**
+ * Loads a cart or list with its lines, priced for its owner: the price
+ * table of the customer (RF21) and the automatic volume discounts
+ * (RN04). Visitor carts get the catalog price.
  *
  * @param cartId - Cart or list id, already checked against the owner.
  * @param client - Prisma client or transaction.
@@ -407,15 +484,18 @@ export async function loadCartView(
   cartId: string,
   client: Client = prisma
 ): Promise<CartView> {
-  const [items, rules] = await Promise.all([
+  const [cart, items, rules, volumeRules] = await Promise.all([
+    client.cart.findUnique({ where: { id: cartId }, select: { userId: true } }),
     client.cartItem.findMany({
       where: { cartId },
       include: cartItemInclude,
       orderBy: { createdAt: "asc" },
     }),
     loadCartExtrasRules(client),
+    loadVolumeRules(client),
   ])
-  return summarizeLines(items.map((item) => toCartLine(item, rules)))
+  const pricing = await loadCustomerPricing(cart?.userId ?? null, client)
+  return buildCartView(items, { rules, pricing, volumeRules })
 }
 
 /** An empty cart. */
@@ -423,6 +503,9 @@ export const EMPTY_CART: CartView = {
   lines: [],
   count: 0,
   subtotal: "0.00",
+  discount: "0.00",
+  volumeDiscounts: [],
+  priceTableName: null,
   servicesTotal: "0.00",
   total: "0.00",
   extraBusinessDays: 0,

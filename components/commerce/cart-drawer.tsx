@@ -35,6 +35,12 @@ type CartDrawerProps = {
   items: CartDrawerItem[]
   /** Sum of the items. */
   subtotal: string
+  /** Engraving and additional services, if any. */
+  services?: string
+  /** Automatic discounts (positive number), if any. */
+  discount?: string
+  /** Total before shipping; the subtotal when omitted. */
+  total?: string
 }
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -47,10 +53,16 @@ const brl = new Intl.NumberFormat("pt-BR", {
  * subtotals, order summary and the way to the cart. Slides from the
  * right, traps focus and closes with Esc.
  *
- * @param props - Cart lines and subtotal.
+ * @param props - Cart lines and amounts.
  * @returns The trigger and the drawer.
  */
-export function CartDrawer({ items, subtotal }: CartDrawerProps) {
+export function CartDrawer({
+  items,
+  subtotal,
+  services,
+  discount,
+  total,
+}: CartDrawerProps) {
   const count = items.reduce((sum, item) => sum + item.quantity, 0)
   return (
     <Sheet>
@@ -115,7 +127,12 @@ export function CartDrawer({ items, subtotal }: CartDrawerProps) {
         </ul>
         {count > 0 && (
           <div className="flex flex-col gap-sm p-md">
-            <OrderSummary subtotal={subtotal} total={subtotal} />
+            <OrderSummary
+              subtotal={subtotal}
+              services={services}
+              discount={discount}
+              total={total ?? subtotal}
+            />
             <SheetClose
               nativeButton={false}
               render={

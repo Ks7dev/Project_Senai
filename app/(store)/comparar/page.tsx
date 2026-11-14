@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { CompareView } from "@/features/catalog/compare/compare-view"
 import { getComparisonProducts } from "@/features/shared/lib/catalog/catalog-query"
+import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
 
 export const metadata = { title: "Comparar produtos — Atelier Bureau" }
 
@@ -20,7 +21,13 @@ async function Comparison({
     .split(",")
     .map((slug) => slug.trim())
     .filter((slug) => /^[a-z0-9-]{1,191}$/.test(slug))
-  return <CompareView products={await getComparisonProducts(slugs)} />
+  return (
+    <CompareView
+      products={await priceCardsForCurrentCustomer(
+        await getComparisonProducts(slugs)
+      )}
+    />
+  )
 }
 
 /**
