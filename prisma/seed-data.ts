@@ -98,6 +98,41 @@ export const settings: SettingSeed[] = [
     description: "Vencimentos do pagamento faturado, em dias (RN03)",
   },
   {
+    key: "refund.withdrawal_days",
+    value: 7,
+    description:
+      "Prazo do direito de arrependimento de PF, em dias corridos do recebimento, com reembolso integral (RN22)",
+  },
+  {
+    key: "refund.max_days_after_payment",
+    value: 180,
+    description:
+      "Prazo máximo para estornar pelo Mercado Pago, em dias após a aprovação do pagamento, salvo arrependimento (RN18)",
+  },
+  {
+    key: "invoice.issuer",
+    value: {
+      cnpj: "12345678000195",
+      name: "Atelier Bureau Papelaria e Mobiliário Ltda (fictícia)",
+      state: "SP",
+    },
+    description:
+      "Emitente da NF-e em homologação: CNPJ cadastrado no emissor, razão social e UF de origem (fictícios, RF13)",
+  },
+  {
+    key: "invoice.nfe_defaults",
+    value: {
+      operationNature: "Venda de mercadoria",
+      ncm: "48201000",
+      cfopSameState: "5102",
+      cfopOtherState: "6102",
+      icmsSituation: "102",
+      pisCofinsSituation: "07",
+    },
+    description:
+      "Padrões fiscais da NF-e: natureza da operação, NCM, CFOP dentro e fora do estado e situações tributárias (Simples Nacional, a validar com a contabilidade, RF13)",
+  },
+  {
     key: "personalization.engraving",
     value: { price: "90.00", extraBusinessDays: 3, maxLength: 30 },
     description:
@@ -180,6 +215,55 @@ export const settings: SettingSeed[] = [
   },
 ]
 
+/**
+ * Agenda of the demonstrations of complex items (#70, RF19). Kept in a
+ * separate list so the merge with the other settings stays additive.
+ */
+export const demoSettings: SettingSeed[] = [
+  {
+    key: "demo.min_business_days",
+    value: 1,
+    description:
+      "Antecedência mínima para agendar uma demonstração, em dias úteis (RF19)",
+  },
+  {
+    key: "demo.window_days",
+    value: 30,
+    description:
+      "Quantos dias corridos a agenda de demonstrações oferece a partir da primeira data (RF19)",
+  },
+  {
+    key: "demo.weekdays",
+    value: [1, 2, 3, 4, 5],
+    description:
+      "Dias da semana com demonstração (0 = domingo … 6 = sábado) (RF19)",
+  },
+  {
+    key: "demo.time_slots",
+    value: ["09:30", "11:00", "14:00", "15:30", "17:00"],
+    description:
+      "Horários de início das demonstrações, no horário de Brasília (RF19)",
+  },
+  {
+    key: "demo.slot_capacity",
+    value: 1,
+    description:
+      "Demonstrações que a equipe comercial atende no mesmo horário (RF19)",
+  },
+  {
+    key: "demo.blocked_dates",
+    value: [
+      "2026-11-20",
+      "2026-12-24",
+      "2026-12-25",
+      "2026-12-31",
+      "2027-01-01",
+    ],
+    description:
+      "Datas sem demonstração, como feriados e recesso, no formato AAAA-MM-DD (RF19)",
+  },
+]
+
 /** A CEP range of the delivery coverage. */
 export type ShippingRegionSeed = {
   /** Region name, in Portuguese. */
@@ -192,11 +276,13 @@ export type ShippingRegionSeed = {
   ownDelivery: boolean
   /** Own delivery prices by maximum weight. */
   ownDeliveryRates?: Array<{ maxKg: number; price: string }>
+  /** Order total that ships for free to the region (RN23), if any. */
+  freeShippingMinimum?: string
 }
 
 /**
- * Own delivery coverage: São Paulo Metropolitan Region (RN16). The free
- * shipping minimum per region (RN23) is still to be defined (#73).
+ * Own delivery coverage: São Paulo Metropolitan Region (RN16), with a
+ * provisional free shipping minimum (RN23, #73) editable in /admin/frete.
  */
 export const shippingRegions: ShippingRegionSeed[] = [
   {
@@ -209,6 +295,7 @@ export const shippingRegions: ShippingRegionSeed[] = [
       { maxKg: 100, price: "240.00" },
       { maxKg: 300, price: "480.00" },
     ],
+    freeShippingMinimum: "5000.00",
   },
 ]
 
@@ -465,6 +552,73 @@ export const products: ProductSeed[] = [
   },
 ]
 
+/** A customer price table (RF21). */
+export type PriceTableSeed = {
+  /** Table name, shown to the customer. */
+  name: string
+  /** Description for the back office. */
+  description: string
+  /** Default discount over the catalog price, in percent. */
+  discountPercent: string
+  /** Discounts per product slug, replacing the default. */
+  items: Array<{ product: string; discountPercent: string }>
+  /** Corporate account slugs that buy with the table. */
+  organizations: string[]
+}
+
+/**
+ * Demo price table (RF21). The percentages are fictitious examples for
+ * the academic demo, edited in the back office (/admin/precos). No
+ * account is assigned by the seed, so the catalog prices the other
+ * flows rely on do not change; the demo assigns it in the back office.
+ */
+export const priceTables: PriceTableSeed[] = [
+  {
+    name: "Corporativo",
+    description: "Exemplo fictício para a demonstração: contas corporativas.",
+    discountPercent: "5.00",
+    items: [{ product: "mesa-regulavel-carvalho", discountPercent: "8.00" }],
+    organizations: [],
+  },
+]
+
+/** An automatic volume discount of a category (RN04). */
+export type VolumeDiscountSeed = {
+  /** Category slug. */
+  category: string
+  /** Minimum units of the category, or null. */
+  minQuantity: number | null
+  /** Minimum amount of the category, or null. */
+  minAmount: string | null
+  /** Discount in percent. */
+  discountPercent: string
+}
+
+/**
+ * Demo volume discounts (RN04). Fictitious thresholds for the academic
+ * demo, edited in the back office (/admin/precos).
+ */
+export const volumeDiscounts: VolumeDiscountSeed[] = [
+  {
+    category: "papelaria-nobre",
+    minQuantity: 10,
+    minAmount: null,
+    discountPercent: "5.00",
+  },
+  {
+    category: "papelaria-nobre",
+    minQuantity: 50,
+    minAmount: null,
+    discountPercent: "10.00",
+  },
+  {
+    category: "mobiliario-ergonomico",
+    minQuantity: 4,
+    minAmount: "25000.00",
+    discountPercent: "6.00",
+  },
+]
+
 /** A fictitious account for development and the demo. */
 export type AccountSeed = {
   /** Login e-mail (fictitious domain). */
@@ -496,6 +650,13 @@ export const accounts: AccountSeed[] = [
     roles: ["sales"],
   },
   {
+    email: "financeiro@atelierbureau.test",
+    name: "Equipe Financeira",
+    personType: "PF",
+    document: "00000001910",
+    roles: ["finance"],
+  },
+  {
     email: "cliente.pf@atelierbureau.test",
     name: "Cliente Pessoa Física",
     personType: "PF",
@@ -512,6 +673,32 @@ export const accounts: AccountSeed[] = [
     name: "Aprovador Empresa Fictícia",
     personType: "PJ",
     document: "00000000515",
+  },
+]
+
+/** A seller rule by region and segment (RN11). */
+export type SellerRuleSeed = {
+  /** E-mail of a seeded account with the sales role. */
+  sellerEmail: string
+  /** WhatsApp of the seller, digits with area code (fictitious). */
+  sellerPhone: string
+  /** Segment; null means any. */
+  personType: "PF" | "PJ" | null
+  /** State (UF); null means any. */
+  state: string | null
+}
+
+/**
+ * Dedicated seller rules (#69, RF18, RN11). The general rule sends
+ * every customer to the fictitious sales account until the back office
+ * defines the regions, segments and the real WhatsApp numbers.
+ */
+export const sellerRules: SellerRuleSeed[] = [
+  {
+    sellerEmail: "comercial@atelierbureau.test",
+    sellerPhone: "11900000000",
+    personType: null,
+    state: null,
   },
 ]
 

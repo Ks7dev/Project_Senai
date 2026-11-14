@@ -6,6 +6,7 @@ import {
   RateLimiter,
   type RateLimitRule,
 } from "@/features/shared/lib/rate-limit/rate-limit"
+import { clientIpFromHeaders } from "@/features/shared/lib/request/client-ip"
 
 const limiter = new RateLimiter()
 
@@ -28,8 +29,7 @@ export async function enforceActionRateLimit(
   rule: RateLimitRule
 ): Promise<void> {
   const requestHeaders = await headers()
-  const forwarded = requestHeaders.get("x-forwarded-for")
-  const ip = forwarded?.split(",")[0]?.trim() || "unknown"
+  const ip = clientIpFromHeaders(requestHeaders) ?? "unknown"
   const result = limiter.check(`action:${name}:${ip}`, rule)
   if (!result.allowed) {
     logger.warn("action rate limit exceeded", { group: name })

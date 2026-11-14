@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import {
   activeCartWhere,
   addItemsToCart,
+  EMPTY_CART,
   findActiveCartId,
   loadCartExtrasRules,
   loadCartView,
@@ -20,15 +21,75 @@ import {
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
 import {
+  applyCouponSchema,
+  cartShippingSchema,
   removeCartItemSchema,
   saveProjectListSchema,
   setCartItemExtrasSchema,
   updateCartItemSchema,
+  type ApplyCouponInput,
+  type CartShippingInput,
   type RemoveCartItemInput,
   type SaveProjectListInput,
   type SetCartItemExtrasInput,
   type UpdateCartItemInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
+import type { PromotionsNoteData } from "@/features/shared/components/promotions-note"
+import { COUPON_STATUS_MESSAGE } from "@/features/shared/lib/promotions/promotion-math"
+import {
+  applyShippingBenefits,
+  loadCartCoupon,
+  priceCart,
+  type CartPricing,
+} from "@/features/shared/lib/promotions/promotion-service"
+import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+import { quoteShippingForItems } from "@/features/shared/lib/shipping/shipping-service"
+import type { ShippingQuote } from "@/features/shared/lib/shipping/strategies"
+
+/** Promotions of the cart as the cart page shows them (RF46). */
+export type CartPromotions = PromotionsNoteData & {
+  /** Total discount, decimal string. */
+  discount: string
+  /** Total after the discount, before shipping, decimal string. */
+  total: string
+}
+
+/**
+ * Maps the pricing to what the cart page shows.
+ *
+ * @param pricing - Cart pricing.
+ * @returns The promotions block.
+ */
+function toCartPromotions(pricing: CartPricing): CartPromotions {
+  return {
+    discount: pricing.discount,
+    total: pricing.total,
+    applied: pricing.applied,
+    couponCode: pricing.coupon?.code ?? null,
+    couponMessage:
+      pricing.coupon && pricing.coupon.status !== "applied"
+        ? COUPON_STATUS_MESSAGE[pricing.coupon.status]
+        : null,
+  }
+}
+
+/**
+ * Active cart of whoever is browsing, with its promotions. The owner
+ * comes from the session or the visitor cookie, never from the request.
+ *
+ * @returns The cart id (null without a cart), view and pricing.
+ */
+async function loadOwnCartPricing(): Promise<{
+  cartId: string | null
+  cart: CartView
+  pricing: CartPricing
+}> {
+  const owner = await resolveCartOwner({ create: false })
+  const cartId = owner ? await findActiveCartId(owner) : null
+  const cart = cartId ? await loadCartView(cartId) : EMPTY_CART
+  const couponCode = await loadCartCoupon(cartId)
+  return { cartId, cart, pricing: await priceCart(cart, { couponCode }) }
+}
 
 /** Most project lists a customer can keep at once. */
 const MAX_PROJECT_LISTS = 50
@@ -247,5 +308,124 @@ export async function saveCartAsProjectList(
     return { success: true, listId }
   } catch (error) {
     return toActionError(error, { action: "saveCartAsProjectList" })
+  }
+}
+
+/**
+ * Promotions in force on the active cart (RF46): product and category
+ * discounts and the coupon kept on the cart, checked again now.
+ *
+ * @returns `{ success: true, promotions }` or `{ success: false, error }`.
+ */
+export async function getCartPromotions(): Promise<
+  ActionResult<{ promotions: CartPromotions }>
+> {
+  try {
+    const { pricing } = await loadOwnCartPricing()
+    return { success: true, promotions: toCartPromotions(pricing) }
+  } catch (error) {
+    return toActionError(error, { action: "getCartPromotions" })
+  }
+}
+
+/**
+ * Applies a coupon to the active cart (RF46). Only a coupon in force,
+ * whose minimum the cart reaches and that changes the order, is kept on
+ * the cart; the checkout checks it again before placing the order.
+ *
+ * @param input - Coupon code.
+ * @returns `{ success: true, promotions }` or `{ success: false, error }`.
+ */
+export async function applyCartCoupon(
+  input: ApplyCouponInput
+): Promise<ActionResult<{ promotions: CartPromotions }>> {
+  try {
+    const parsed = applyCouponSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? "Código de cupom inválido.",
+        "invalid"
+      )
+    }
+    await enforceActionRateLimit("coupon", { limit: 10, windowMs: 60_000 })
+    const { cartId, cart } = await loadOwnCartPricing()
+    if (!cartId || cart.lines.length === 0) {
+      throw new AppError("Seu carrinho está vazio.", "empty_cart")
+    }
+    const pricing = await priceCart(cart, { couponCode: parsed.data.code })
+    const status = pricing.coupon?.status ?? "not_found"
+    if (status !== "applied") {
+      throw new AppError(COUPON_STATUS_MESSAGE[status], `coupon_${status}`)
+    }
+    await prisma.cart.update({
+      where: { id: cartId },
+      data: { couponCode: parsed.data.code },
+    })
+    return { success: true, promotions: toCartPromotions(pricing) }
+  } catch (error) {
+    return toActionError(error, { action: "applyCartCoupon" })
+  }
+}
+
+/**
+ * Removes the coupon of the active cart.
+ *
+ * @returns `{ success: true, promotions }` or `{ success: false, error }`.
+ */
+export async function removeCartCoupon(): Promise<
+  ActionResult<{ promotions: CartPromotions }>
+> {
+  try {
+    const { cartId, cart } = await loadOwnCartPricing()
+    if (cartId) {
+      await prisma.cart.update({
+        where: { id: cartId },
+        data: { couponCode: null },
+      })
+    }
+    const pricing = await priceCart(cart, { couponCode: null })
+    return { success: true, promotions: toCartPromotions(pricing) }
+  } catch (error) {
+    return toActionError(error, { action: "removeCartCoupon" })
+  }
+}
+
+/**
+ * Shipping estimate of the active cart for a CEP (RF25), with courtesy
+ * shipping of a promotion or the regional free shipping minimum applied
+ * (RN23). The lines come from the cart, never from the request.
+ *
+ * @param input - Destination CEP.
+ * @returns `{ success: true, quote }` or `{ success: false, error }`.
+ */
+export async function quoteCartShipping(
+  input: CartShippingInput
+): Promise<ActionResult<{ quote: ShippingQuote }>> {
+  try {
+    const parsed = cartShippingSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? "Revise o CEP.",
+        "invalid"
+      )
+    }
+    await enforceActionRateLimit("shipping", { limit: 30, windowMs: 60_000 })
+    const { cart, pricing } = await loadOwnCartPricing()
+    const items = cart.lines
+      .filter((line) => line.purchasable)
+      .map((line) => ({ skuCode: line.skuCode, quantity: line.quantity }))
+    if (items.length === 0) {
+      throw new AppError("Seu carrinho está vazio.", "empty_cart")
+    }
+    const quote = await quoteShippingForItems({ cep: parsed.data.cep, items })
+    return {
+      success: true,
+      quote: await applyShippingBenefits(quote, {
+        pricing,
+        cep: parsed.data.cep,
+      }),
+    }
+  } catch (error) {
+    return toActionError(error, { action: "quoteCartShipping" })
   }
 }

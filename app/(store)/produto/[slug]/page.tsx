@@ -1,7 +1,10 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { loadProductPage } from "@/features/catalog/product-page/load-product"
+import {
+  loadProductPage,
+  loadProductPageForCustomer,
+} from "@/features/catalog/product-page/load-product"
 import { ProductPageView } from "@/features/catalog/product-page/product-page-view"
 import { siteUrl } from "@/features/shared/lib/email/site-url"
 import {
@@ -58,14 +61,26 @@ async function ProductContent({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const product = await loadProductPage(slug)
+  const product = await loadProductPageForCustomer(slug)
   if (!product) notFound()
+  // Structured data always carries the public catalog price, never the
+  // price of the logged-in customer table (RF21)
+  const catalogProduct = {
+    ...product,
+    price: product.listPrice ?? product.price,
+    skus: product.skus.map((sku) => ({
+      ...sku,
+      price: sku.listPrice ?? sku.price,
+    })),
+  }
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: serializeJsonLd(buildProductJsonLd(product, siteUrl())),
+          __html: serializeJsonLd(
+            buildProductJsonLd(catalogProduct, siteUrl())
+          ),
         }}
       />
       <ProductPageView product={product} />
