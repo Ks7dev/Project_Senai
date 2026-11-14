@@ -323,3 +323,84 @@ export function supportTicketEmail(input: {
     action: { label: "Ver chamado", url: input.url },
   })
 }
+
+/**
+ * Demonstration request received, confirmed or canceled, sent to the
+ * customer (RF19, RF53).
+ *
+ * @param input - Name, stage, date, mode, product, team note and link.
+ * @returns The e-mail.
+ */
+export function demoCustomerEmail(input: {
+  name: string
+  stage: "received" | "confirmed" | "canceled"
+  when: string
+  mode: string
+  product: string | null
+  note?: string | null
+  url: string
+}): RenderedEmail {
+  const copy = {
+    received: {
+      subject: "Recebemos o seu pedido de demonstração",
+      heading: "Demonstração solicitada",
+      text: "Recebemos o seu pedido de demonstração. O seu vendedor confirma a data e o horário em breve.",
+    },
+    confirmed: {
+      subject: "Demonstração confirmada",
+      heading: "Demonstração confirmada",
+      text: "A sua demonstração está confirmada. Até lá!",
+    },
+    canceled: {
+      subject: "Demonstração cancelada",
+      heading: "Demonstração cancelada",
+      text: "A demonstração foi cancelada. Escolha outra data no site quando quiser.",
+    },
+  }[input.stage]
+  return render(`demo.${input.stage}`, copy.subject, {
+    preheader: `${input.when} · ${input.mode}`,
+    heading: copy.heading,
+    paragraphs: [
+      `Olá, ${input.name}.`,
+      copy.text,
+      ...(input.note ? [`Mensagem da equipe: ${input.note}`] : []),
+    ],
+    details: [
+      { label: "Data e horário", value: input.when },
+      { label: "Formato", value: input.mode },
+      ...(input.product ? [{ label: "Produto", value: input.product }] : []),
+    ],
+    action: { label: "Ver demonstrações", url: input.url },
+  })
+}
+
+/**
+ * New demonstration request, sent to the seller who receives it (RF19).
+ *
+ * @param input - Seller name, customer, date, mode, product and link.
+ * @returns The e-mail.
+ */
+export function demoSalesEmail(input: {
+  sellerName: string
+  customer: string
+  company: string | null
+  when: string
+  mode: string
+  product: string | null
+  url: string
+}): RenderedEmail {
+  return render("demo.sales", `Nova demonstração: ${input.when}`, {
+    preheader: `${input.customer} pediu uma demonstração.`,
+    heading: "Nova solicitação de demonstração",
+    paragraphs: [
+      `Olá, ${input.sellerName}.`,
+      `${input.customer}${input.company ? ` (${input.company})` : ""} pediu uma demonstração. Confirme ou cancele no back office.`,
+    ],
+    details: [
+      { label: "Data e horário", value: input.when },
+      { label: "Formato", value: input.mode },
+      ...(input.product ? [{ label: "Produto", value: input.product }] : []),
+    ],
+    action: { label: "Abrir demonstrações", url: input.url },
+  })
+}
