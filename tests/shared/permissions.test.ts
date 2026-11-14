@@ -102,6 +102,48 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/promocoes")
   })
 
+  it("shows the after-sales module to sales and hides it from finance (#68)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/atendimento")).toBe(false)
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).toContain("/admin/atendimento")
+    expect(
+      visibleAdminModules(rolePermissions("finance")).map((m) => m.href)
+    ).not.toContain("/admin/atendimento")
+  })
+
+  it("shows the NF-e module to finance and hides it from sales (#63)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/nfe")).toBe(false)
+    expect(
+      visibleAdminModules(rolePermissions("finance")).map((m) => m.href)
+    ).toContain("/admin/nfe")
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).not.toContain("/admin/nfe")
+  })
+
+  it("shows the finance module to finance and hides it from sales (#61)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/financeiro")).toBe(false)
+    const finance = rolePermissions("finance")
+    expect(visibleAdminModules(finance).map((m) => m.href)).toContain(
+      "/admin/financeiro"
+    )
+    expect(hasPermission(finance, "credit:approve")).toBe(true)
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).not.toContain("/admin/financeiro")
+  })
+
+  it("shows the price tables module to sales only (#52)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/precos")).toBe(false)
+    const visible = (key: string) =>
+      visibleAdminModules(rolePermissions(key)).map((m) => m.href)
+    expect(visible("sales")).toContain("/admin/precos")
+    expect(visible("admin")).toContain("/admin/precos")
+    expect(visible("finance")).not.toContain("/admin/precos")
+    expect(visible("stock")).not.toContain("/admin/precos")
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)

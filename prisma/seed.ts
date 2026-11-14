@@ -7,11 +7,15 @@ import {
   accounts,
   categories,
   corporateAccount,
+  demoSettings,
   permissions,
+  priceTables,
   products,
   roles,
+  sellerRules,
   settings,
   shippingRegions,
+  volumeDiscounts,
 } from "./seed-data"
 
 try {
@@ -35,7 +39,7 @@ const seedPassword = process.env.SEED_PASSWORD ?? "atelier-demo-2026"
  * idempotent: running it again updates the same rows (upsert).
  */
 async function main() {
-  for (const setting of settings) {
+  for (const setting of [...settings, ...demoSettings]) {
     await prisma.setting.upsert({
       where: { key: setting.key },
       create: {
@@ -189,6 +193,28 @@ async function main() {
     }
   }
 
+  for (const rule of sellerRules) {
+    const sellerId = userIds.get(rule.sellerEmail)!
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: sellerId },
+      select: { phone: true },
+    })
+    if (!user.phone) {
+      await prisma.user.update({
+        where: { id: sellerId },
+        data: { phone: rule.sellerPhone },
+      })
+    }
+    const existing = await prisma.sellerRule.findFirst({
+      where: { active: true, personType: rule.personType, state: rule.state },
+    })
+    if (!existing) {
+      await prisma.sellerRule.create({
+        data: { sellerId, personType: rule.personType, state: rule.state },
+      })
+    }
+  }
+
   const organization = await prisma.organization.upsert({
     where: { slug: corporateAccount.slug },
     create: {
@@ -219,6 +245,58 @@ async function main() {
       },
       update: { role: member.role },
     })
+  }
+
+  for (const table of priceTables) {
+    const existing = await prisma.priceTable.findFirst({
+      where: { name: table.name, deletedAt: null },
+    })
+    if (existing) continue
+    const saved = await prisma.priceTable.create({
+      data: {
+        name: table.name,
+        description: table.description,
+        discountPercent: table.discountPercent,
+      },
+    })
+    for (const item of table.items) {
+      const product = await prisma.product.findUniqueOrThrow({
+        where: { slug: item.product },
+      })
+      await prisma.priceTableItem.create({
+        data: {
+          priceTableId: saved.id,
+          productId: product.id,
+          discountPercent: item.discountPercent,
+        },
+      })
+    }
+    await prisma.organization.updateMany({
+      where: { slug: { in: table.organizations }, priceTableId: null },
+      data: { priceTableId: saved.id },
+    })
+  }
+
+  for (const rule of volumeDiscounts) {
+    const categoryId = categoryIds.get(rule.category)!
+    const existing = await prisma.volumeDiscount.findFirst({
+      where: {
+        categoryId,
+        minQuantity: rule.minQuantity,
+        minAmount: rule.minAmount,
+        deletedAt: null,
+      },
+    })
+    if (!existing) {
+      await prisma.volumeDiscount.create({
+        data: {
+          categoryId,
+          minQuantity: rule.minQuantity,
+          minAmount: rule.minAmount,
+          discountPercent: rule.discountPercent,
+        },
+      })
+    }
   }
 }
 
