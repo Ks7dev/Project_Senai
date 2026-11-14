@@ -13,6 +13,7 @@ import {
   settings,
   shippingRegions,
 } from "./seed-data"
+import { institutionalPages } from "./seed-institutional-pages"
 
 try {
   process.loadEnvFile()
@@ -56,6 +57,15 @@ async function main() {
         data: { ...region, ownDeliveryRates: region.ownDeliveryRates },
       })
     }
+  }
+
+  // Created once: the text edited in the back office is never replaced
+  for (const page of institutionalPages) {
+    await prisma.institutionalPage.upsert({
+      where: { slug: page.slug },
+      create: page,
+      update: {},
+    })
   }
 
   for (const permission of permissions) {

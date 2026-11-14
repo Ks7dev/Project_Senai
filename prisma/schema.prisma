@@ -170,6 +170,7 @@ model User {
   sellerAccounts     Organization[]       @relation("OrganizationSeller")
   creditLimitChanges CreditLimitChange[]
   updatedSettings    Setting[]
+  updatedPages       InstitutionalPage[]
 
   @@map("users")
 }
@@ -902,6 +903,23 @@ model Setting {
 
   @@index([updatedById])
   @@map("settings")
+}
+
+/// Institutional page edited in the back office without a deploy: terms
+/// of use, privacy policy, exchanges and returns, warranty (RF57)
+model InstitutionalPage {
+  /// Route of the page, e.g. "termos-de-uso"
+  slug        String   @id @db.VarChar(80)
+  title       String   @db.VarChar(120)
+  /// Text in a small Markdown subset (headings, lists, tables, bold)
+  body        String   @db.MediumText
+  updatedById String?  @map("updated_by_id") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+  @@map("institutional_pages")
 }
 
 /// Append-only log of sensitive actions (RNF12)
