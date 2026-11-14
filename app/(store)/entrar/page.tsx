@@ -2,7 +2,11 @@ import { Suspense } from "react"
 import { SignInView } from "@/features/access/sign-in/sign-in-view"
 import { safeRedirectPath } from "@/features/shared/lib/validation/documents"
 
-export const metadata = { title: "Entrar — Atelier Bureau" }
+export const metadata = {
+  title: "Entrar — Atelier Bureau",
+  description:
+    "Entre na sua conta da Atelier Bureau para acompanhar pedidos, cotações e listas de projeto.",
+}
 
 /**
  * Reads the post-login destination from the query string.

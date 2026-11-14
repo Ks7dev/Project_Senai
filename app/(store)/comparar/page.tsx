@@ -2,7 +2,11 @@ import { Suspense } from "react"
 import { CompareView } from "@/features/catalog/compare/compare-view"
 import { getComparisonProducts } from "@/features/shared/lib/catalog/catalog-query"
 
-export const metadata = { title: "Comparar produtos — Atelier Bureau" }
+export const metadata = {
+  title: "Comparar produtos — Atelier Bureau",
+  description:
+    "Compare lado a lado preço, garantia, prazo e especificações de produtos da Atelier Bureau.",
+}
 
 /**
  * Loads the products named in the "p" query parameter.

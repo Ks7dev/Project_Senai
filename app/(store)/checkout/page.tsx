@@ -4,7 +4,11 @@ import { PageContainer } from "@/components/layout/page-container"
 import { getCheckout } from "@/features/payment/checkout/action/checkout-actions"
 import { CheckoutView } from "@/features/payment/checkout/checkout-view"
 
-export const metadata = { title: "Finalizar compra — Atelier Bureau" }
+export const metadata = {
+  title: "Finalizar compra — Atelier Bureau",
+  description:
+    "Finalize sua compra na Atelier Bureau: endereço de entrega, frete e forma de pagamento em um só lugar.",
+}
 
 /**
  * Loads the cart, the saved addresses and the payment methods of the
