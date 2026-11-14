@@ -24,6 +24,8 @@ describe("seed configuration (#5, #8)", () => {
     expect(setting("shipping.correios_max_side_cm")).toBe(100)
     expect(setting("shipping.correios_max_dimensions_sum_cm")).toBe(200)
     expect(setting("payment.invoiced_due_days")).toEqual([28, 56])
+    expect(setting("refund.withdrawal_days")).toBe(7)
+    expect(setting("refund.max_days_after_payment")).toBe(180)
   })
 
   it("has unique setting keys", () => {
