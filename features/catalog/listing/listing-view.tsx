@@ -16,6 +16,9 @@ import {
 import type { CatalogPage } from "@/features/shared/lib/catalog/catalog-query"
 import { cn } from "@/lib/utils"
 
+/** Cards of the first row (desktop grid), loaded with priority (RNF10). */
+const FIRST_ROW_SIZE = 4
+
 type ListingViewProps = {
   /** Base path: "/categoria/<slug>" or "/busca". */
   basePath: string
@@ -204,10 +207,11 @@ export function ListingView({
             </div>
           ) : (
             <ul className="grid grid-cols-2 gap-gutter-mobile md:grid-cols-3 md:gap-gutter-tablet lg:gap-gutter xl:grid-cols-4">
-              {page.products.map((product) => (
+              {page.products.map((product, index) => (
                 <li key={product.id}>
                   <ProductCard
                     {...product}
+                    priority={index < FIRST_ROW_SIZE}
                     actions={
                       <>
                         <FavoriteButton

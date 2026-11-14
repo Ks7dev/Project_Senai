@@ -73,6 +73,7 @@ export function ProductPageView({ product }: ProductPageViewProps) {
                 srcSet={`/media/${image.key}-640.webp 640w, /media/${image.key}-1024.webp 1024w, /media/${image.key}-1600.webp 1600w`}
                 sizes="(min-width: 1200px) 50vw, 100vw"
                 alt={image.alt}
+                fetchPriority={imageIndex === 0 ? "high" : "auto"}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -101,6 +102,8 @@ export function ProductPageView({ product }: ProductPageViewProps) {
                     <img
                       src={`/media/${item.key}-320.webp`}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   </button>

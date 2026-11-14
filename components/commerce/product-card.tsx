@@ -20,6 +20,11 @@ export type ProductCardProps = {
   available: boolean
   /** Buttons over the image (favorite, compare), outside the link. */
   actions?: ReactNode
+  /**
+   * Loads the image eagerly with high priority. Use it for the cards of
+   * the first row, which can be the largest paint (RNF10).
+   */
+  priority?: boolean
 }
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -45,6 +50,7 @@ export function ProductCard({
   imageAlt,
   available,
   actions,
+  priority = false,
 }: ProductCardProps) {
   return (
     <article className="group relative flex flex-col gap-sm">
@@ -60,7 +66,9 @@ export function ProductCard({
               srcSet={`/media/${imageKey}-320.webp 320w, /media/${imageKey}-640.webp 640w`}
               sizes="(min-width: 1200px) 25vw, (min-width: 768px) 33vw, 50vw"
               alt={imageAlt}
-              loading="lazy"
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
+              decoding="async"
               className="h-full w-full object-cover"
             />
           ) : (

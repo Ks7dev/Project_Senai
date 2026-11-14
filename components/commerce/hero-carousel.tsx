@@ -130,6 +130,7 @@ export function HeroCarousel({ slides }: { slides: CarouselSlide[] }) {
             srcSet={`/media/${slide.imageKey}-640.webp 640w, /media/${slide.imageKey}-1024.webp 1024w, /media/${slide.imageKey}-1600.webp 1600w`}
             sizes="(min-width: 1200px) 50vw, 100vw"
             alt={slide.imageAlt ?? ""}
+            fetchPriority={index === 0 ? "high" : "auto"}
             className="h-64 w-full object-cover lg:h-full"
           />
         ) : (
