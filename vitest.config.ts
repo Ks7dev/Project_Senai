@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
     exclude: ["tests/e2e/**", "tests/integration/**", "node_modules/**"],
   },
 })

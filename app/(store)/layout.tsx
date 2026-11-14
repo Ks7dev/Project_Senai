@@ -4,6 +4,7 @@ import { connection } from "next/server"
 import { CartDrawer } from "@/components/commerce/cart-drawer"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/layout/skip-link"
 import { CompareBar } from "@/features/shared/components/compare-controls"
 import { getMenuCategoryLinks } from "@/features/app/shell/store-navigation"
 import { loadCurrentCart } from "@/features/shared/lib/cart/cart-store"
@@ -78,8 +79,8 @@ async function StoreFooter() {
 }
 
 /**
- * Store layout: skip link, header, page content and institutional
- * footer, shared by every public store route.
+ * Store layout: skip link, header, main landmark with the page content
+ * and institutional footer, shared by every public store route.
  *
  * @param props - Layout props with the rendered route as children.
  * @returns The store shell.
@@ -87,12 +88,7 @@ async function StoreFooter() {
 export default function StoreLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <a
-        href="#conteudo"
-        className="sr-only z-50 rounded bg-primary px-md py-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-sm focus:left-sm"
-      >
-        Pular para o conteúdo
-      </a>
+      <SkipLink />
       <Suspense
         fallback={
           <SiteHeader categories={categoryLinks} services={serviceLinks} />
@@ -100,9 +96,13 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
       >
         <StoreHeader />
       </Suspense>
-      <div id="conteudo" className="flex flex-1 flex-col">
+      <main
+        id={MAIN_CONTENT_ID}
+        tabIndex={-1}
+        className="flex flex-1 flex-col focus:outline-none"
+      >
         {children}
-      </div>
+      </main>
       <Suspense
         fallback={
           <SiteFooter
