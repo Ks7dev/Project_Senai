@@ -189,6 +189,15 @@ export function ProductPageView({ product }: ProductPageViewProps) {
             <MessageCircleIcon className="size-4" aria-hidden /> Falar com um
             vendedor
           </Link>
+          {product.requiresInstallation && (
+            <Link
+              href={`/demonstracao?produto=${encodeURIComponent(product.slug)}`}
+              className="inline-flex items-center gap-sm text-body-sm text-primary underline"
+            >
+              <CalendarClockIcon className="size-4" aria-hidden /> Agendar uma
+              demonstração
+            </Link>
+          )}
 
           {sku && (
             <ShippingEstimate

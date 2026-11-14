@@ -118,6 +118,21 @@ enum ShippingMethod {
   MANUAL_QUOTE
 }
 
+/// Where a product demonstration happens (RF19)
+enum DemoMode {
+  SHOWROOM
+  ONLINE
+  ON_SITE
+}
+
+/// Demonstration request life cycle (RF19)
+enum DemoStatus {
+  REQUESTED
+  CONFIRMED
+  CANCELED
+  DONE
+}
+
 /// What the customer asks in an after-sales ticket (RF17)
 enum SupportTicketKind {
   WARRANTY
@@ -176,6 +191,8 @@ model User {
   supportTickets     SupportTicket[]      @relation("SupportTicketCustomer")
   supportEvents      SupportTicketEvent[]
   sellerRules        SellerRule[]
+  demoRequests       DemoRequest[]        @relation("DemoCustomer")
+  assignedDemos      DemoRequest[]        @relation("DemoSeller")
 
   @@map("users")
 }
@@ -270,6 +287,7 @@ model Organization {
   orders             Order[]
   creditLimitChanges CreditLimitChange[]
   supportTickets     SupportTicket[]
+  demoRequests       DemoRequest[]
 
   @@index([sellerId])
   @@index([creditStatus])
@@ -447,6 +465,8 @@ model Product {
   skus       Sku[]
   favorites  Favorite[]
   quoteItems QuoteItem[]
+
+  demoRequests DemoRequest[]
 
   @@index([categoryId, status])
   @@index([status, basePrice])
@@ -1016,6 +1036,40 @@ model SellerRule {
   @@index([active, personType, state])
   @@index([sellerId])
   @@map("seller_rules")
+}
+
+/// Meeting or demonstration asked by the customer for a complex item
+/// (RF19): date and time picked from the configured agenda, received by
+/// the dedicated seller (RN11)
+model DemoRequest {
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  userId         String        @map("user_id") @db.VarChar(36)
+  organizationId String?       @map("organization_id") @db.VarChar(36)
+  productId      String?       @map("product_id") @db.Char(36)
+  /// Seller who receives the request
+  sellerId       String?       @map("seller_id") @db.VarChar(36)
+  mode           DemoMode
+  /// Start of the meeting (UTC)
+  scheduledAt    DateTime      @map("scheduled_at") @db.DateTime(3)
+  status         DemoStatus    @default(REQUESTED)
+  /// Phone for the contact, digits only (optional)
+  phone          String?       @db.VarChar(20)
+  notes          String?       @db.Text
+  /// Message of the sales team when confirming or canceling
+  teamNote       String?       @map("team_note") @db.Text
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  user           User          @relation("DemoCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  seller         User?         @relation("DemoSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([scheduledAt, status])
+  @@index([userId, createdAt])
+  @@index([organizationId])
+  @@index([productId])
+  @@index([sellerId, scheduledAt])
+  @@map("demo_requests")
 }
 
 /// Transactional e-mail queue (RF53): written in the same transaction

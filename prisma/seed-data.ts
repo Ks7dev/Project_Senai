@@ -180,6 +180,55 @@ export const settings: SettingSeed[] = [
   },
 ]
 
+/**
+ * Agenda of the demonstrations of complex items (#70, RF19). Kept in a
+ * separate list so the merge with the other settings stays additive.
+ */
+export const demoSettings: SettingSeed[] = [
+  {
+    key: "demo.min_business_days",
+    value: 1,
+    description:
+      "Antecedência mínima para agendar uma demonstração, em dias úteis (RF19)",
+  },
+  {
+    key: "demo.window_days",
+    value: 30,
+    description:
+      "Quantos dias corridos a agenda de demonstrações oferece a partir da primeira data (RF19)",
+  },
+  {
+    key: "demo.weekdays",
+    value: [1, 2, 3, 4, 5],
+    description:
+      "Dias da semana com demonstração (0 = domingo … 6 = sábado) (RF19)",
+  },
+  {
+    key: "demo.time_slots",
+    value: ["09:30", "11:00", "14:00", "15:30", "17:00"],
+    description:
+      "Horários de início das demonstrações, no horário de Brasília (RF19)",
+  },
+  {
+    key: "demo.slot_capacity",
+    value: 1,
+    description:
+      "Demonstrações que a equipe comercial atende no mesmo horário (RF19)",
+  },
+  {
+    key: "demo.blocked_dates",
+    value: [
+      "2026-11-20",
+      "2026-12-24",
+      "2026-12-25",
+      "2026-12-31",
+      "2027-01-01",
+    ],
+    description:
+      "Datas sem demonstração, como feriados e recesso, no formato AAAA-MM-DD (RF19)",
+  },
+]
+
 /** A CEP range of the delivery coverage. */
 export type ShippingRegionSeed = {
   /** Region name, in Portuguese. */

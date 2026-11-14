@@ -62,7 +62,16 @@ export default function AdminSupportPage(
         <p className="text-body text-ink-muted">
           Chamados de garantia e assistência técnica abertos pelos clientes.
         </p>
-        <nav aria-label="Seções do atendimento" className="pt-sm">
+        <nav
+          aria-label="Seções do atendimento"
+          className="flex flex-wrap gap-md pt-sm"
+        >
+          <Link
+            href="/admin/atendimento/demonstracoes"
+            className="text-body-sm text-primary underline"
+          >
+            Demonstrações agendadas
+          </Link>
           <Link
             href="/admin/atendimento/vendedores"
             className="text-body-sm text-primary underline"
