@@ -102,6 +102,20 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/promocoes")
   })
 
+  it("delivers the audit log to admin and finance only (#76)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/auditoria")).toBe(false)
+    for (const key of ["admin", "finance"]) {
+      expect(
+        visibleAdminModules(rolePermissions(key)).map((m) => m.href)
+      ).toContain("/admin/auditoria")
+    }
+    for (const key of ["sales", "stock"]) {
+      expect(
+        visibleAdminModules(rolePermissions(key)).map((m) => m.href)
+      ).not.toContain("/admin/auditoria")
+    }
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)
