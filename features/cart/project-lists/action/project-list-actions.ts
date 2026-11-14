@@ -4,13 +4,17 @@ import type { Prisma } from "@/generated/prisma/client"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import {
   addItemsToCart,
+  buildCartView,
   cartItemInclude,
   getOrCreateActiveCartId,
   loadCartExtrasRules,
   loadCartView,
-  summarizeLines,
   toCartLine,
 } from "@/features/shared/lib/cart/cart-store"
+import {
+  loadCustomerPricing,
+  loadVolumeRules,
+} from "@/features/shared/lib/pricing/customer-pricing"
 import type { ProjectListView } from "@/features/shared/lib/cart/cart-types"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
 import { prisma } from "@/features/shared/lib/db/prisma"
@@ -60,21 +64,25 @@ export async function listMyProjectLists(): Promise<
 > {
   try {
     const userId = await requireUserId()
-    const rules = await loadCartExtrasRules()
-    const rows = await prisma.cart.findMany({
-      where: { userId, kind: "PROJECT_LIST", deletedAt: null },
-      orderBy: { updatedAt: "desc" },
-      include: {
-        items: { include: cartItemInclude, orderBy: { createdAt: "asc" } },
-      },
-    })
+    const [rules, pricing, volumeRules, rows] = await Promise.all([
+      loadCartExtrasRules(),
+      loadCustomerPricing(userId),
+      loadVolumeRules(),
+      prisma.cart.findMany({
+        where: { userId, kind: "PROJECT_LIST", deletedAt: null },
+        orderBy: { updatedAt: "desc" },
+        include: {
+          items: { include: cartItemInclude, orderBy: { createdAt: "asc" } },
+        },
+      }),
+    ])
     return {
       success: true,
       lists: rows.map((row) => ({
         id: row.id,
         name: row.name ?? "Lista sem nome",
         updatedAt: row.updatedAt.toISOString(),
-        ...summarizeLines(row.items.map((item) => toCartLine(item, rules))),
+        ...buildCartView(row.items, { rules, pricing, volumeRules }),
       })),
     }
   } catch (error) {

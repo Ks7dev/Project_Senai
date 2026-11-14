@@ -465,6 +465,73 @@ export const products: ProductSeed[] = [
   },
 ]
 
+/** A customer price table (RF21). */
+export type PriceTableSeed = {
+  /** Table name, shown to the customer. */
+  name: string
+  /** Description for the back office. */
+  description: string
+  /** Default discount over the catalog price, in percent. */
+  discountPercent: string
+  /** Discounts per product slug, replacing the default. */
+  items: Array<{ product: string; discountPercent: string }>
+  /** Corporate account slugs that buy with the table. */
+  organizations: string[]
+}
+
+/**
+ * Demo price table (RF21). The percentages are fictitious examples for
+ * the academic demo, edited in the back office (/admin/precos). No
+ * account is assigned by the seed, so the catalog prices the other
+ * flows rely on do not change; the demo assigns it in the back office.
+ */
+export const priceTables: PriceTableSeed[] = [
+  {
+    name: "Corporativo",
+    description: "Exemplo fictício para a demonstração: contas corporativas.",
+    discountPercent: "5.00",
+    items: [{ product: "mesa-regulavel-carvalho", discountPercent: "8.00" }],
+    organizations: [],
+  },
+]
+
+/** An automatic volume discount of a category (RN04). */
+export type VolumeDiscountSeed = {
+  /** Category slug. */
+  category: string
+  /** Minimum units of the category, or null. */
+  minQuantity: number | null
+  /** Minimum amount of the category, or null. */
+  minAmount: string | null
+  /** Discount in percent. */
+  discountPercent: string
+}
+
+/**
+ * Demo volume discounts (RN04). Fictitious thresholds for the academic
+ * demo, edited in the back office (/admin/precos).
+ */
+export const volumeDiscounts: VolumeDiscountSeed[] = [
+  {
+    category: "papelaria-nobre",
+    minQuantity: 10,
+    minAmount: null,
+    discountPercent: "5.00",
+  },
+  {
+    category: "papelaria-nobre",
+    minQuantity: 50,
+    minAmount: null,
+    discountPercent: "10.00",
+  },
+  {
+    category: "mobiliario-ergonomico",
+    minQuantity: 4,
+    minAmount: "25000.00",
+    discountPercent: "6.00",
+  },
+]
+
 /** A fictitious account for development and the demo. */
 export type AccountSeed = {
   /** Login e-mail (fictitious domain). */

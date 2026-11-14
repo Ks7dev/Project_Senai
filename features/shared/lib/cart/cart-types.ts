@@ -15,10 +15,19 @@ export type CartLine = {
   productSlug: string
   /** Storage key of the first product image. */
   imageKey: string | null
+  /** Category of the product, used by the volume discounts (RN04). */
+  categoryId: string
+  /** Category name. */
+  categoryName: string
   /** Quantity. */
   quantity: number
-  /** Current unit price as a decimal string (read from the catalog). */
+  /**
+   * Current unit price for the customer as a decimal string: the catalog
+   * price with the discount of the customer table (RF21).
+   */
   unitPrice: string
+  /** Catalog unit price when the customer table lowers it, otherwise null. */
+  listUnitPrice: string | null
   /** Quantity × unit price as a decimal string. */
   total: string
   /** False when the product or variation left the catalog. */
@@ -39,6 +48,18 @@ export type CartLine = {
   extraBusinessDays: number
 }
 
+/** A volume discount applied to the cart (RN04). */
+export type CartVolumeDiscount = {
+  /** Category name. */
+  categoryName: string
+  /** Discount in basis points (1% = 100). */
+  basisPoints: number
+  /** Units of the category in the cart. */
+  quantity: number
+  /** Discount amount as a decimal string. */
+  amount: string
+}
+
 /** Cart or saved project list with its totals. */
 export type CartView = {
   /** Lines, oldest first. */
@@ -47,9 +68,18 @@ export type CartView = {
   count: number
   /** Sum of the purchasable lines as a decimal string. */
   subtotal: string
+  /** Automatic volume discounts (RN04) as a decimal string. */
+  discount: string
+  /** Volume discounts applied, one per category at most (RN04). */
+  volumeDiscounts: CartVolumeDiscount[]
+  /** Name of the customer price table (RF21), or null. */
+  priceTableName: string | null
   /** Engraving and additional services as a decimal string. */
   servicesTotal: string
-  /** Subtotal plus services, before shipping, as a decimal string. */
+  /**
+   * Subtotal minus the volume discounts plus services, before shipping,
+   * as a decimal string.
+   */
   total: string
   /** Business days the extras add to the order lead time (largest line). */
   extraBusinessDays: number
