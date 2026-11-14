@@ -886,6 +886,8 @@ model CreditLimitChange {
   organizationId String       @map("organization_id") @db.VarChar(36)
   previousLimit  Decimal?     @map("previous_limit") @db.Decimal(12, 2)
   newLimit       Decimal?     @map("new_limit") @db.Decimal(12, 2)
+  /// Credit status before the change (#61)
+  previousStatus CreditStatus? @map("previous_status")
   status         CreditStatus
   changedById    String       @map("changed_by_id") @db.VarChar(36)
   note           String?      @db.VarChar(255)

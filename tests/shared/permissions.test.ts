@@ -92,6 +92,18 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/cotacoes")
   })
 
+  it("shows the finance module to finance and hides it from sales (#61)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/financeiro")).toBe(false)
+    const finance = rolePermissions("finance")
+    expect(visibleAdminModules(finance).map((m) => m.href)).toContain(
+      "/admin/financeiro"
+    )
+    expect(hasPermission(finance, "credit:approve")).toBe(true)
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).not.toContain("/admin/financeiro")
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)

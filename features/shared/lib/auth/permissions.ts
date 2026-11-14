@@ -108,7 +108,6 @@ export const adminModules: AdminModule[] = [
 export const PENDING_ADMIN_ROUTES: ReadonlySet<string> = new Set([
   "/admin/separacao",
   "/admin/clientes",
-  "/admin/financeiro",
   "/admin/nfe",
   "/admin/promocoes",
   "/admin/atendimento",
