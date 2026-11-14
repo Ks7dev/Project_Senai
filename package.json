@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
-    "@types/jsdom": "^30.0.0",
     "@types/node": "^24.19.2",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
