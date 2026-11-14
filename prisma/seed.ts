@@ -8,10 +8,12 @@ import {
   categories,
   corporateAccount,
   permissions,
+  priceTables,
   products,
   roles,
   settings,
   shippingRegions,
+  volumeDiscounts,
 } from "./seed-data"
 
 try {
@@ -219,6 +221,58 @@ async function main() {
       },
       update: { role: member.role },
     })
+  }
+
+  for (const table of priceTables) {
+    const existing = await prisma.priceTable.findFirst({
+      where: { name: table.name, deletedAt: null },
+    })
+    if (existing) continue
+    const saved = await prisma.priceTable.create({
+      data: {
+        name: table.name,
+        description: table.description,
+        discountPercent: table.discountPercent,
+      },
+    })
+    for (const item of table.items) {
+      const product = await prisma.product.findUniqueOrThrow({
+        where: { slug: item.product },
+      })
+      await prisma.priceTableItem.create({
+        data: {
+          priceTableId: saved.id,
+          productId: product.id,
+          discountPercent: item.discountPercent,
+        },
+      })
+    }
+    await prisma.organization.updateMany({
+      where: { slug: { in: table.organizations }, priceTableId: null },
+      data: { priceTableId: saved.id },
+    })
+  }
+
+  for (const rule of volumeDiscounts) {
+    const categoryId = categoryIds.get(rule.category)!
+    const existing = await prisma.volumeDiscount.findFirst({
+      where: {
+        categoryId,
+        minQuantity: rule.minQuantity,
+        minAmount: rule.minAmount,
+        deletedAt: null,
+      },
+    })
+    if (!existing) {
+      await prisma.volumeDiscount.create({
+        data: {
+          categoryId,
+          minQuantity: rule.minQuantity,
+          minAmount: rule.minAmount,
+          discountPercent: rule.discountPercent,
+        },
+      })
+    }
   }
 }
 

@@ -21,6 +21,7 @@ import {
   type SaveProjectListInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
 import { CartLineExtras } from "@/features/cart/cart-page/cart-line-extras"
+import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
 import type { CartExtrasRules } from "@/features/shared/lib/cart/cart-extras"
 import { MAX_LINE_QUANTITY } from "@/features/shared/lib/cart/cart-math"
@@ -42,8 +43,9 @@ type CartPageViewProps = {
 
 /**
  * Cart page (#46, RF07): lines with quantity and removal, laser
- * engraving and additional services (#47, RF51, RF52), order summary
- * with the extras cost and lead time, shipping estimate by CEP and the
+ * engraving and additional services (#47, RF51, RF52), prices of the
+ * customer table (RF21), automatic volume discounts (RN04), order
+ * summary with the extras cost and lead time, shipping estimate by CEP and the
  * option to save the cart as a project list to resume later.
  *
  * @param props - Cart, login state and extras rules.
@@ -133,12 +135,17 @@ export function CartPageView({
             <OrderSummary
               subtotal={cart.subtotal}
               services={cart.servicesTotal}
+              discount={cart.discount}
               total={cart.total}
               note={
                 cart.extraBusinessDays > 0
                   ? `Personalização e serviços acrescentam ${cart.extraBusinessDays} ${cart.extraBusinessDays === 1 ? "dia útil" : "dias úteis"} ao prazo de entrega.`
                   : undefined
               }
+            />
+            <CartPricingNotes
+              priceTableName={cart.priceTableName}
+              volumeDiscounts={cart.volumeDiscounts}
             />
             {purchasable.length > 0 && (
               <ShippingEstimate
@@ -244,7 +251,17 @@ function CartLineRow({
           {line.productName}
         </Link>
         <span className="text-ink-muted">
-          {line.skuName} · {brl.format(Number(line.unitPrice))} cada
+          {line.skuName} ·{" "}
+          {line.listUnitPrice && (
+            <>
+              <span className="sr-only">de </span>
+              <span className="line-through">
+                {brl.format(Number(line.listUnitPrice))}
+              </span>{" "}
+              <span className="sr-only">por </span>
+            </>
+          )}
+          {brl.format(Number(line.unitPrice))} cada
         </span>
         {!line.purchasable && (
           <span className="text-destructive">

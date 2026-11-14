@@ -136,7 +136,11 @@ model User {
   createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
   deletedAt        DateTime?  @map("deleted_at") @db.DateTime(3)
+  /// Price table of a PF customer (RF21); corporate members use the
+  /// table of their account
+  priceTableId     String?    @map("price_table_id") @db.Char(36)
 
+  priceTable         PriceTable?          @relation(fields: [priceTableId], references: [id], onDelete: SetNull)
   sessions           Session[]
   accounts           Account[]
   twoFactors         TwoFactor[]
@@ -158,6 +162,7 @@ model User {
   creditLimitChanges CreditLimitChange[]
   updatedSettings    Setting[]
 
+  @@index([priceTableId])
   @@map("users")
 }
 
@@ -241,8 +246,11 @@ model Organization {
   sellerId     String?      @map("seller_id") @db.VarChar(36)
   createdAt    DateTime     @map("created_at") @db.DateTime(3)
   deletedAt    DateTime?    @map("deleted_at") @db.DateTime(3)
+  /// Price table of the corporate account (RF21)
+  priceTableId String?      @map("price_table_id") @db.Char(36)
 
   seller             User?               @relation("OrganizationSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  priceTable         PriceTable?         @relation(fields: [priceTableId], references: [id], onDelete: SetNull)
   members            Member[]
   invitations        Invitation[]
   addresses          Address[]
@@ -253,6 +261,7 @@ model Organization {
 
   @@index([sellerId])
   @@index([creditStatus])
+  @@index([priceTableId])
   @@map("organizations")
 }
 
@@ -387,6 +396,8 @@ model Category {
   children  Category[] @relation("CategoryTree")
   products  Product[]
 
+  volumeDiscounts VolumeDiscount[]
+
   @@index([parentId, position])
   @@map("categories")
 }
@@ -427,6 +438,8 @@ model Product {
   skus       Sku[]
   favorites  Favorite[]
   quoteItems QuoteItem[]
+
+  priceTableItems PriceTableItem[]
 
   @@index([categoryId, status])
   @@index([status, basePrice])
@@ -830,6 +843,68 @@ model ShippingRegion {
 
   @@index([cepStart, cepEnd])
   @@map("shipping_regions")
+}
+
+// ---------------------------------------------------------------------
+// Customer price tables (RF21) and volume discounts (RN04)
+// ---------------------------------------------------------------------
+
+/// Price table of a customer or segment (RF21): a discount over the
+/// catalog price, with optional overrides per product
+model PriceTable {
+  id              String    @id @default(uuid(7)) @db.Char(36)
+  name            String    @db.VarChar(120)
+  description     String?   @db.VarChar(255)
+  /// Discount over the catalog price for every product, in percent
+  discountPercent Decimal   @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt       DateTime? @map("deleted_at") @db.DateTime(3)
+
+  items         PriceTableItem[]
+  organizations Organization[]
+  users         User[]
+
+  @@index([active, deletedAt])
+  @@map("price_tables")
+}
+
+/// Discount of a price table for one product, replacing the table default
+model PriceTableItem {
+  id              String     @id @default(uuid(7)) @db.Char(36)
+  priceTableId    String     @map("price_table_id") @db.Char(36)
+  productId       String     @map("product_id") @db.Char(36)
+  /// Discount over the catalog price of the product, in percent
+  discountPercent Decimal    @map("discount_percent") @db.Decimal(5, 2)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  priceTable      PriceTable @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([priceTableId, productId])
+  @@index([productId])
+  @@map("price_table_items")
+}
+
+/// Automatic volume discount of a product category (RN04): applies when
+/// the cart reaches the minimum quantity and/or amount of the category
+model VolumeDiscount {
+  id              String    @id @default(uuid(7)) @db.Char(36)
+  categoryId      String    @map("category_id") @db.Char(36)
+  /// Minimum units of the category in the cart, or null
+  minQuantity     Int?      @map("min_quantity")
+  /// Minimum amount of the category in the cart, or null
+  minAmount       Decimal?  @map("min_amount") @db.Decimal(12, 2)
+  /// Discount over the category amount, in percent
+  discountPercent Decimal   @map("discount_percent") @db.Decimal(5, 2)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt       DateTime? @map("deleted_at") @db.DateTime(3)
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId, active])
+  @@map("volume_discounts")
 }
 
 // ---------------------------------------------------------------------

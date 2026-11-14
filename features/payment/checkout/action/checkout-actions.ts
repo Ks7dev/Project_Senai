@@ -520,8 +520,9 @@ export async function quoteCheckoutShipping(
  * Places the order of the active cart (RF28, RF43, RN01, RN13, RN20).
  * The shipping is quoted again on the server and the order only goes on
  * when the chosen option and the total are still what the customer saw.
- * In one transaction it numbers the order, copies the lines with their
- * prices and extras, reserves the stock with `SELECT ... FOR UPDATE`,
+ * In one transaction it numbers the order, copies the lines with the
+ * prices of the customer table (RF21) and their extras, stores the
+ * automatic volume discount (RN04), reserves the stock with `SELECT ... FOR UPDATE`,
  * stores the shipment, records the first status, empties the cart and
  * writes the audit log (RNF12). The order then waits for:
  * - the payment (card, Pix, boleto), confirmed only by Mercado Pago;
@@ -656,6 +657,8 @@ export async function placeOrder(
             status,
             paymentMethod: data.paymentMethod,
             subtotal: cart.subtotal,
+            // Automatic volume discounts, priced again on the server (RN04)
+            discount: cart.discount,
             servicesTotal: cart.servicesTotal,
             shippingTotal: shipping,
             total,
@@ -753,6 +756,8 @@ export async function placeOrder(
             status,
             paymentMethod: data.paymentMethod,
             total,
+            discount: cart.discount,
+            priceTable: cart.priceTableName,
             shippingTotal: shipping,
             method: chosen?.method ?? "MANUAL_QUOTE",
             requiresApproval,

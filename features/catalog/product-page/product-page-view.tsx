@@ -6,18 +6,24 @@ import {
   CalendarClockIcon,
   FileTextIcon,
   MessageCircleIcon,
+  PackageIcon,
   ShieldCheckIcon,
+  TagIcon,
 } from "lucide-react"
 import { MaterialSwatches } from "@/components/commerce/material-swatches"
 import { SpecAccordion } from "@/components/commerce/spec-accordion"
 import { PageContainer } from "@/components/layout/page-container"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
-import type { ProductPageData } from "@/features/catalog/product-page/load-product"
+import type { CustomerProductPageData } from "@/features/catalog/product-page/load-product"
 import { AddToCartButton } from "@/features/shared/components/add-to-cart-button"
 import { CompareButton } from "@/features/shared/components/compare-controls"
 import { FavoriteButton } from "@/features/shared/components/favorite-button"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
+import {
+  describeVolumeMinimum,
+  formatPercent,
+} from "@/features/shared/lib/pricing/pricing-math"
 import { cn } from "@/lib/utils"
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -26,14 +32,16 @@ const brl = new Intl.NumberFormat("pt-BR", {
 })
 
 type ProductPageViewProps = {
-  /** Product data. */
-  product: ProductPageData
+  /** Product data with the customer prices. */
+  product: CustomerProductPageData
 }
 
 /**
  * Product page (#26, RF03): gallery, variation choice, price, stock or
  * made-to-order notice, warranty, certifications, lead time, datasheet
- * download and the buy, quote and seller contact actions.
+ * download and the buy, quote and seller contact actions. The price is
+ * the one of the logged-in customer table (RF21), and the volume
+ * discounts of the category are listed (RN04).
  *
  * @param props - Product data.
  * @returns The page content.
@@ -44,6 +52,7 @@ export function ProductPageView({ product }: ProductPageViewProps) {
   const sku = product.skus.find((item) => item.code === skuCode)
   const image = product.images[imageIndex]
   const inStock = (sku?.available ?? 0) > 0
+  const listPrice = sku ? sku.listPrice : product.listPrice
 
   return (
     <PageContainer className="flex flex-col gap-xl py-xl">
@@ -140,9 +149,47 @@ export function ProductPageView({ product }: ProductPageViewProps) {
               <Badge variant="outline">Aceita gravação</Badge>
             )}
           </div>
-          <p className="text-headline-md text-ink">
-            {brl.format(Number(sku?.price ?? product.price))}
-          </p>
+          <div className="flex flex-col gap-xs">
+            {listPrice && (
+              <p className="text-body-sm text-ink-muted">
+                <span className="sr-only">Preço de catálogo: </span>
+                <span className="line-through">
+                  {brl.format(Number(listPrice))}
+                </span>
+              </p>
+            )}
+            <p className="text-headline-md text-ink">
+              {brl.format(Number(sku?.price ?? product.price))}
+            </p>
+            {listPrice && product.priceTableName && (
+              <p className="flex items-center gap-xs text-body-sm text-primary">
+                <TagIcon className="size-4" aria-hidden />
+                Preço da sua tabela: {product.priceTableName}
+              </p>
+            )}
+          </div>
+
+          {product.volumeTiers.length > 0 && (
+            <div className="flex flex-col gap-xs rounded bg-subtle p-sm text-body-sm">
+              <p className="flex items-center gap-xs font-medium text-ink">
+                <PackageIcon className="size-4 text-primary" aria-hidden />
+                Desconto por volume em {product.category.name}
+              </p>
+              <ul className="flex flex-col gap-xs text-ink">
+                {product.volumeTiers.map((tier) => (
+                  <li
+                    key={`${tier.minQuantity}-${tier.minAmount}-${tier.basisPoints}`}
+                  >
+                    {formatPercent(tier.basisPoints)} de desconto{" "}
+                    {describeVolumeMinimum(tier)} na categoria
+                  </li>
+                ))}
+              </ul>
+              <p className="text-ink-muted">
+                Aplicado automaticamente no carrinho.
+              </p>
+            </div>
+          )}
 
           {product.skus.length > 1 && (
             <MaterialSwatches

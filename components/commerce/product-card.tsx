@@ -12,6 +12,8 @@ export type ProductCardProps = {
   brand: string | null
   /** Price as a decimal string. */
   price: string
+  /** Higher catalog price, shown struck through, when the price is lower. */
+  listPrice?: string | null
   /** Storage key of the first image (without width suffix). */
   imageKey: string | null
   /** Alternative text of the image. */
@@ -41,6 +43,7 @@ export function ProductCard({
   name,
   brand,
   price,
+  listPrice,
   imageKey,
   imageAlt,
   available,
@@ -80,8 +83,17 @@ export function ProductCard({
         <div className="flex flex-col gap-xs px-xs pb-sm">
           {brand && <p className="text-caps text-clay uppercase">{brand}</p>}
           <h3 className="text-headline-sm text-ink">{name}</h3>
-          <p className="text-label font-medium text-ink">
-            {brl.format(Number(price))}
+          <p className="flex flex-wrap items-baseline gap-x-sm text-label font-medium text-ink">
+            {listPrice && (
+              <span className="text-body-sm font-normal text-ink-muted line-through">
+                <span className="sr-only">De </span>
+                {brl.format(Number(listPrice))}
+              </span>
+            )}
+            <span>
+              {listPrice && <span className="sr-only">por </span>}
+              {brl.format(Number(price))}
+            </span>
           </p>
         </div>
       </Link>

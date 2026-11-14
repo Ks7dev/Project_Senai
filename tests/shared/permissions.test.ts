@@ -92,6 +92,16 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/cotacoes")
   })
 
+  it("shows the price tables module to sales only (#52)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/precos")).toBe(false)
+    const visible = (key: string) =>
+      visibleAdminModules(rolePermissions(key)).map((m) => m.href)
+    expect(visible("sales")).toContain("/admin/precos")
+    expect(visible("admin")).toContain("/admin/precos")
+    expect(visible("finance")).not.toContain("/admin/precos")
+    expect(visible("stock")).not.toContain("/admin/precos")
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)

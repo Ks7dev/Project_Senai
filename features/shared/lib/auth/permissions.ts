@@ -75,6 +75,11 @@ export const adminModules: AdminModule[] = [
   },
   { href: "/admin/clientes", label: "Clientes", permission: "customer:read" },
   {
+    href: "/admin/precos",
+    label: "Preços e descontos",
+    permission: "customer:update",
+  },
+  {
     href: "/admin/financeiro",
     label: "Financeiro",
     permission: "payment:refund",
