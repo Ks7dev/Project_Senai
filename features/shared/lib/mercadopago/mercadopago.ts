@@ -458,6 +458,63 @@ export async function findMercadoPagoPaymentByReference(
   return toProviderPayment(results[0])
 }
 
+/** A refund created in Mercado Pago (RF34). */
+export type ProviderRefund = {
+  /** Mercado Pago refund id. */
+  id: string
+  /** Refunded amount as a decimal string with 2 places. */
+  amount: string
+  /** Raw status: "approved", "in_process" or "rejected". */
+  status: string
+}
+
+const rawRefundSchema = z.object({
+  id: z.union([z.number(), z.string()]).transform(String),
+  amount: moneySchema,
+  status: z.string().nullish(),
+})
+
+/**
+ * Refunds a payment in `POST /v1/payments/{id}/refunds` (RF34). The
+ * amount is always sent, so a full refund returns exactly what the
+ * store computed. The idempotency key (our refund row id) makes a retry
+ * of the same refund never return the money twice.
+ *
+ * @param input - Mercado Pago payment id, amount (decimal string) and
+ * the idempotency key.
+ * @param fetcher - Fetch implementation (replaced in tests).
+ * @returns The refund created.
+ * @throws MercadoPagoError.
+ */
+export async function createMercadoPagoRefund(
+  input: { paymentId: string; amount: string; idempotencyKey: string },
+  fetcher: typeof fetch = fetch
+): Promise<ProviderRefund> {
+  if (!/^\d{1,20}$/.test(input.paymentId)) {
+    throw new MercadoPagoError("not_found")
+  }
+  const raw = await callMercadoPago(
+    "create_refund",
+    `/v1/payments/${input.paymentId}/refunds`,
+    {
+      method: "POST",
+      body: { amount: Number(input.amount) },
+      headers: { "X-Idempotency-Key": input.idempotencyKey },
+    },
+    fetcher
+  )
+  const parsed = rawRefundSchema.safeParse(raw)
+  if (!parsed.success) {
+    logger.warn("mercadopago returned an unexpected refund payload")
+    throw new MercadoPagoError("unavailable")
+  }
+  return {
+    id: parsed.data.id,
+    amount: parsed.data.amount.toFixed(2),
+    status: parsed.data.status ?? "approved",
+  }
+}
+
 /**
  * Reads a payment from `GET /v1/payments/{id}`: the source of truth for
  * the webhook and the reconciliation (RF30, #57).

@@ -9,6 +9,7 @@ import {
   queryCatalog,
   searchSuggestions,
 } from "@/features/shared/lib/catalog/catalog-query"
+import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
 
 export const metadata = { title: "Busca — Atelier Bureau" }
 
@@ -54,10 +55,15 @@ async function SearchResults({
 }) {
   const filters = parseCatalogFilters(await searchParams)
   if (!filters.q) return <EmptySearch />
-  const [page, suggestions] = await Promise.all([
+  const [catalog, suggestions] = await Promise.all([
     queryCatalog(filters),
     searchSuggestions(filters.q),
   ])
+  // Price of the logged-in customer table, applied after the shared cache
+  const page = {
+    ...catalog,
+    products: await priceCardsForCurrentCustomer(catalog.products),
+  }
   const hasSuggestions =
     suggestions.categories.length > 0 || suggestions.products.length > 0
   return (

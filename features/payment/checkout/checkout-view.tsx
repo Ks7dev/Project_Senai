@@ -8,6 +8,7 @@ import {
   CalendarDaysIcon,
   CreditCardIcon,
   QrCodeIcon,
+  ReceiptTextIcon,
   TruckIcon,
 } from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
@@ -20,8 +21,13 @@ import {
   type CheckoutQuote,
 } from "@/features/payment/checkout/action/checkout-actions"
 import type { CheckoutPaymentMethod } from "@/features/payment/checkout/schema/checkout-schema"
+import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
 import { PromotionsNote } from "@/features/shared/components/promotions-note"
 import { institutionalLinks } from "@/features/shared/config/navigation"
+import {
+  centsToMoney,
+  moneyToCents,
+} from "@/features/shared/lib/cart/cart-math"
 import { FREE_SHIPPING_MESSAGE } from "@/features/shared/lib/promotions/promotion-math"
 import {
   UNAVAILABLE_REASON_LABEL,
@@ -102,6 +108,9 @@ function optionKey(option: CheckoutOption): string {
 function MethodIcon({ method }: { method: CheckoutPaymentMethod }) {
   const className = "size-5 shrink-0 text-primary"
   if (method === "PIX") return <QrCodeIcon className={className} aria-hidden />
+  if (method === "INVOICED") {
+    return <ReceiptTextIcon className={className} aria-hidden />
+  }
   if (method === "BOLETO") {
     return <BarcodeIcon className={className} aria-hidden />
   }
@@ -131,6 +140,10 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
   const [pending, startTransition] = useTransition()
 
   const { cart, promotions } = context
+  // Volume discounts (RN04) plus promotions and coupon (RF46)
+  const discount = centsToMoney(
+    moneyToCents(cart.discount) + moneyToCents(promotions.discount)
+  )
   const option =
     quote?.status === "quoted"
       ? quote.options.find((item) => optionKey(item) === selected)
@@ -434,7 +447,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
           subtotal={cart.subtotal}
           services={cart.servicesTotal}
           shipping={shipping}
-          discount={promotions.discount}
+          discount={discount}
           total={total}
           note={
             quote?.status === "manual_quote"
@@ -442,9 +455,13 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
               : undefined
           }
         />
+        <CartPricingNotes
+          priceTableName={cart.priceTableName}
+          volumeDiscounts={cart.volumeDiscounts}
+        />
         {(promotions.applied.length > 0 || promotions.couponCode) && (
           <PromotionsNote promotions={promotions} />
-        )}
+        )}{" "}
         {cart.extraBusinessDays > 0 && (
           <p className="text-body-sm text-ink-muted">
             Personalização e serviços acrescentam {cart.extraBusinessDays}{" "}

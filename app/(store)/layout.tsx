@@ -37,6 +37,9 @@ async function HeaderCart() {
   return (
     <CartDrawer
       subtotal={cart?.subtotal ?? "0.00"}
+      services={cart?.servicesTotal}
+      discount={cart?.discount}
+      total={cart?.total}
       items={lines.map((line) => ({
         sku: line.skuCode,
         name: line.productName,

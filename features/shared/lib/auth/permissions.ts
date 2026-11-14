@@ -75,6 +75,11 @@ export const adminModules: AdminModule[] = [
   },
   { href: "/admin/clientes", label: "Clientes", permission: "customer:read" },
   {
+    href: "/admin/precos",
+    label: "Preços e descontos",
+    permission: "customer:update",
+  },
+  {
     href: "/admin/financeiro",
     label: "Financeiro",
     permission: "payment:refund",
@@ -108,9 +113,6 @@ export const adminModules: AdminModule[] = [
 export const PENDING_ADMIN_ROUTES: ReadonlySet<string> = new Set([
   "/admin/separacao",
   "/admin/clientes",
-  "/admin/financeiro",
-  "/admin/nfe",
-  "/admin/atendimento",
   "/admin/configuracoes",
 ])
 
