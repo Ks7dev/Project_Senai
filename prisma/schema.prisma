@@ -104,6 +104,56 @@ enum PaymentStatus {
   PARTIALLY_REFUNDED
 }
 
+/// Status of an installment of an invoiced order (RF33, #60)
+enum InstallmentStatus {
+  OPEN
+  PAID
+  CANCELED
+}
+
+/// How an installment was settled: by hand or by the bank return (RF33)
+enum SettlementMethod {
+  MANUAL
+  BANK_RETURN
+}
+
+/// Status of a refund (RF34, #59)
+enum RefundStatus {
+  PENDING_APPROVAL
+  PROCESSING
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+/// Why the money goes back (RF34, RN07, RN18, RN22)
+enum RefundReason {
+  CANCELLATION
+  WITHDRAWAL
+  EVALUATED_RETURN
+  ADJUSTMENT
+}
+
+/// Whole remaining amount or part of it (RF34)
+enum RefundKind {
+  FULL
+  PARTIAL
+}
+
+/// How the money goes back: Mercado Pago API or bank transfer (invoiced)
+enum RefundChannel {
+  MERCADO_PAGO
+  MANUAL_TRANSFER
+}
+
+/// Status of the NF-e of an order (RF13, #63)
+enum InvoiceStatus {
+  PENDING
+  PROCESSING
+  ISSUED
+  FAILED
+}
+
 enum EmailStatus {
   PENDING
   SENT
@@ -167,7 +217,11 @@ model User {
   createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
   deletedAt        DateTime?  @map("deleted_at") @db.DateTime(3)
+  /// Price table of a PF customer (RF21); corporate members use the
+  /// table of their account
+  priceTableId     String?    @map("price_table_id") @db.Char(36)
 
+  priceTable         PriceTable?          @relation(fields: [priceTableId], references: [id], onDelete: SetNull)
   sessions           Session[]
   accounts           Account[]
   twoFactors         TwoFactor[]
@@ -193,7 +247,11 @@ model User {
   sellerRules        SellerRule[]
   demoRequests       DemoRequest[]        @relation("DemoCustomer")
   assignedDemos      DemoRequest[]        @relation("DemoSeller")
+  settledReceivables Receivable[]
+  requestedRefunds   Refund[]             @relation("RefundRequester")
+  decidedRefunds     Refund[]             @relation("RefundDecider")
 
+  @@index([priceTableId])
   @@map("users")
 }
 
@@ -277,8 +335,11 @@ model Organization {
   sellerId     String?      @map("seller_id") @db.VarChar(36)
   createdAt    DateTime     @map("created_at") @db.DateTime(3)
   deletedAt    DateTime?    @map("deleted_at") @db.DateTime(3)
+  /// Price table of the corporate account (RF21)
+  priceTableId String?      @map("price_table_id") @db.Char(36)
 
   seller             User?               @relation("OrganizationSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  priceTable         PriceTable?         @relation(fields: [priceTableId], references: [id], onDelete: SetNull)
   members            Member[]
   invitations        Invitation[]
   addresses          Address[]
@@ -291,6 +352,7 @@ model Organization {
 
   @@index([sellerId])
   @@index([creditStatus])
+  @@index([priceTableId])
   @@map("organizations")
 }
 
@@ -425,6 +487,8 @@ model Category {
   children  Category[] @relation("CategoryTree")
   products  Product[]
 
+  volumeDiscounts VolumeDiscount[]
+
   @@index([parentId, position])
   @@map("categories")
 }
@@ -466,7 +530,8 @@ model Product {
   favorites  Favorite[]
   quoteItems QuoteItem[]
 
-  demoRequests DemoRequest[]
+  demoRequests    DemoRequest[]
+  priceTableItems PriceTableItem[]
 
   @@index([categoryId, status])
   @@index([status, basePrice])
@@ -719,6 +784,9 @@ model Order {
   shipment       Shipment?
   stockMovements StockMovement[]
   supportTickets SupportTicket[]
+  receivables    Receivable[]
+  refunds        Refund[]
+  invoice        Invoice?
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -811,10 +879,121 @@ model Payment {
   createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
   order          Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds        Refund[]
 
   @@index([orderId])
   @@index([status, expiresAt])
   @@map("payments")
+}
+
+/// Full or partial refund of an order (RF34, RN07, RN18, RN22): through
+/// the Mercado Pago API, or by bank transfer for invoiced orders. A
+/// refund of a corporate order already invoiced waits for the finance
+/// approval (RN07). Every step is also in the audit log (RNF12).
+model Refund {
+  id               String        @id @default(uuid(7)) @db.Char(36)
+  orderId          String        @map("order_id") @db.Char(36)
+  /// Mercado Pago payment refunded; null for invoiced orders
+  paymentRowId     String?       @map("payment_row_id") @db.Char(36)
+  kind             RefundKind
+  reason           RefundReason
+  channel          RefundChannel
+  amount           Decimal       @db.Decimal(12, 2)
+  status           RefundStatus
+  /// Refund id returned by Mercado Pago
+  providerRefundId String?       @unique @map("provider_refund_id") @db.VarChar(64)
+  /// Justification of the request (evaluation report, cancellation, etc.)
+  note             String        @db.VarChar(500)
+  /// Why the Mercado Pago call failed, safe to show
+  failureReason    String?       @map("failure_reason") @db.VarChar(255)
+  requestedById    String        @map("requested_by_id") @db.VarChar(36)
+  decidedById      String?       @map("decided_by_id") @db.VarChar(36)
+  decidedAt        DateTime?     @map("decided_at") @db.DateTime(3)
+  decisionNote     String?       @map("decision_note") @db.VarChar(255)
+  completedAt      DateTime?     @map("completed_at") @db.DateTime(3)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment          Payment?      @relation(fields: [paymentRowId], references: [id], onDelete: Restrict)
+  requestedBy      User          @relation("RefundRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy        User?         @relation("RefundDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentRowId])
+  @@index([requestedById])
+  @@index([decidedById])
+  @@map("refunds")
+}
+
+/// Installment of an invoiced order (RF12, RF33, RN03, RN17): own boleto
+/// outside Mercado Pago, due 28 and 56 days after the confirmation, and
+/// settled by hand (or by the bank return) by the finance team.
+model Receivable {
+  id               String            @id @default(uuid(7)) @db.Char(36)
+  orderId          String            @map("order_id") @db.Char(36)
+  /// 1 for the first due date, 2 for the second
+  sequence         Int
+  /// Days after the confirmation, e.g. 28 or 56
+  dueDays          Int               @map("due_days")
+  amount           Decimal           @db.Decimal(12, 2)
+  /// Due date: end of the day in São Paulo, stored in UTC
+  dueDate          DateTime          @map("due_date") @db.DateTime(3)
+  status           InstallmentStatus @default(OPEN)
+  /// Own boleto number ("nosso número")
+  boletoNumber     String            @unique @map("boleto_number") @db.VarChar(20)
+  /// Digitable line of the own boleto (fictitious bank in homologation)
+  digitableLine    String            @map("digitable_line") @db.VarChar(64)
+  paidAt           DateTime?         @map("paid_at") @db.DateTime(3)
+  paidAmount       Decimal?          @map("paid_amount") @db.Decimal(12, 2)
+  settledById      String?           @map("settled_by_id") @db.VarChar(36)
+  settlementMethod SettlementMethod? @map("settlement_method")
+  settlementNote   String?           @map("settlement_note") @db.VarChar(255)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  settledBy        User?             @relation(fields: [settledById], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, sequence])
+  @@index([status, dueDate])
+  @@index([settledById])
+  @@map("invoiced_installments")
+}
+
+/// NF-e of an order (RF13, #63), issued through the NF-e provider API in
+/// homologation after the order is confirmed (RN13). Keeps the XML, the
+/// DANFE (storage key) and the access key; a failure is retried with a
+/// backoff and alerts the team, who may reprocess it by hand.
+model Invoice {
+  id            String        @id @default(uuid(7)) @db.Char(36)
+  orderId       String        @unique @map("order_id") @db.Char(36)
+  status        InvoiceStatus @default(PENDING)
+  /// Access key (chave de acesso), 44 digits
+  accessKey     String?       @unique @map("access_key") @db.Char(44)
+  number        String?       @db.VarChar(20)
+  series        String?       @db.VarChar(5)
+  /// SEFAZ authorization protocol
+  protocol      String?       @db.VarChar(64)
+  /// Authorized XML
+  xml           String?       @db.MediumText
+  /// Storage key of the DANFE PDF (private, back office download)
+  danfeKey      String?       @map("danfe_key") @db.VarChar(255)
+  /// When the provider accepted the request; null = send it again
+  submittedAt   DateTime?     @map("submitted_at") @db.DateTime(3)
+  attempts      Int           @default(0)
+  /// Last failure, safe to show to the back office
+  lastError     String?       @map("last_error") @db.VarChar(500)
+  /// When the job tries again; null = only by hand
+  nextAttemptAt DateTime?     @map("next_attempt_at") @db.DateTime(3)
+  /// When the team was alerted of the current failure
+  alertedAt     DateTime?     @map("alerted_at") @db.DateTime(3)
+  issuedAt      DateTime?     @map("issued_at") @db.DateTime(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt])
+  @@map("invoices")
 }
 
 /// Mercado Pago webhook notifications already received (RF30, #57). The
@@ -876,6 +1055,68 @@ model ShippingRegion {
 }
 
 // ---------------------------------------------------------------------
+// Customer price tables (RF21) and volume discounts (RN04)
+// ---------------------------------------------------------------------
+
+/// Price table of a customer or segment (RF21): a discount over the
+/// catalog price, with optional overrides per product
+model PriceTable {
+  id              String    @id @default(uuid(7)) @db.Char(36)
+  name            String    @db.VarChar(120)
+  description     String?   @db.VarChar(255)
+  /// Discount over the catalog price for every product, in percent
+  discountPercent Decimal   @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt       DateTime? @map("deleted_at") @db.DateTime(3)
+
+  items         PriceTableItem[]
+  organizations Organization[]
+  users         User[]
+
+  @@index([active, deletedAt])
+  @@map("price_tables")
+}
+
+/// Discount of a price table for one product, replacing the table default
+model PriceTableItem {
+  id              String     @id @default(uuid(7)) @db.Char(36)
+  priceTableId    String     @map("price_table_id") @db.Char(36)
+  productId       String     @map("product_id") @db.Char(36)
+  /// Discount over the catalog price of the product, in percent
+  discountPercent Decimal    @map("discount_percent") @db.Decimal(5, 2)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  priceTable      PriceTable @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([priceTableId, productId])
+  @@index([productId])
+  @@map("price_table_items")
+}
+
+/// Automatic volume discount of a product category (RN04): applies when
+/// the cart reaches the minimum quantity and/or amount of the category
+model VolumeDiscount {
+  id              String    @id @default(uuid(7)) @db.Char(36)
+  categoryId      String    @map("category_id") @db.Char(36)
+  /// Minimum units of the category in the cart, or null
+  minQuantity     Int?      @map("min_quantity")
+  /// Minimum amount of the category in the cart, or null
+  minAmount       Decimal?  @map("min_amount") @db.Decimal(12, 2)
+  /// Discount over the category amount, in percent
+  discountPercent Decimal   @map("discount_percent") @db.Decimal(5, 2)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt       DateTime? @map("deleted_at") @db.DateTime(3)
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId, active])
+  @@map("volume_discounts")
+}
+
+// ---------------------------------------------------------------------
 // Configuration, audit, favorites and credit history
 // ---------------------------------------------------------------------
 
@@ -925,16 +1166,18 @@ model Favorite {
 
 /// History of corporate credit limit changes (RF58, RN10)
 model CreditLimitChange {
-  id             String       @id @default(uuid(7)) @db.Char(36)
-  organizationId String       @map("organization_id") @db.VarChar(36)
-  previousLimit  Decimal?     @map("previous_limit") @db.Decimal(12, 2)
-  newLimit       Decimal?     @map("new_limit") @db.Decimal(12, 2)
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  organizationId String        @map("organization_id") @db.VarChar(36)
+  previousLimit  Decimal?      @map("previous_limit") @db.Decimal(12, 2)
+  newLimit       Decimal?      @map("new_limit") @db.Decimal(12, 2)
+  /// Credit status before the change (#61)
+  previousStatus CreditStatus? @map("previous_status")
   status         CreditStatus
-  changedById    String       @map("changed_by_id") @db.VarChar(36)
-  note           String?      @db.VarChar(255)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.DateTime(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  changedBy      User         @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  changedById    String        @map("changed_by_id") @db.VarChar(36)
+  note           String?       @db.VarChar(255)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  changedBy      User          @relation(fields: [changedById], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
   @@index([changedById])
