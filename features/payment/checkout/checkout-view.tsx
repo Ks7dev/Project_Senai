@@ -8,6 +8,7 @@ import {
   CalendarDaysIcon,
   CreditCardIcon,
   QrCodeIcon,
+  ReceiptTextIcon,
   TruckIcon,
 } from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
@@ -20,6 +21,7 @@ import {
   type CheckoutQuote,
 } from "@/features/payment/checkout/action/checkout-actions"
 import type { CheckoutPaymentMethod } from "@/features/payment/checkout/schema/checkout-schema"
+import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
 import {
   UNAVAILABLE_REASON_LABEL,
   type ScheduleDay,
@@ -99,6 +101,9 @@ function optionKey(option: CheckoutOption): string {
 function MethodIcon({ method }: { method: CheckoutPaymentMethod }) {
   const className = "size-5 shrink-0 text-primary"
   if (method === "PIX") return <QrCodeIcon className={className} aria-hidden />
+  if (method === "INVOICED") {
+    return <ReceiptTextIcon className={className} aria-hidden />
+  }
   if (method === "BOLETO") {
     return <BarcodeIcon className={className} aria-hidden />
   }
@@ -415,12 +420,17 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
           subtotal={cart.subtotal}
           services={cart.servicesTotal}
           shipping={shipping}
+          discount={cart.discount}
           total={total}
           note={
             quote?.status === "manual_quote"
               ? "Frete a cotar pela equipe comercial."
               : undefined
           }
+        />
+        <CartPricingNotes
+          priceTableName={cart.priceTableName}
+          volumeDiscounts={cart.volumeDiscounts}
         />
         {cart.extraBusinessDays > 0 && (
           <p className="text-body-sm text-ink-muted">
