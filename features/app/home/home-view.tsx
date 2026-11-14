@@ -6,6 +6,10 @@ import { getProductCardsBySlugs } from "@/features/shared/lib/catalog/catalog-qu
 import { DEFAULT_HOME_CONTENT } from "@/features/shared/lib/content/home-content"
 import { getHomeContent } from "@/features/shared/lib/content/home-content-cache"
 import { logger } from "@/features/shared/lib/logger/logger"
+import {
+  loadCurrentCustomerPricing,
+  priceCards,
+} from "@/features/shared/lib/pricing/customer-pricing"
 
 /**
  * Editorial home (#30, RF47): carousel and product showcases managed
@@ -22,11 +26,13 @@ export async function HomeView() {
   } catch (error) {
     logger.error("home content unavailable", { error })
   }
+  const pricing = await loadCurrentCustomerPricing()
   const showcases = await Promise.all(
     content.showcases.map(async (showcase) => ({
       ...showcase,
-      products: await getProductCardsBySlugs(showcase.productSlugs).catch(
-        () => []
+      products: priceCards(
+        await getProductCardsBySlugs(showcase.productSlugs).catch(() => []),
+        pricing
       ),
     }))
   )
