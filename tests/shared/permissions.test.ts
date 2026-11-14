@@ -92,6 +92,16 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/cotacoes")
   })
 
+  it("delivers the promotions module to whoever manages promotions (#73)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/promocoes")).toBe(false)
+    expect(
+      visibleAdminModules(rolePermissions("admin")).map((m) => m.href)
+    ).toContain("/admin/promocoes")
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).not.toContain("/admin/promocoes")
+  })
+
   it("gives stock and logistics the shipping module but not finance", () => {
     const granted = rolePermissions("stock")
     expect(hasPermission(granted, "shipment:manage")).toBe(true)

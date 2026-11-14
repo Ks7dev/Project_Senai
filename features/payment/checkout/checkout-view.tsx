@@ -20,6 +20,8 @@ import {
   type CheckoutQuote,
 } from "@/features/payment/checkout/action/checkout-actions"
 import type { CheckoutPaymentMethod } from "@/features/payment/checkout/schema/checkout-schema"
+import { PromotionsNote } from "@/features/shared/components/promotions-note"
+import { FREE_SHIPPING_MESSAGE } from "@/features/shared/lib/promotions/promotion-math"
 import {
   UNAVAILABLE_REASON_LABEL,
   type ScheduleDay,
@@ -127,7 +129,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
 
-  const { cart } = context
+  const { cart, promotions } = context
   const option =
     quote?.status === "quoted"
       ? quote.options.find((item) => optionKey(item) === selected)
@@ -137,7 +139,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
   const total =
     quote?.status === "manual_quote"
       ? quote.total
-      : (option?.total ?? cart.total)
+      : (option?.total ?? promotions.total)
   const schedule = quote?.schedule ?? null
   const earliestDate = option?.earliestInstallationDate ?? null
   const chosenDay = schedule?.find(
@@ -312,9 +314,25 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
                       {item.carrier} · {deliveryTimeMessage(item)}
                     </span>
                   </span>
-                  <strong>{brl.format(Number(item.price))}</strong>
+                  <span className="flex flex-col items-end">
+                    {item.originalPrice && (
+                      <s className="text-label-sm text-ink-muted">
+                        {brl.format(Number(item.originalPrice))}
+                      </s>
+                    )}
+                    <strong>
+                      {Number(item.price) === 0
+                        ? "Grátis"
+                        : brl.format(Number(item.price))}
+                    </strong>
+                  </span>
                 </label>
               ))}
+              {option?.freeShippingReason && (
+                <p className="text-body-sm text-primary">
+                  {FREE_SHIPPING_MESSAGE[option.freeShippingReason]}
+                </p>
+              )}
             </fieldset>
           )}
           {quote?.status === "manual_quote" && (
@@ -415,6 +433,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
           subtotal={cart.subtotal}
           services={cart.servicesTotal}
           shipping={shipping}
+          discount={promotions.discount}
           total={total}
           note={
             quote?.status === "manual_quote"
@@ -422,6 +441,9 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
               : undefined
           }
         />
+        {(promotions.applied.length > 0 || promotions.couponCode) && (
+          <PromotionsNote promotions={promotions} />
+        )}
         {cart.extraBusinessDays > 0 && (
           <p className="text-body-sm text-ink-muted">
             Personalização e serviços acrescentam {cart.extraBusinessDays}{" "}

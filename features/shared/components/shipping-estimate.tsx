@@ -13,10 +13,13 @@ import {
   manualQuoteResponseMessage,
 } from "@/features/shared/lib/shipping/shipping-messages"
 import type { ShippingQuote } from "@/features/shared/lib/shipping/strategies"
+import type { ActionResult } from "@/features/shared/lib/errors/action-result"
+import { FREE_SHIPPING_MESSAGE } from "@/features/shared/lib/promotions/promotion-math"
 import {
   INVALID_CEP_MESSAGE,
   isValidCep,
 } from "@/features/shared/schema/cep-schema"
+import type { ShippingQuoteInput } from "@/features/shared/schema/shipping-schema"
 
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -28,6 +31,13 @@ type ShippingEstimateProps = {
   items: Array<{ skuCode: string; quantity: number }>
   /** CEP to start with, e.g. the default address of the customer. */
   initialCep?: string
+  /**
+   * Server Action that quotes, when not the public one: the cart passes
+   * its own, which applies promotions and free shipping rules (RN23).
+   */
+  quoteAction?: (
+    input: ShippingQuoteInput
+  ) => Promise<ActionResult<{ quote: ShippingQuote }>>
 }
 
 /**
@@ -42,6 +52,7 @@ type ShippingEstimateProps = {
 export function ShippingEstimate({
   items,
   initialCep = "",
+  quoteAction = quoteShipping,
 }: ShippingEstimateProps) {
   const id = useId()
   const [cep, setCep] = useState(initialCep)
@@ -55,7 +66,7 @@ export function ShippingEstimate({
     if (!isValidCep(cep)) return setError(INVALID_CEP_MESSAGE)
     setError(undefined)
     startTransition(async () => {
-      const result = await quoteShipping({ cep, items })
+      const result = await quoteAction({ cep, items })
       if (!result.success) return setError(result.error)
       setQuote(result.quote)
     })
@@ -116,10 +127,26 @@ export function ShippingEstimate({
                     {option.carrier} · {deliveryTimeMessage(option)}
                   </span>
                 </span>
-                <strong>{brl.format(Number(option.price))}</strong>
+                <span className="flex flex-col items-end">
+                  {option.originalPrice && (
+                    <s className="text-label-sm text-ink-muted">
+                      {brl.format(Number(option.originalPrice))}
+                    </s>
+                  )}
+                  <strong>
+                    {Number(option.price) === 0
+                      ? "Grátis"
+                      : brl.format(Number(option.price))}
+                  </strong>
+                </span>
               </li>
             ))}
           </ul>
+        )}
+        {quote?.status === "quoted" && quote.options[0]?.freeShippingReason && (
+          <p className="text-body-sm text-primary">
+            {FREE_SHIPPING_MESSAGE[quote.options[0].freeShippingReason]}
+          </p>
         )}
         {quote?.status === "manual_quote" && (
           <p className="rounded bg-clay-tint p-sm text-body-sm text-ink">

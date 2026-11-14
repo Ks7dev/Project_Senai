@@ -192,11 +192,13 @@ export type ShippingRegionSeed = {
   ownDelivery: boolean
   /** Own delivery prices by maximum weight. */
   ownDeliveryRates?: Array<{ maxKg: number; price: string }>
+  /** Order total that ships for free to the region (RN23), if any. */
+  freeShippingMinimum?: string
 }
 
 /**
- * Own delivery coverage: São Paulo Metropolitan Region (RN16). The free
- * shipping minimum per region (RN23) is still to be defined (#73).
+ * Own delivery coverage: São Paulo Metropolitan Region (RN16), with a
+ * provisional free shipping minimum (RN23, #73) editable in /admin/frete.
  */
 export const shippingRegions: ShippingRegionSeed[] = [
   {
@@ -209,6 +211,7 @@ export const shippingRegions: ShippingRegionSeed[] = [
       { maxKg: 100, price: "240.00" },
       { maxKg: 300, price: "480.00" },
     ],
+    freeShippingMinimum: "5000.00",
   },
 ]
 

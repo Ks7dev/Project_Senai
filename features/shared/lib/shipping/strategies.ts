@@ -60,6 +60,10 @@ export type ShippingOption = {
   price: string
   /** Business days to deliver; null when scheduled with the customer. */
   deliveryDays: number | null
+  /** Price before free shipping, when a rule made it free (RN23). */
+  originalPrice?: string
+  /** Why the option became free: a promotion or the regional minimum. */
+  freeShippingReason?: "promotion" | "regional_minimum"
 }
 
 /**
