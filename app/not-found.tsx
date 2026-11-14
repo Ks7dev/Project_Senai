@@ -1,6 +1,11 @@
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 
+export const metadata = {
+  title: "Página não encontrada — Atelier Bureau",
+  description: "O endereço procurado não existe mais na Atelier Bureau.",
+}
+
 /**
  * 404 page shown for unknown routes.
  *

@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ListingView } from "@/features/catalog/listing/listing-view"
@@ -7,9 +8,41 @@ import {
   getCategoryWithSubtree,
   queryCatalog,
 } from "@/features/shared/lib/catalog/catalog-query"
+import { siteUrl } from "@/features/shared/lib/email/site-url"
+import { STORE_NAME } from "@/features/shared/lib/seo/product-json-ld"
 
 type Params = { slug: string }
 type Search = Record<string, string | string[] | undefined>
+
+/**
+ * Title, description and canonical URL of the category listing
+ * (RNF14, #31). Filters and pages share the canonical of the category.
+ *
+ * @param props - Page props.
+ * @returns The page metadata.
+ */
+export async function generateMetadata(
+  props: PageProps<"/categoria/[slug]">
+): Promise<Metadata> {
+  const { slug } = await props.params
+  const category = await getCategoryWithSubtree(slug)
+  if (!category) return { title: `Categoria não encontrada — ${STORE_NAME}` }
+  const description = `${category.name} na ${STORE_NAME}: papelaria nobre e mobiliário executivo com garantia, entrega para todo o Brasil e condições para empresas.`
+  const url = `${siteUrl()}/categoria/${category.slug}`
+  return {
+    title: `${category.name} — ${STORE_NAME}`,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      title: category.name,
+      description,
+      url,
+      siteName: STORE_NAME,
+      locale: "pt_BR",
+    },
+  }
+}
 
 /**
  * Loads the category and its filtered products.

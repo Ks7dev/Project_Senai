@@ -7,7 +7,11 @@ import {
   loadCurrentCart,
 } from "@/features/shared/lib/cart/cart-store"
 
-export const metadata = { title: "Carrinho — Atelier Bureau" }
+export const metadata = {
+  title: "Carrinho — Atelier Bureau",
+  description:
+    "Revise os itens do seu carrinho, simule o frete e siga para a finalização da compra na Atelier Bureau.",
+}
 
 /**
  * Loads the active cart: the account cart when logged in (user id from
