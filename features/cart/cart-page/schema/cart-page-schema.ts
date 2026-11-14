@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { cepSchema } from "@/features/shared/schema/cep-schema"
 import {
   cartQuantitySchema,
   lineServicesSchema,
@@ -43,3 +44,27 @@ export const saveProjectListSchema = z.object({
 
 /** Values of the save as project list form. */
 export type SaveProjectListInput = z.input<typeof saveProjectListSchema>
+
+/** Coupon typed by the customer in the cart (RF46). */
+export const applyCouponSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\s+/g, "").toUpperCase())
+    .pipe(
+      z
+        .string()
+        .min(3, "Informe o código do cupom.")
+        .max(40, "Código de cupom inválido.")
+        .regex(/^[A-Z0-9_-]+$/, "Use apenas letras, números, hífen ou _.")
+    ),
+})
+
+/** Values of the coupon form. */
+export type ApplyCouponInput = z.input<typeof applyCouponSchema>
+
+/** Shipping estimate of the cart for a CEP; the lines come from the cart. */
+export const cartShippingSchema = z.object({ cep: cepSchema })
+
+/** Values of the cart shipping estimate. */
+export type CartShippingInput = z.input<typeof cartShippingSchema>
