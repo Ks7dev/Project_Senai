@@ -300,6 +300,128 @@ export function orderCanceledEmail(
 }
 
 /**
+ * Invoiced order confirmed, with the due dates and the digitable lines
+ * of the own boletos (RF12, RF33, RN03).
+ *
+ * @param input - Order data and the installments.
+ * @returns The e-mail.
+ */
+export function invoicedInstallmentsEmail(
+  input: OrderEmailData & {
+    installments: Array<{
+      sequence: number
+      amount: string
+      dueDate: Date
+      digitableLine: string
+    }>
+  }
+): RenderedEmail {
+  const date = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  })
+  return render(
+    "order.invoiced_installments",
+    `Pedido ${input.number}: boletos do faturado`,
+    {
+      preheader: "Seu pedido faturado foi confirmado. Confira os vencimentos.",
+      heading: "Pedido faturado confirmado",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        "Seu pedido foi confirmado no faturado. Os boletos vencem nas datas abaixo; use a linha digitável para pagar no banco.",
+        "Ambiente de homologação: os boletos são fictícios e não devem ser pagos.",
+      ],
+      details: [
+        ...orderDetails(input),
+        ...input.installments.flatMap((item) => [
+          {
+            label: `Parcela ${item.sequence}`,
+            value: `${brl.format(Number(item.amount))} com vencimento em ${date.format(item.dueDate)}`,
+          },
+          {
+            label: `Linha digitável ${item.sequence}`,
+            value: item.digitableLine,
+          },
+        ]),
+      ],
+      action: { label: "Acompanhar pedido", url: input.url },
+    }
+  )
+}
+
+/**
+ * Refund done (RF34): how much went back and how.
+ *
+ * @param input - Order data, refunded amount, whether it was the whole
+ * remaining value and how the money goes back.
+ * @returns The e-mail.
+ */
+export function refundCompletedEmail(
+  input: OrderEmailData & {
+    amount: string
+    full: boolean
+    channel: "MERCADO_PAGO" | "MANUAL_TRANSFER"
+  }
+): RenderedEmail {
+  return render(
+    "order.refunded",
+    `Pedido ${input.number}: estorno ${input.full ? "total" : "parcial"}`,
+    {
+      preheader: "O estorno do seu pedido foi processado.",
+      heading: input.full
+        ? "Estorno total processado"
+        : "Estorno parcial processado",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        input.channel === "MERCADO_PAGO"
+          ? "O valor abaixo foi estornado pelo mesmo meio de pagamento. No cartão, o crédito aparece na fatura conforme o prazo do emissor."
+          : `O valor abaixo será devolvido por transferência bancária para a conta da empresa.${input.full ? " As parcelas em aberto do faturado foram canceladas." : ""}`,
+      ],
+      details: [
+        ...orderDetails(input),
+        { label: "Valor estornado", value: brl.format(Number(input.amount)) },
+      ],
+      action: { label: "Ver pedido", url: input.url },
+    }
+  )
+}
+
+/**
+ * Internal alert: the NF-e of an order failed (RF13, #63).
+ *
+ * @param input - Team member name, order number, failure and link.
+ * @returns The e-mail.
+ */
+export function nfeFailureAlertEmail(input: {
+  name: string
+  number: string
+  error: string
+  automaticRetry: boolean
+  url: string
+}): RenderedEmail {
+  return render(
+    "internal.nfe_failure",
+    `Falha na emissão da NF-e do pedido ${input.number}`,
+    {
+      preheader: "A NF-e de um pedido não foi emitida.",
+      heading: "Falha na emissão da NF-e",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        `A NF-e do pedido ${input.number} não foi emitida.`,
+        input.automaticRetry
+          ? "O sistema tentará de novo automaticamente. Se a falha continuar, confira os dados e reprocesse no back office."
+          : "Corrija os dados indicados e reprocesse a NF-e no back office.",
+      ],
+      details: [
+        { label: "Pedido", value: input.number },
+        { label: "Motivo", value: input.error },
+      ],
+      action: { label: "Abrir NF-e no back office", url: input.url },
+    }
+  )
+}
+
+/**
  * Support ticket opened or updated (RF53: chamados, RF18).
  *
  * @param input - Name, ticket number, status text and link.

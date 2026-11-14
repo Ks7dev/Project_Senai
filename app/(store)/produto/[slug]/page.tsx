@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { notFound } from "next/navigation"
-import { loadProductPage } from "@/features/catalog/product-page/load-product"
+import { loadProductPageForCustomer } from "@/features/catalog/product-page/load-product"
 import { ProductPageView } from "@/features/catalog/product-page/product-page-view"
 
 /**
@@ -15,7 +15,7 @@ async function ProductContent({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const product = await loadProductPage(slug)
+  const product = await loadProductPageForCustomer(slug)
   if (!product) notFound()
   return <ProductPageView product={product} />
 }
