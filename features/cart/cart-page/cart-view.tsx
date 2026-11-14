@@ -5,7 +5,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { MinusIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import {
+  MessageCircleIcon,
+  MinusIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
 import { PageContainer } from "@/components/layout/page-container"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -27,10 +32,15 @@ import {
   type SaveProjectListInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
 import { CartLineExtras } from "@/features/cart/cart-page/cart-line-extras"
+import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
 import { PromotionsNote } from "@/features/shared/components/promotions-note"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
 import type { CartExtrasRules } from "@/features/shared/lib/cart/cart-extras"
-import { MAX_LINE_QUANTITY } from "@/features/shared/lib/cart/cart-math"
+import {
+  centsToMoney,
+  MAX_LINE_QUANTITY,
+  moneyToCents,
+} from "@/features/shared/lib/cart/cart-math"
 import type { CartLine, CartView } from "@/features/shared/lib/cart/cart-types"
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -51,10 +61,11 @@ type CartPageViewProps = {
 
 /**
  * Cart page (#46, RF07): lines with quantity and removal, laser
- * engraving and additional services (#47, RF51, RF52), order summary
- * with the extras cost and lead time, promotions and coupon (#73, RF46),
- * shipping estimate by CEP with free shipping rules (RN23) and the
- * option to save the cart as a project list to resume later.
+ * engraving and additional services (#47, RF51, RF52), prices of the
+ * customer table (RF21), automatic volume discounts (RN04), order
+ * summary with the extras cost and lead time, promotions and coupon
+ * (#73, RF46), shipping estimate by CEP with free shipping rules (RN23)
+ * and the option to save the cart as a project list to resume later.
  *
  * @param props - Cart, login state, extras rules and promotions.
  * @returns The page content.
@@ -67,7 +78,11 @@ export function CartPageView({
 }: CartPageViewProps) {
   const router = useRouter()
   const [cart, setCart] = useState(initialCart)
-  const discount = promotions?.discount ?? "0.00"
+  // Volume discounts (RN04) plus promotions and coupon (RF46); the
+  // promotions total is already priced over the cart total
+  const discount = centsToMoney(
+    moneyToCents(cart.discount) + moneyToCents(promotions?.discount ?? "0")
+  )
   const total = promotions?.total ?? cart.total
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
@@ -154,6 +169,10 @@ export function CartPageView({
                   : undefined
               }
             />
+            <CartPricingNotes
+              priceTableName={cart.priceTableName}
+              volumeDiscounts={cart.volumeDiscounts}
+            />
             {promotions &&
               (promotions.applied.length > 0 || promotions.couponCode) && (
                 <PromotionsNote promotions={promotions} />
@@ -197,6 +216,13 @@ export function CartPageView({
                 Solicitar cotação do carrinho
               </Link>
             )}
+            <Link
+              href="/atendimento?origem=carrinho"
+              className="inline-flex items-center gap-sm text-body-sm text-primary underline"
+            >
+              <MessageCircleIcon className="size-4" aria-hidden /> Falar com o
+              vendedor
+            </Link>
             {purchasable.length > 0 &&
               purchasable.length < cart.lines.length && (
                 <p className="text-body-sm text-ink-muted">
@@ -269,7 +295,17 @@ function CartLineRow({
           {line.productName}
         </Link>
         <span className="text-ink-muted">
-          {line.skuName} · {brl.format(Number(line.unitPrice))} cada
+          {line.skuName} ·{" "}
+          {line.listUnitPrice && (
+            <>
+              <span className="sr-only">de </span>
+              <span className="line-through">
+                {brl.format(Number(line.listUnitPrice))}
+              </span>{" "}
+              <span className="sr-only">por </span>
+            </>
+          )}
+          {brl.format(Number(line.unitPrice))} cada
         </span>
         {!line.purchasable && (
           <span className="text-destructive">
