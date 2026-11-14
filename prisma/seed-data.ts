@@ -496,6 +496,13 @@ export const accounts: AccountSeed[] = [
     roles: ["sales"],
   },
   {
+    email: "financeiro@atelierbureau.test",
+    name: "Equipe Financeira",
+    personType: "PF",
+    document: "00000001910",
+    roles: ["finance"],
+  },
+  {
     email: "cliente.pf@atelierbureau.test",
     name: "Cliente Pessoa Física",
     personType: "PF",
