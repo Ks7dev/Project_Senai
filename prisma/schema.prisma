@@ -175,6 +175,7 @@ model User {
   updatedSettings    Setting[]
   supportTickets     SupportTicket[]      @relation("SupportTicketCustomer")
   supportEvents      SupportTicketEvent[]
+  sellerRules        SellerRule[]
 
   @@map("users")
 }
@@ -995,6 +996,26 @@ model SupportTicketAttachment {
 
   @@index([ticketId])
   @@map("support_ticket_attachments")
+}
+
+/// Dedicated seller by region (state) and segment (PF or PJ) (RF18,
+/// RN11). A corporate account with `organizations.seller_id` keeps its
+/// own seller; the others follow the most specific active rule.
+model SellerRule {
+  id         String      @id @default(uuid(7)) @db.Char(36)
+  sellerId   String      @map("seller_id") @db.VarChar(36)
+  /// Segment; null means any
+  personType PersonType? @map("person_type")
+  /// State (UF) of the customer address; null means any
+  state      String?     @db.Char(2)
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.DateTime(3)
+  seller     User        @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([active, personType, state])
+  @@index([sellerId])
+  @@map("seller_rules")
 }
 
 /// Transactional e-mail queue (RF53): written in the same transaction

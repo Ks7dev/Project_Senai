@@ -5,7 +5,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { MinusIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import {
+  MessageCircleIcon,
+  MinusIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
 import { PageContainer } from "@/components/layout/page-container"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -172,6 +177,13 @@ export function CartPageView({
                 Solicitar cotação do carrinho
               </Link>
             )}
+            <Link
+              href="/atendimento?origem=carrinho"
+              className="inline-flex items-center gap-sm text-body-sm text-primary underline"
+            >
+              <MessageCircleIcon className="size-4" aria-hidden /> Falar com o
+              vendedor
+            </Link>
             {purchasable.length > 0 &&
               purchasable.length < cart.lines.length && (
                 <p className="text-body-sm text-ink-muted">
