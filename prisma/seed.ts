@@ -10,6 +10,7 @@ import {
   permissions,
   products,
   roles,
+  sellerRules,
   settings,
   shippingRegions,
 } from "./seed-data"
@@ -185,6 +186,28 @@ async function main() {
         where: { userId_roleId: { userId: user.id, roleId: role.id } },
         create: { userId: user.id, roleId: role.id },
         update: {},
+      })
+    }
+  }
+
+  for (const rule of sellerRules) {
+    const sellerId = userIds.get(rule.sellerEmail)!
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: sellerId },
+      select: { phone: true },
+    })
+    if (!user.phone) {
+      await prisma.user.update({
+        where: { id: sellerId },
+        data: { phone: rule.sellerPhone },
+      })
+    }
+    const existing = await prisma.sellerRule.findFirst({
+      where: { active: true, personType: rule.personType, state: rule.state },
+    })
+    if (!existing) {
+      await prisma.sellerRule.create({
+        data: { sellerId, personType: rule.personType, state: rule.state },
       })
     }
   }

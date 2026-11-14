@@ -515,6 +515,32 @@ export const accounts: AccountSeed[] = [
   },
 ]
 
+/** A seller rule by region and segment (RN11). */
+export type SellerRuleSeed = {
+  /** E-mail of a seeded account with the sales role. */
+  sellerEmail: string
+  /** WhatsApp of the seller, digits with area code (fictitious). */
+  sellerPhone: string
+  /** Segment; null means any. */
+  personType: "PF" | "PJ" | null
+  /** State (UF); null means any. */
+  state: string | null
+}
+
+/**
+ * Dedicated seller rules (#69, RF18, RN11). The general rule sends
+ * every customer to the fictitious sales account until the back office
+ * defines the regions, segments and the real WhatsApp numbers.
+ */
+export const sellerRules: SellerRuleSeed[] = [
+  {
+    sellerEmail: "comercial@atelierbureau.test",
+    sellerPhone: "11900000000",
+    personType: null,
+    state: null,
+  },
+]
+
 /** Fictitious corporate account with a requester and an approver. */
 export const corporateAccount = {
   name: "Empresa Fictícia Ltda.",
