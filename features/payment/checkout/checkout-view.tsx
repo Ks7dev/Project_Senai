@@ -8,6 +8,7 @@ import {
   CalendarDaysIcon,
   CreditCardIcon,
   QrCodeIcon,
+  ReceiptTextIcon,
   TruckIcon,
 } from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
@@ -99,6 +100,9 @@ function optionKey(option: CheckoutOption): string {
 function MethodIcon({ method }: { method: CheckoutPaymentMethod }) {
   const className = "size-5 shrink-0 text-primary"
   if (method === "PIX") return <QrCodeIcon className={className} aria-hidden />
+  if (method === "INVOICED") {
+    return <ReceiptTextIcon className={className} aria-hidden />
+  }
   if (method === "BOLETO") {
     return <BarcodeIcon className={className} aria-hidden />
   }

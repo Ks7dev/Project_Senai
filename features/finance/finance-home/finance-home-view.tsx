@@ -22,6 +22,13 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
       "Aprovar ou recusar contas para a compra faturada, definir o limite de crédito e consultar o histórico de alterações.",
     permission: "credit:approve",
   },
+  {
+    href: "/admin/financeiro/faturado",
+    title: "Faturado 28/56 dias",
+    description:
+      "Boletos próprios das compras faturadas, vencimentos, baixa manual e pedidos faturados aguardando confirmação.",
+    permission: "payment:refund",
+  },
 ]
 
 /**

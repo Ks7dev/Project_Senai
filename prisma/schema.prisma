@@ -104,6 +104,19 @@ enum PaymentStatus {
   PARTIALLY_REFUNDED
 }
 
+/// Status of an installment of an invoiced order (RF33, #60)
+enum InstallmentStatus {
+  OPEN
+  PAID
+  CANCELED
+}
+
+/// How an installment was settled: by hand or by the bank return (RF33)
+enum SettlementMethod {
+  MANUAL
+  BANK_RETURN
+}
+
 enum EmailStatus {
   PENDING
   SENT
@@ -157,6 +170,7 @@ model User {
   sellerAccounts     Organization[]       @relation("OrganizationSeller")
   creditLimitChanges CreditLimitChange[]
   updatedSettings    Setting[]
+  settledReceivables Receivable[]
 
   @@map("users")
 }
@@ -678,6 +692,7 @@ model Order {
   payments       Payment[]
   shipment       Shipment?
   stockMovements StockMovement[]
+  receivables    Receivable[]
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -772,6 +787,40 @@ model Payment {
   @@index([orderId])
   @@index([status, expiresAt])
   @@map("payments")
+}
+
+/// Installment of an invoiced order (RF12, RF33, RN03, RN17): own boleto
+/// outside Mercado Pago, due 28 and 56 days after the confirmation, and
+/// settled by hand (or by the bank return) by the finance team.
+model Receivable {
+  id               String            @id @default(uuid(7)) @db.Char(36)
+  orderId          String            @map("order_id") @db.Char(36)
+  /// 1 for the first due date, 2 for the second
+  sequence         Int
+  /// Days after the confirmation, e.g. 28 or 56
+  dueDays          Int               @map("due_days")
+  amount           Decimal           @db.Decimal(12, 2)
+  /// Due date: end of the day in São Paulo, stored in UTC
+  dueDate          DateTime          @map("due_date") @db.DateTime(3)
+  status           InstallmentStatus @default(OPEN)
+  /// Own boleto number ("nosso número")
+  boletoNumber     String            @unique @map("boleto_number") @db.VarChar(20)
+  /// Digitable line of the own boleto (fictitious bank in homologation)
+  digitableLine    String            @map("digitable_line") @db.VarChar(64)
+  paidAt           DateTime?         @map("paid_at") @db.DateTime(3)
+  paidAmount       Decimal?          @map("paid_amount") @db.Decimal(12, 2)
+  settledById      String?           @map("settled_by_id") @db.VarChar(36)
+  settlementMethod SettlementMethod? @map("settlement_method")
+  settlementNote   String?           @map("settlement_note") @db.VarChar(255)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  settledBy        User?             @relation(fields: [settledById], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, sequence])
+  @@index([status, dueDate])
+  @@index([settledById])
+  @@map("invoiced_installments")
 }
 
 /// Mercado Pago webhook notifications already received (RF30, #57). The
@@ -882,18 +931,18 @@ model Favorite {
 
 /// History of corporate credit limit changes (RF58, RN10)
 model CreditLimitChange {
-  id             String       @id @default(uuid(7)) @db.Char(36)
-  organizationId String       @map("organization_id") @db.VarChar(36)
-  previousLimit  Decimal?     @map("previous_limit") @db.Decimal(12, 2)
-  newLimit       Decimal?     @map("new_limit") @db.Decimal(12, 2)
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  organizationId String        @map("organization_id") @db.VarChar(36)
+  previousLimit  Decimal?      @map("previous_limit") @db.Decimal(12, 2)
+  newLimit       Decimal?      @map("new_limit") @db.Decimal(12, 2)
   /// Credit status before the change (#61)
   previousStatus CreditStatus? @map("previous_status")
   status         CreditStatus
-  changedById    String       @map("changed_by_id") @db.VarChar(36)
-  note           String?      @db.VarChar(255)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.DateTime(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  changedBy      User         @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  changedById    String        @map("changed_by_id") @db.VarChar(36)
+  note           String?       @db.VarChar(255)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  changedBy      User          @relation(fields: [changedById], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
   @@index([changedById])

@@ -9,8 +9,17 @@ const QUOTED_METHODS = [
   "OWN_DELIVERY",
 ] as const
 
-/** Payment methods offered at checkout (RF29). */
-export const CHECKOUT_PAYMENT_METHODS = ["CARD", "PIX", "BOLETO"] as const
+/**
+ * Payment methods offered at checkout (RF29). The invoiced purchase is
+ * only offered to corporate accounts approved by the finance team, with
+ * credit available (RF12, RN03, RN10).
+ */
+export const CHECKOUT_PAYMENT_METHODS = [
+  "CARD",
+  "PIX",
+  "BOLETO",
+  "INVOICED",
+] as const
 
 /** A payment method offered at checkout. */
 export type CheckoutPaymentMethod = (typeof CHECKOUT_PAYMENT_METHODS)[number]

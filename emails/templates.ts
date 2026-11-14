@@ -300,6 +300,56 @@ export function orderCanceledEmail(
 }
 
 /**
+ * Invoiced order confirmed, with the due dates and the digitable lines
+ * of the own boletos (RF12, RF33, RN03).
+ *
+ * @param input - Order data and the installments.
+ * @returns The e-mail.
+ */
+export function invoicedInstallmentsEmail(
+  input: OrderEmailData & {
+    installments: Array<{
+      sequence: number
+      amount: string
+      dueDate: Date
+      digitableLine: string
+    }>
+  }
+): RenderedEmail {
+  const date = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  })
+  return render(
+    "order.invoiced_installments",
+    `Pedido ${input.number}: boletos do faturado`,
+    {
+      preheader: "Seu pedido faturado foi confirmado. Confira os vencimentos.",
+      heading: "Pedido faturado confirmado",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        "Seu pedido foi confirmado no faturado. Os boletos vencem nas datas abaixo; use a linha digitável para pagar no banco.",
+        "Ambiente de homologação: os boletos são fictícios e não devem ser pagos.",
+      ],
+      details: [
+        ...orderDetails(input),
+        ...input.installments.flatMap((item) => [
+          {
+            label: `Parcela ${item.sequence}`,
+            value: `${brl.format(Number(item.amount))} com vencimento em ${date.format(item.dueDate)}`,
+          },
+          {
+            label: `Linha digitável ${item.sequence}`,
+            value: item.digitableLine,
+          },
+        ]),
+      ],
+      action: { label: "Acompanhar pedido", url: input.url },
+    }
+  )
+}
+
+/**
  * Support ticket opened or updated (RF53: chamados, RF18).
  *
  * @param input - Name, ticket number, status text and link.

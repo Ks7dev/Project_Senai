@@ -24,6 +24,10 @@ import {
   loadCartView,
 } from "@/features/shared/lib/cart/cart-store"
 import type { CartView } from "@/features/shared/lib/cart/cart-types"
+import {
+  assertInvoicedCredit,
+  loadCreditPosition,
+} from "@/features/shared/lib/credit/credit-service"
 import { writeAudit } from "@/features/shared/lib/db/audit"
 import {
   addDaysToKey,
@@ -52,6 +56,8 @@ import {
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
+import { loadInvoicedDueDays } from "@/features/shared/lib/invoiced/invoiced-billing"
+import { transitionOrder } from "@/features/shared/lib/orders/order-lifecycle"
 import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
 import {
   isRetryableOrderError,
@@ -187,6 +193,11 @@ const INSTALLATION_DATE_REQUIRED_MESSAGE =
 /** Message when the chosen installation date is blocked (RN05). */
 const INSTALLATION_DATE_UNAVAILABLE_MESSAGE =
   "A data de entrega e instalação escolhida não está disponível. Escolha outra data."
+
+const brl = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+})
 
 /** How many times a conflicting order number is retried. */
 const ORDER_NUMBER_ATTEMPTS = 3
@@ -340,12 +351,27 @@ async function loadInstallationCalendar(
 }
 
 /**
- * Payment methods offered at checkout (RF29).
+ * Payment methods offered at checkout (RF29). Corporate accounts
+ * approved by the finance team with credit available also see the
+ * invoiced purchase with the own boletos (RF12, RN03, RN10).
  *
+ * @param buyer - Buyer.
  * @returns The options.
  */
-async function paymentOptions(): Promise<CheckoutPaymentOption[]> {
+async function paymentOptions(buyer: Buyer): Promise<CheckoutPaymentOption[]> {
   const { pixMinutes, boletoBusinessDays } = await loadPaymentDeadlines()
+  const invoiced: CheckoutPaymentOption[] = []
+  if (buyer.organizationId) {
+    const credit = await loadCreditPosition(prisma, buyer.organizationId)
+    if (credit.canBuyInvoiced) {
+      const days = await loadInvoicedDueDays(prisma)
+      invoiced.push({
+        method: "INVOICED",
+        label: PAYMENT_METHOD_LABEL.INVOICED,
+        note: `Boleto próprio com vencimentos em ${new Intl.ListFormat("pt-BR", { type: "conjunction" }).format(days.map(String))} dias após a confirmação. Crédito disponível: ${brl.format(Number(credit.available))}.`,
+      })
+    }
+  }
   return [
     {
       method: "CARD",
@@ -362,6 +388,7 @@ async function paymentOptions(): Promise<CheckoutPaymentOption[]> {
       label: PAYMENT_METHOD_LABEL.BOLETO,
       note: `O boleto vence em ${boletoBusinessDays} ${boletoBusinessDays === 1 ? "dia útil" : "dias úteis"}. Sem pagamento nesse prazo, o pedido é cancelado e os itens voltam ao estoque.`,
     },
+    ...invoiced,
   ]
 }
 
@@ -415,7 +442,7 @@ export async function getCheckout(): Promise<
         where: addressScope(buyer),
         orderBy: [{ isDefault: "desc" }, { label: "asc" }],
       }),
-      paymentOptions(),
+      paymentOptions(buyer),
     ])
     const approvalLimit = buyer.organizationId
       ? (await getNumberSetting("order.approval_limit")).toFixed(2)
@@ -525,6 +552,9 @@ export async function quoteCheckoutShipping(
  * stores the shipment, records the first status, empties the cart and
  * writes the audit log (RNF12). The order then waits for:
  * - the payment (card, Pix, boleto), confirmed only by Mercado Pago;
+ *   an invoiced order (RF12, RN03) is checked against the credit of the
+ *   account (RN10) and, with nothing else pending, confirmed at once with
+ *   its own boletos due in 28 and 56 days (RF33, RN17);
  * - the company approval, above the approval limit (RN01);
  * - the sales team, when no shipping API answered (RN20).
  * A cart with furniture that needs installation only goes on with a
@@ -549,7 +579,7 @@ export async function placeOrder(
     const data = parsed.data
     const buyer = await loadBuyer()
     await enforceActionRateLimit("checkout", { limit: 10, windowMs: 60_000 })
-    const methods = await paymentOptions()
+    const methods = await paymentOptions(buyer)
     if (!methods.some((option) => option.method === data.paymentMethod)) {
       throw new AppError("Escolha a forma de pagamento.", "invalid_method")
     }
@@ -633,14 +663,26 @@ export async function placeOrder(
           scheduledDeliveryAt = scheduledAtFromKey(date)
         }
 
+        const invoiced = data.paymentMethod === "INVOICED"
+        if (invoiced) {
+          // Only approved accounts with credit for this order (RN03, RN10)
+          await assertInvoicedCredit(tx, {
+            organizationId: buyer.organizationId,
+            amount: total,
+          })
+        }
         const approvalLimit = await getNumberSetting("order.approval_limit", tx)
         const requiresApproval =
           buyer.organizationId !== null && Number(total) > approvalLimit
-        const status: OrderStatusKey = manualReason
+        const initialStatus: OrderStatusKey = manualReason
           ? "AWAITING_SHIPPING_QUOTE"
           : requiresApproval
             ? "AWAITING_APPROVAL"
             : "AWAITING_PAYMENT"
+        // An invoiced order with credit and no pending step is confirmed
+        // right away, without Mercado Pago (RN13, RN17)
+        const confirmNow = invoiced && initialStatus === "AWAITING_PAYMENT"
+        const status: OrderStatusKey = confirmNow ? "PAID" : initialStatus
 
         const skus = await tx.sku.findMany({
           where: { code: { in: cart.lines.map((line) => line.skuCode) } },
@@ -653,7 +695,7 @@ export async function placeOrder(
             number,
             userId: buyer.user.id,
             organizationId: buyer.organizationId,
-            status,
+            status: initialStatus,
             paymentMethod: data.paymentMethod,
             subtotal: cart.subtotal,
             servicesTotal: cart.servicesTotal,
@@ -735,13 +777,27 @@ export async function placeOrder(
           data: {
             orderId: order.id,
             fromStatus: null,
-            toStatus: status,
+            toStatus: initialStatus,
             changedById: buyer.user.id,
             note: "Pedido criado no checkout.",
             createdAt: now,
           },
         })
-        await enqueueOrderStatusEmails(tx, { orderId: order.id, to: status })
+        await enqueueOrderStatusEmails(tx, {
+          orderId: order.id,
+          to: initialStatus,
+        })
+        if (confirmNow) {
+          // Writes off the stock and creates the own boletos (RF33)
+          await transitionOrder(tx, {
+            orderId: order.id,
+            to: "PAID",
+            changedById: buyer.user.id,
+            note: "Pedido faturado confirmado com crédito disponível.",
+            expectedFrom: ["AWAITING_PAYMENT"],
+            now,
+          })
+        }
         await tx.cartItem.deleteMany({ where: { cartId } })
         await writeAudit(tx, {
           userId: buyer.user.id,
