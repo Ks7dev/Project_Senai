@@ -118,6 +118,22 @@ enum ShippingMethod {
   MANUAL_QUOTE
 }
 
+/// What the customer asks in an after-sales ticket (RF17)
+enum SupportTicketKind {
+  WARRANTY
+  TECHNICAL_ASSISTANCE
+}
+
+/// After-sales ticket life cycle (RF17); allowed transitions live in
+/// features/shared/lib/support/ticket-status.ts
+enum SupportTicketStatus {
+  OPEN
+  IN_ANALYSIS
+  WAITING_CUSTOMER
+  RESOLVED
+  DENIED
+}
+
 // ---------------------------------------------------------------------
 // Authentication (Better Auth: core, two-factor and organization)
 // ---------------------------------------------------------------------
@@ -157,6 +173,8 @@ model User {
   sellerAccounts     Organization[]       @relation("OrganizationSeller")
   creditLimitChanges CreditLimitChange[]
   updatedSettings    Setting[]
+  supportTickets     SupportTicket[]      @relation("SupportTicketCustomer")
+  supportEvents      SupportTicketEvent[]
 
   @@map("users")
 }
@@ -250,6 +268,7 @@ model Organization {
   quotes             Quote[]
   orders             Order[]
   creditLimitChanges CreditLimitChange[]
+  supportTickets     SupportTicket[]
 
   @@index([sellerId])
   @@index([creditStatus])
@@ -678,6 +697,7 @@ model Order {
   payments       Payment[]
   shipment       Shipment?
   stockMovements StockMovement[]
+  supportTickets SupportTicket[]
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -700,6 +720,8 @@ model OrderItem {
   services        Json?
   order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sku             Sku     @relation(fields: [skuId], references: [id], onDelete: Restrict)
+
+  supportTickets SupportTicket[]
 
   @@index([orderId])
   @@index([skuId])
@@ -896,6 +918,83 @@ model CreditLimitChange {
   @@index([organizationId, createdAt])
   @@index([changedById])
   @@map("credit_limit_changes")
+}
+
+// ---------------------------------------------------------------------
+// After-sales: warranty and technical assistance tickets (RF17, RN12)
+// ---------------------------------------------------------------------
+
+/// Ticket opened by the customer for an item of a delivered order
+model SupportTicket {
+  id             String              @id @default(uuid(7)) @db.Char(36)
+  /// Readable ticket number, e.g. "CHA-2026-000123"
+  number         String              @unique @db.VarChar(20)
+  kind           SupportTicketKind
+  status         SupportTicketStatus @default(OPEN)
+  /// Customer who opened the ticket (from the session)
+  userId         String              @map("user_id") @db.VarChar(36)
+  organizationId String?             @map("organization_id") @db.VarChar(36)
+  orderId        String              @map("order_id") @db.Char(36)
+  orderItemId    String              @map("order_item_id") @db.Char(36)
+  subject        String              @db.VarChar(160)
+  description    String              @db.Text
+  /// Outcome of the technical evaluation, shown to the customer
+  resolution     String?             @db.Text
+  closedAt       DateTime?           @map("closed_at") @db.DateTime(3)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user         User                      @relation("SupportTicketCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization?             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order        Order                     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem    OrderItem                 @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  events       SupportTicketEvent[]
+  attachments  SupportTicketAttachment[]
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([orderId])
+  @@index([orderItemId])
+  @@map("support_tickets")
+}
+
+/// Timeline of a ticket: status changes and messages of the customer
+/// and of the team. Append only.
+model SupportTicketEvent {
+  id         String               @id @default(uuid(7)) @db.Char(36)
+  ticketId   String               @map("ticket_id") @db.Char(36)
+  fromStatus SupportTicketStatus? @map("from_status")
+  toStatus   SupportTicketStatus? @map("to_status")
+  message    String?              @db.Text
+  /// Author from the session; null for the system
+  authorId   String?              @map("author_id") @db.VarChar(36)
+  /// Whether the author is from the Atelier Bureau team
+  fromTeam   Boolean              @default(false) @map("from_team")
+  createdAt  DateTime             @default(now()) @map("created_at") @db.DateTime(3)
+  ticket     SupportTicket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author     User?                @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+  @@map("support_ticket_events")
+}
+
+/// Photos and documents of the problem (private storage)
+model SupportTicketAttachment {
+  id         String        @id @default(uuid(7)) @db.Char(36)
+  ticketId   String        @map("ticket_id") @db.Char(36)
+  name       String        @db.VarChar(191)
+  mimeType   String        @map("mime_type") @db.VarChar(100)
+  sizeBytes  Int           @map("size_bytes")
+  storageKey String        @map("storage_key") @db.VarChar(255)
+  /// Whether the team (not the customer) sent the file
+  fromTeam   Boolean       @default(false) @map("from_team")
+  createdAt  DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_ticket_attachments")
 }
 
 /// Transactional e-mail queue (RF53): written in the same transaction
