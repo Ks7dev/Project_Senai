@@ -7,7 +7,7 @@ import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
 export const metadata = { title: "Abrir chamado — Atelier Bureau" }
 
 /** Query string of the page. */
-type SearchParams = { pedido?: string; item?: string }
+type SearchParams = { pedido?: string; item?: string; tipo?: string }
 
 /**
  * Loads the delivered orders; visitors go to the login and come back.
@@ -20,10 +20,14 @@ async function TicketForm({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  const { pedido, item } = await searchParams
+  const { pedido, item, tipo } = await searchParams
   const result = await getTicketForm({
     pedido: typeof pedido === "string" ? pedido : undefined,
     item: typeof item === "string" ? item : undefined,
+    tipo:
+      tipo === "troca" || tipo === "devolucao" || tipo === "arrependimento"
+        ? tipo
+        : undefined,
   })
   if (!result.success) {
     if (result.error === UNAUTHENTICATED_MESSAGE) {
@@ -39,7 +43,8 @@ async function TicketForm({
 }
 
 /**
- * New warranty or technical assistance ticket (#68, RF17).
+ * New after-sales ticket: warranty, technical assistance (#68, RF17),
+ * exchange, return or withdrawal (#71, RN12, RN22).
  *
  * @param props - Page props.
  * @returns The page.
@@ -55,8 +60,9 @@ export default function NewSupportTicketPage(
           Abrir chamado
         </h1>
         <p className="text-body text-ink-muted">
-          Garantia ou assistência técnica de um produto que você recebeu. A
-          equipe avalia o caso e responde por aqui e por e-mail.
+          Garantia, assistência técnica, troca, devolução ou arrependimento de
+          um produto que você recebeu. A equipe avalia o caso e responde por
+          aqui e por e-mail.
         </p>
       </header>
       <Suspense fallback={<p className="text-body">Carregando pedidos…</p>}>

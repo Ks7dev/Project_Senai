@@ -39,6 +39,7 @@ describe("opening a ticket (#68, RF17)", () => {
       orderId,
       orderItemId,
       kind: "WARRANTY",
+      returnReason: null,
       subject: "Pistão desce sozinho",
       description: "A cadeira perde altura depois de alguns minutos.",
     })

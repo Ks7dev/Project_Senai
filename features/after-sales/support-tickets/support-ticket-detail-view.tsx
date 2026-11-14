@@ -23,6 +23,10 @@ import {
   TicketTimeline,
 } from "@/features/shared/components/support-ticket-parts"
 import { saveDownloadedFile } from "@/features/shared/lib/quotes/save-download"
+import {
+  RETURN_OUTCOME_LABEL,
+  RETURN_REASON_LABEL,
+} from "@/features/shared/lib/support/return-policy"
 import type { TicketDetail } from "@/features/shared/lib/support/ticket-detail"
 import {
   formatTicketDate,
@@ -101,9 +105,21 @@ export function SupportTicketDetailView({
           <TicketStatusBadge status={ticket.status} />
         </div>
         <p className="text-body text-ink-muted">{status.description}</p>
+        {ticket.kind === "WITHDRAWAL" && !final && (
+          <p className="text-body-sm text-ink-muted">
+            No arrependimento, a coleta é por nossa conta e o reembolso é
+            integral, pelo mesmo meio de pagamento, depois da conferência do
+            produto.
+          </p>
+        )}
         {ticket.resolution && (
           <div className="rounded bg-subtle p-md">
             <p className="text-label">Resultado da avaliação</p>
+            {ticket.returnOutcome && (
+              <p className="text-body font-medium">
+                {RETURN_OUTCOME_LABEL[ticket.returnOutcome]}
+              </p>
+            )}
             <p className="text-body whitespace-pre-line">{ticket.resolution}</p>
           </div>
         )}
@@ -118,6 +134,12 @@ export function SupportTicketDetailView({
             <dt className="text-ink-muted">Tipo</dt>
             <dd>{TICKET_KIND_LABEL[ticket.kind]}</dd>
           </div>
+          {ticket.returnReason && (
+            <div>
+              <dt className="text-ink-muted">Motivo</dt>
+              <dd>{RETURN_REASON_LABEL[ticket.returnReason]}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-ink-muted">Aberto em</dt>
             <dd>{formatTicketDate(ticket.createdAt)}</dd>

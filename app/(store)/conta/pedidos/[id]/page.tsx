@@ -53,7 +53,15 @@ async function OrderTrackingContent({
             className="text-primary underline"
           >
             Abrir chamado de garantia ou assistência técnica
+          </Link>{" "}
+          ou{" "}
+          <Link
+            href={`/conta/chamados/novo?pedido=${result.tracking.orderId}&tipo=devolucao`}
+            className="text-primary underline"
+          >
+            solicitar troca, devolução ou arrependimento
           </Link>
+          .
         </p>
       )}
       <Link

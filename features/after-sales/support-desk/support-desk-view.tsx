@@ -22,6 +22,13 @@ import {
   TicketTimeline,
 } from "@/features/shared/components/support-ticket-parts"
 import { saveDownloadedFile } from "@/features/shared/lib/quotes/save-download"
+import {
+  allowedReturnOutcomes,
+  canDenyTicket,
+  isReturnKind,
+  RETURN_OUTCOME_LABEL,
+  RETURN_REASON_LABEL,
+} from "@/features/shared/lib/support/return-policy"
 import type { TicketDetail } from "@/features/shared/lib/support/ticket-detail"
 import {
   formatTicketDate,
@@ -63,11 +70,18 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
       status: "",
       message: "",
       resolution: "",
+      returnOutcome: "",
     },
   })
   const status = useWatch({ control: form.control, name: "status" })
   const errors = form.formState.errors
   const final = isFinalTicketStatus(ticket.status)
+  const returnFlow = isReturnKind(ticket.kind)
+  const outcomes = allowedReturnOutcomes(ticket.kind)
+  const statusOptions = nextTicketStatuses(ticket.status).filter(
+    (option) =>
+      option !== "DENIED" || canDenyTicket(ticket.kind, ticket.legalReview)
+  )
 
   const download = (attachmentId: string) =>
     startTransition(async () => {
@@ -91,6 +105,7 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
         status: "",
         message: "",
         resolution: "",
+        returnOutcome: "",
       })
       setFiles([])
       setNotice("Resposta registrada. O cliente recebe um e-mail.")
@@ -112,6 +127,11 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
           {ticket.resolution && (
             <div className="rounded bg-subtle p-md">
               <p className="text-label">Resultado da avaliação</p>
+              {ticket.returnOutcome && (
+                <p className="text-body font-medium">
+                  {RETURN_OUTCOME_LABEL[ticket.returnOutcome]}
+                </p>
+              )}
               <p className="text-body whitespace-pre-line">
                 {ticket.resolution}
               </p>
@@ -164,7 +184,7 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
                 <option value="">
                   Manter “{TICKET_STATUS[ticket.status].label}”
                 </option>
-                {nextTicketStatuses(ticket.status).map((option) => (
+                {statusOptions.map((option) => (
                   <option key={option} value={option}>
                     {TICKET_STATUS[option].label}
                   </option>
@@ -185,6 +205,32 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
                 {...form.register("message")}
               />
             </FormField>
+            {returnFlow && status === "RESOLVED" && (
+              <FormField
+                id="desk-outcome"
+                label="Resultado da troca ou devolução"
+                error={errors.returnOutcome?.message}
+                hint={
+                  ticket.kind === "WITHDRAWAL"
+                    ? "O arrependimento termina sempre em reembolso integral, feito pelo financeiro pelo mesmo meio de pagamento."
+                    : "Decidido depois da avaliação técnica do produto. O reembolso é feito pelo financeiro."
+                }
+              >
+                <select
+                  id="desk-outcome"
+                  className="h-11 rounded border border-line bg-canvas px-md text-body"
+                  {...fieldAria("desk-outcome", errors.returnOutcome?.message)}
+                  {...form.register("returnOutcome")}
+                >
+                  <option value="">Escolha o resultado</option>
+                  {outcomes.map((option) => (
+                    <option key={option} value={option}>
+                      {RETURN_OUTCOME_LABEL[option]}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
             {status && requiresResolution(status) && (
               <FormField
                 id="desk-resolution"
@@ -233,6 +279,27 @@ export function SupportDeskView({ ticket }: { ticket: TicketDetail }) {
             <dt className="text-ink-muted">Tipo</dt>
             <dd>{TICKET_KIND_LABEL[ticket.kind]}</dd>
           </div>
+          {ticket.returnReason && (
+            <div>
+              <dt className="text-ink-muted">Motivo</dt>
+              <dd>{RETURN_REASON_LABEL[ticket.returnReason]}</dd>
+            </div>
+          )}
+          {returnFlow && (
+            <div>
+              <dt className="text-ink-muted">Item personalizado</dt>
+              <dd>{ticket.personalized ? "Sim" : "Não"}</dd>
+            </div>
+          )}
+          {ticket.legalReview && (
+            <div>
+              <dt className="text-ink-muted">Parecer jurídico</dt>
+              <dd className="text-error">
+                Arrependimento de item personalizado de pessoa física: aguarde o
+                parecer jurídico antes de concluir (RN22).
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-ink-muted">Cliente</dt>
             <dd>

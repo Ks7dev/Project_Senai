@@ -47,6 +47,13 @@ import {
 } from "@/features/shared/lib/support/ticket-format"
 import { nextTicketNumber } from "@/features/shared/lib/support/ticket-number"
 import {
+  checkReturnEligibility,
+  isPersonalizedItem,
+  isReturnKind,
+  purchasePersonType,
+  withdrawalDeadline,
+} from "@/features/shared/lib/support/return-policy"
+import {
   isFinalTicketStatus,
   statusAfterCustomerReply,
   TICKET_STATUS,
@@ -73,8 +80,18 @@ export type TicketFormOrder = {
   number: string
   /** Delivery date, ISO string. */
   deliveredAt: string | null
+  /** Person type of the purchase (RN12, RN22). */
+  personType: "PF" | "PJ"
+  /** End (exclusive) of the PF withdrawal right, ISO string; null for PJ. */
+  withdrawalUntil: string | null
   /** Items of the order. */
-  items: Array<{ id: string; name: string; quantity: number }>
+  items: Array<{
+    id: string
+    name: string
+    quantity: number
+    /** Personalized or made to measure (RF51). */
+    personalized: boolean
+  }>
 }
 
 /** What the new ticket page starts with. */
@@ -85,6 +102,15 @@ export type TicketForm = {
   orderId: string | null
   /** Preselected item, when it belongs to the preselected order. */
   orderItemId: string | null
+  /** Preselected kind, from the order page links. */
+  kind: TicketKindKey
+}
+
+/** Kind preselected by the `tipo` query string. */
+const SOURCE_KIND: Record<string, TicketKindKey> = {
+  troca: "EXCHANGE",
+  devolucao: "RETURN",
+  arrependimento: "WITHDRAWAL",
 }
 
 /** A ticket of the customer list. */
@@ -105,6 +131,29 @@ export type MyTicketRow = {
   itemName: string
   /** Last change, ISO string. */
   updatedAt: string
+}
+
+/**
+ * E-mail text of a new ticket: the withdrawal promises the full refund
+ * after the receipt check; the other kinds go to the evaluation.
+ *
+ * @param kind - Ticket kind.
+ * @param product - Product name.
+ * @param order - Order number.
+ * @returns The message.
+ */
+function openedMessage(
+  kind: TicketKindKey,
+  product: string,
+  order: string
+): string {
+  if (kind === "WITHDRAWAL") {
+    return `Recebemos o seu pedido de arrependimento de "${product}" do pedido ${order}. A equipe vai combinar a coleta, sem custo para você; o reembolso é integral e sai pelo mesmo meio de pagamento depois da conferência do produto.`
+  }
+  if (kind === "EXCHANGE" || kind === "RETURN") {
+    return `Recebemos a sua solicitação sobre "${product}" do pedido ${order}. Toda troca ou devolução passa pela avaliação técnica do produto, e o resultado é informado pelo site antes de qualquer troca, reparo ou reembolso.`
+  }
+  return `Recebemos o seu chamado sobre "${product}" do pedido ${order}. A equipe técnica vai analisar e responder pelo site.`
 }
 
 /**
@@ -147,6 +196,8 @@ export async function getTicketForm(
       select: {
         id: true,
         number: true,
+        organizationId: true,
+        user: { select: { personType: true } },
         shipment: { select: { deliveredAt: true } },
         statusHistory: {
           where: { toStatus: "DELIVERED" },
@@ -154,23 +205,42 @@ export async function getTicketForm(
           take: 1,
           select: { toStatus: true, createdAt: true },
         },
-        items: { select: { id: true, productName: true, quantity: true } },
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            quantity: true,
+            personalization: true,
+          },
+        },
       },
     })
-    const orders = rows.map((row) => ({
-      orderId: row.id,
-      number: row.number,
-      deliveredAt:
-        orderDeliveredAt({
-          shipmentDeliveredAt: row.shipment?.deliveredAt,
-          history: row.statusHistory,
-        })?.toISOString() ?? null,
-      items: row.items.map((item) => ({
-        id: item.id,
-        name: item.productName,
-        quantity: item.quantity,
-      })),
-    }))
+    const orders = rows.map((row): TicketFormOrder => {
+      const deliveredAt = orderDeliveredAt({
+        shipmentDeliveredAt: row.shipment?.deliveredAt,
+        history: row.statusHistory,
+      })
+      const personType = purchasePersonType({
+        organizationId: row.organizationId,
+        buyerPersonType: row.user.personType,
+      })
+      return {
+        orderId: row.id,
+        number: row.number,
+        deliveredAt: deliveredAt?.toISOString() ?? null,
+        personType,
+        withdrawalUntil:
+          personType === "PF" && deliveredAt
+            ? withdrawalDeadline(deliveredAt).toISOString()
+            : null,
+        items: row.items.map((item) => ({
+          id: item.id,
+          name: item.productName,
+          quantity: item.quantity,
+          personalized: isPersonalizedItem(item.personalization),
+        })),
+      }
+    })
     const order = orders.find((row) => row.orderId === source.pedido) ?? null
     const item = order?.items.find((row) => row.id === source.item) ?? null
     return {
@@ -179,6 +249,7 @@ export async function getTicketForm(
         orders,
         orderId: order?.orderId ?? null,
         orderItemId: item?.id ?? null,
+        kind: source.tipo ? SOURCE_KIND[source.tipo] : "WARRANTY",
       },
     }
   } catch (error) {
@@ -187,9 +258,13 @@ export async function getTicketForm(
 }
 
 /**
- * Opens a warranty or technical assistance ticket for an item of a
- * delivered order (RF17), with photos or documents of the problem.
- * Checks the order scope of the session user, stores the files in the
+ * Opens a warranty, technical assistance, exchange, return or withdrawal
+ * ticket for an item of a delivered order (RF17, RN12, RN22), with
+ * photos or documents of the problem. Exchanges, returns and
+ * withdrawals are checked against the commercial policy: PF withdrawal
+ * within 7 days of the receipt; PJ personalized items only for a
+ * manufacturing defect; everything else goes to the technical
+ * evaluation. Checks the order scope of the session user, stores the files in the
  * private storage and, in one transaction, numbers the ticket, records
  * the first step of the timeline and the files, queues the "ticket
  * opened" e-mail (RF53) and writes the audit log (RNF12). Files of a
@@ -231,10 +306,48 @@ export async function openSupportTicket(
       select: {
         id: true,
         productName: true,
-        order: { select: { id: true, number: true, organizationId: true } },
+        personalization: true,
+        order: {
+          select: {
+            id: true,
+            number: true,
+            organizationId: true,
+            user: { select: { personType: true } },
+            shipment: { select: { deliveredAt: true } },
+            statusHistory: {
+              where: { toStatus: "DELIVERED" },
+              orderBy: { createdAt: "asc" },
+              take: 1,
+              select: { toStatus: true, createdAt: true },
+            },
+          },
+        },
       },
     })
     if (!item) throw new AppError(ORDER_NOT_ELIGIBLE_MESSAGE, "not_eligible")
+
+    const personalized = isPersonalizedItem(item.personalization)
+    let legalReview = false
+    if (isReturnKind(data.kind)) {
+      const eligibility = checkReturnEligibility({
+        kind: data.kind,
+        reason: data.returnReason,
+        personType: purchasePersonType({
+          organizationId: item.order.organizationId,
+          buyerPersonType: item.order.user.personType,
+        }),
+        personalized,
+        deliveredAt: orderDeliveredAt({
+          shipmentDeliveredAt: item.order.shipment?.deliveredAt,
+          history: item.order.statusHistory,
+        }),
+        now: new Date(),
+      })
+      if (!eligibility.allowed) {
+        throw new AppError(eligibility.message, "return_not_allowed")
+      }
+      legalReview = eligibility.legalReview
+    }
 
     await storeTicketFiles(files, stored)
 
@@ -253,6 +366,9 @@ export async function openSupportTicket(
             orderItemId: item.id,
             subject: data.subject,
             description: data.description,
+            returnReason: data.returnReason,
+            personalized,
+            legalReview,
             createdAt: now,
             events: {
               create: {
@@ -270,7 +386,11 @@ export async function openSupportTicket(
           name: customer.user.name,
           number,
           status: TICKET_STATUS.OPEN.label,
-          message: `Recebemos o seu chamado sobre "${item.productName}" do pedido ${item.order.number}. A equipe técnica vai analisar e responder pelo site.`,
+          message: openedMessage(
+            data.kind,
+            item.productName,
+            item.order.number
+          ),
           url: `${siteUrl()}/conta/chamados/${ticket.id}`,
         })
         await enqueueEmail(tx, { to: customer.user.email, ...email }, now)
@@ -282,6 +402,8 @@ export async function openSupportTicket(
           after: {
             number,
             kind: data.kind,
+            returnReason: data.returnReason,
+            legalReview,
             orderId: item.order.id,
             orderItemId: item.id,
             attachments: files.length,

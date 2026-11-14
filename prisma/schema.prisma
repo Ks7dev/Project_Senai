@@ -137,6 +137,28 @@ enum DemoStatus {
 enum SupportTicketKind {
   WARRANTY
   TECHNICAL_ASSISTANCE
+  /// Exchange after the technical evaluation (RN12)
+  EXCHANGE
+  /// Return after the technical evaluation (RN12)
+  RETURN
+  /// PF withdrawal right within 7 days of receipt (RN22, CDC art. 49)
+  WITHDRAWAL
+}
+
+/// Why the customer asks for an exchange or a return (RN12)
+enum ReturnReason {
+  DEFECT
+  TRANSPORT_DAMAGE
+  WRONG_ITEM
+  NOT_AS_EXPECTED
+  OTHER
+}
+
+/// What the evaluation decided for an exchange, return or withdrawal
+enum ReturnOutcome {
+  EXCHANGE
+  REPAIR
+  REFUND
 }
 
 /// After-sales ticket life cycle (RF17); allowed transitions live in
@@ -961,6 +983,14 @@ model SupportTicket {
   description    String              @db.Text
   /// Outcome of the technical evaluation, shown to the customer
   resolution     String?             @db.Text
+  /// Exchanges and returns: why the customer asks (RN12)
+  returnReason   ReturnReason?       @map("return_reason")
+  /// Exchanges, returns and withdrawals: what the evaluation decided
+  returnOutcome  ReturnOutcome?      @map("return_outcome")
+  /// Snapshot: the item was personalized or made to measure (RF51)
+  personalized   Boolean             @default(false)
+  /// PF withdrawal of a personalized item: pending legal opinion (RN22)
+  legalReview    Boolean             @default(false) @map("legal_review")
   closedAt       DateTime?           @map("closed_at") @db.DateTime(3)
   createdAt      DateTime            @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.DateTime(3)

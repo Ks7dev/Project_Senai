@@ -24,6 +24,10 @@ import {
   readQuoteAttachment,
   type AttachmentDownload,
 } from "@/features/shared/lib/quotes/quote-access"
+import {
+  checkReturnResolution,
+  RETURN_OUTCOME_LABEL,
+} from "@/features/shared/lib/support/return-policy"
 import { TICKET_NOT_FOUND_MESSAGE } from "@/features/shared/lib/support/ticket-access"
 import {
   ticketDetailSelect,
@@ -70,6 +74,8 @@ export type SupportQueueRow = {
   orderNumber: string
   /** Product name. */
   itemName: string
+  /** PF withdrawal of a personalized item: legal opinion pending. */
+  legalReview: boolean
   /** Opening date, ISO string. */
   createdAt: string
   /** Last change, ISO string. */
@@ -146,6 +152,7 @@ export async function listSupportQueue(
         kind: true,
         status: true,
         subject: true,
+        legalReview: true,
         createdAt: true,
         updatedAt: true,
         user: { select: { name: true } },
@@ -166,6 +173,7 @@ export async function listSupportQueue(
         company: row.organization?.name ?? null,
         orderNumber: row.order.number,
         itemName: row.orderItem.productName,
+        legalReview: row.legalReview,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
       })),
@@ -204,7 +212,10 @@ export async function getSupportDeskTicket(
 /**
  * Answers a ticket (RF17): changes the status along the allowed path,
  * writes a message to the customer and attaches files (report, label).
- * Resolving or denying records the outcome and closes the ticket. In
+ * Resolving or denying records the outcome and closes the ticket; an
+ * exchange, return or withdrawal resolved records the decided outcome
+ * (exchange, repair or refund; a withdrawal is always refunded and
+ * never denied, RN22), and the refund itself is made by finance. In
  * one transaction it guards against a concurrent change, records the
  * timeline step and the files, queues the update e-mail to the customer
  * (RF53: chamados) and writes the audit log (RNF12). Needs
@@ -235,7 +246,9 @@ export async function updateSupportTicket(
       select: {
         id: true,
         number: true,
+        kind: true,
         status: true,
+        legalReview: true,
         user: { select: { name: true, email: true } },
       },
     })
@@ -252,6 +265,13 @@ export async function updateSupportTicket(
       )
     }
     const closing = statusChanged && isFinalTicketStatus(next)
+    const outcome = checkReturnResolution({
+      kind: ticket.kind,
+      legalReview: ticket.legalReview,
+      status: closing ? next : "",
+      outcome: data.returnOutcome,
+    })
+    if (!outcome.ok) throw new AppError(outcome.message, "invalid_outcome")
 
     await storeTicketFiles(files, stored)
     const now = new Date()
@@ -260,7 +280,13 @@ export async function updateSupportTicket(
         where: { id: ticket.id, status: ticket.status },
         data: {
           status: next,
-          ...(closing ? { resolution: data.resolution, closedAt: now } : {}),
+          ...(closing
+            ? {
+                resolution: data.resolution,
+                returnOutcome: outcome.outcome,
+                closedAt: now,
+              }
+            : {}),
         },
       })
       if (changed.count === 0) {
@@ -293,7 +319,15 @@ export async function updateSupportTicket(
         number: ticket.number,
         status: TICKET_STATUS[next].label,
         message: closing
-          ? `${TICKET_STATUS[next].description} ${data.resolution}`
+          ? [
+              TICKET_STATUS[next].description,
+              outcome.outcome
+                ? `Resultado: ${RETURN_OUTCOME_LABEL[outcome.outcome]}.`
+                : "",
+              data.resolution,
+            ]
+              .filter(Boolean)
+              .join(" ")
           : data.message ||
             "A situação do seu chamado mudou. Confira os detalhes no site.",
         url: `${siteUrl()}/conta/chamados/${ticket.id}`,
@@ -309,6 +343,7 @@ export async function updateSupportTicket(
           status: next,
           message: Boolean(data.message),
           resolution: closing ? data.resolution : undefined,
+          returnOutcome: outcome.outcome ?? undefined,
           attachments: files.length,
         },
       })

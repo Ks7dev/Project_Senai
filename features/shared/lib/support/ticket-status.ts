@@ -3,7 +3,8 @@ export type TicketStatusKey =
   "OPEN" | "IN_ANALYSIS" | "WAITING_CUSTOMER" | "RESOLVED" | "DENIED"
 
 /** Kind of an after-sales ticket, as stored in the database (RF17). */
-export type TicketKindKey = "WARRANTY" | "TECHNICAL_ASSISTANCE"
+export type TicketKindKey =
+  "WARRANTY" | "TECHNICAL_ASSISTANCE" | "EXCHANGE" | "RETURN" | "WITHDRAWAL"
 
 /** How a status is shown: label, help text for the customer and tone. */
 export type TicketStatusInfo = {
@@ -50,12 +51,18 @@ export const TICKET_STATUS: Record<TicketStatusKey, TicketStatusInfo> = {
 export const TICKET_KIND_LABEL: Record<TicketKindKey, string> = {
   WARRANTY: "Garantia",
   TECHNICAL_ASSISTANCE: "Assistência técnica",
+  EXCHANGE: "Troca",
+  RETURN: "Devolução",
+  WITHDRAWAL: "Arrependimento",
 }
 
 /** Every ticket kind the customer may open, in form order. */
 export const TICKET_KINDS = [
   "WARRANTY",
   "TECHNICAL_ASSISTANCE",
+  "EXCHANGE",
+  "RETURN",
+  "WITHDRAWAL",
 ] as const satisfies readonly TicketKindKey[]
 
 /** Every status, in the order of the life cycle. */

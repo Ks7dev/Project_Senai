@@ -125,7 +125,14 @@ export function SupportQueueView({
                       Pedido {ticket.orderNumber}
                     </span>
                   </td>
-                  <td className="p-sm">{TICKET_KIND_LABEL[ticket.kind]}</td>
+                  <td className="p-sm">
+                    {TICKET_KIND_LABEL[ticket.kind]}
+                    {ticket.legalReview && (
+                      <span className="block text-error">
+                        Parecer jurídico pendente
+                      </span>
+                    )}
+                  </td>
                   <td className="p-sm">
                     <TicketStatusBadge status={ticket.status} />
                   </td>
