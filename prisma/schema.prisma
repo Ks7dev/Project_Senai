@@ -146,6 +146,14 @@ enum RefundChannel {
   MANUAL_TRANSFER
 }
 
+/// Status of the NF-e of an order (RF13, #63)
+enum InvoiceStatus {
+  PENDING
+  PROCESSING
+  ISSUED
+  FAILED
+}
+
 enum EmailStatus {
   PENDING
   SENT
@@ -725,6 +733,7 @@ model Order {
   stockMovements StockMovement[]
   receivables    Receivable[]
   refunds        Refund[]
+  invoice        Invoice?
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -894,6 +903,42 @@ model Receivable {
   @@index([status, dueDate])
   @@index([settledById])
   @@map("invoiced_installments")
+}
+
+/// NF-e of an order (RF13, #63), issued through the NF-e provider API in
+/// homologation after the order is confirmed (RN13). Keeps the XML, the
+/// DANFE (storage key) and the access key; a failure is retried with a
+/// backoff and alerts the team, who may reprocess it by hand.
+model Invoice {
+  id            String        @id @default(uuid(7)) @db.Char(36)
+  orderId       String        @unique @map("order_id") @db.Char(36)
+  status        InvoiceStatus @default(PENDING)
+  /// Access key (chave de acesso), 44 digits
+  accessKey     String?       @unique @map("access_key") @db.Char(44)
+  number        String?       @db.VarChar(20)
+  series        String?       @db.VarChar(5)
+  /// SEFAZ authorization protocol
+  protocol      String?       @db.VarChar(64)
+  /// Authorized XML
+  xml           String?       @db.MediumText
+  /// Storage key of the DANFE PDF (private, back office download)
+  danfeKey      String?       @map("danfe_key") @db.VarChar(255)
+  /// When the provider accepted the request; null = send it again
+  submittedAt   DateTime?     @map("submitted_at") @db.DateTime(3)
+  attempts      Int           @default(0)
+  /// Last failure, safe to show to the back office
+  lastError     String?       @map("last_error") @db.VarChar(500)
+  /// When the job tries again; null = only by hand
+  nextAttemptAt DateTime?     @map("next_attempt_at") @db.DateTime(3)
+  /// When the team was alerted of the current failure
+  alertedAt     DateTime?     @map("alerted_at") @db.DateTime(3)
+  issuedAt      DateTime?     @map("issued_at") @db.DateTime(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt])
+  @@map("invoices")
 }
 
 /// Mercado Pago webhook notifications already received (RF30, #57). The

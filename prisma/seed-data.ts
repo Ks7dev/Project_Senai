@@ -110,6 +110,29 @@ export const settings: SettingSeed[] = [
       "Prazo máximo para estornar pelo Mercado Pago, em dias após a aprovação do pagamento, salvo arrependimento (RN18)",
   },
   {
+    key: "invoice.issuer",
+    value: {
+      cnpj: "12345678000195",
+      name: "Atelier Bureau Papelaria e Mobiliário Ltda (fictícia)",
+      state: "SP",
+    },
+    description:
+      "Emitente da NF-e em homologação: CNPJ cadastrado no emissor, razão social e UF de origem (fictícios, RF13)",
+  },
+  {
+    key: "invoice.nfe_defaults",
+    value: {
+      operationNature: "Venda de mercadoria",
+      ncm: "48201000",
+      cfopSameState: "5102",
+      cfopOtherState: "6102",
+      icmsSituation: "102",
+      pisCofinsSituation: "07",
+    },
+    description:
+      "Padrões fiscais da NF-e: natureza da operação, NCM, CFOP dentro e fora do estado e situações tributárias (Simples Nacional, a validar com a contabilidade, RF13)",
+  },
+  {
     key: "personalization.engraving",
     value: { price: "90.00", extraBusinessDays: 3, maxLength: 30 },
     description:
