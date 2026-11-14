@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import Link from "next/link"
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/layout/skip-link"
 import { AdminNav } from "@/features/backoffice/shell/admin-nav"
 
 /** Back office: never indexed by search engines (RNF14, #31). */
@@ -9,7 +10,7 @@ export const metadata = {
 }
 
 /**
- * Back office layout: sidebar with the modules allowed for the user
+ * Back office layout: skip link, sidebar with the modules allowed for the user
  * and the page content. Pages check their own permission on the
  * server (requirePagePermission); the menu only hides what is denied.
  *
@@ -19,6 +20,7 @@ export const metadata = {
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <div className="flex min-h-full flex-1 flex-col lg:flex-row">
+      <SkipLink />
       <aside className="border-b border-line-subtle bg-subtle lg:w-64 lg:border-r lg:border-b-0">
         <div className="flex h-16 items-center px-md">
           <Link
@@ -35,7 +37,11 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           <AdminNav />
         </Suspense>
       </aside>
-      <main id="conteudo" className="flex-1 p-margin-mobile lg:p-xl">
+      <main
+        id={MAIN_CONTENT_ID}
+        tabIndex={-1}
+        className="flex-1 p-margin-mobile focus:outline-none lg:p-xl"
+      >
         {children}
       </main>
     </div>
