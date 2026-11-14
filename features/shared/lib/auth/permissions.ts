@@ -113,7 +113,6 @@ export const PENDING_ADMIN_ROUTES: ReadonlySet<string> = new Set([
   "/admin/atendimento",
   "/admin/configuracoes",
   "/admin/auditoria",
-  "/admin/lgpd",
 ])
 
 /**
