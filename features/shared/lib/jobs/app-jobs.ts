@@ -3,6 +3,7 @@ import { processEmailQueue } from "@/features/shared/lib/email/mailer"
 import type { Job } from "@/features/shared/lib/jobs/scheduler"
 import { expireUnpaidOrders } from "@/features/shared/lib/orders/order-expiration"
 import { reconcilePendingPayments } from "@/features/shared/lib/payments/payment-reconciliation"
+import { expireQuotes } from "@/features/shared/lib/quotes/quote-expiration"
 
 /** One minute, in milliseconds. */
 const MINUTE = 60_000
@@ -15,7 +16,9 @@ const MINUTE = 60_000
  *   the last minute is confirmed instead of canceled (#57);
  * - reconciles the pending payments whose webhook did not arrive with
  *   `GET /v1/payments/{id}` (#57);
- * - delivers the transactional e-mail queue with retries (RF53).
+ * - delivers the transactional e-mail queue with retries (RF53);
+ * - marks the quotes past their validity as expired, so their prices
+ *   are revalidated before an order (RN02).
  */
 export const appJobs: readonly Job[] = [
   {
@@ -36,5 +39,10 @@ export const appJobs: readonly Job[] = [
     name: "deliver-email-queue",
     everyMs: 30_000,
     run: () => processEmailQueue(),
+  },
+  {
+    name: "expire-quotes",
+    everyMs: 10 * MINUTE,
+    run: () => expireQuotes(),
   },
 ]

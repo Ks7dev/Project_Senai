@@ -564,7 +564,8 @@ model Quote {
   organizationId String?           @map("organization_id") @db.VarChar(36)
   status         QuoteStatus       @default(REQUESTED)
   notes          String?           @db.Text
-  /// Valid for 15 days after the answer (RN02)
+  /// End of the validity (RN02): the configured days after the request,
+  /// the answer or the revalidation of the prices
   validUntil     DateTime?         @map("valid_until") @db.DateTime(3)
   subtotal       Decimal           @default(0) @db.Decimal(12, 2)
   discount       Decimal           @default(0) @db.Decimal(12, 2)

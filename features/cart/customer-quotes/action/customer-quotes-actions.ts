@@ -3,9 +3,12 @@
 import {
   customerQuoteSchema,
   quoteAttachmentSchema,
+  revalidateQuoteSchema,
   type CustomerQuoteInput,
   type QuoteAttachmentInput,
+  type RevalidateQuoteInput,
 } from "@/features/cart/customer-quotes/schema/customer-quotes-schema"
+import { FORBIDDEN_MESSAGE } from "@/features/shared/lib/db/permissions"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import {
   AppError,
@@ -19,7 +22,10 @@ import {
   readQuoteAttachment,
   type AttachmentDownload,
 } from "@/features/shared/lib/quotes/quote-access"
+import { revalidateExpiredQuote } from "@/features/shared/lib/quotes/quote-revalidation"
 import type { QuoteStatusKey } from "@/features/shared/lib/quotes/quote-status"
+import { effectiveQuoteStatus } from "@/features/shared/lib/quotes/quote-validity"
+import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 
 /** A quote row of the customer area. */
 export type CustomerQuoteRow = {
@@ -27,7 +33,10 @@ export type CustomerQuoteRow = {
   id: string
   /** Readable number (RF06). */
   number: string
-  /** Status. */
+  /**
+   * Status shown: a quote past its validity reads as expired even
+   * before the background job updates it (RN02).
+   */
   status: QuoteStatusKey
   /** Request date, ISO string. */
   createdAt: string
@@ -79,6 +88,11 @@ export type CustomerQuote = CustomerQuoteRow & {
   discount: string
   /** Shipping, decimal string. */
   shippingTotal: string
+  /**
+   * Whether the quote is expired and this customer may ask for the
+   * revalidation of its prices (RN02).
+   */
+  canRevalidate: boolean
 }
 
 /** Fields of the quote list and page. */
@@ -96,21 +110,25 @@ const rowSelect = {
  * Maps a loaded quote to a row.
  *
  * @param row - Quote with its requester.
+ * @param now - Reference time of the validity (RN02).
  * @returns The row.
  */
-function toRow(row: {
-  id: string
-  number: string
-  status: QuoteStatusKey
-  createdAt: Date
-  validUntil: Date | null
-  total: { toFixed: (digits: number) => string }
-  user: { name: string }
-}): CustomerQuoteRow {
+function toRow(
+  row: {
+    id: string
+    number: string
+    status: QuoteStatusKey
+    createdAt: Date
+    validUntil: Date | null
+    total: { toFixed: (digits: number) => string }
+    user: { name: string }
+  },
+  now: Date
+): CustomerQuoteRow {
   return {
     id: row.id,
     number: row.number,
-    status: row.status,
+    status: effectiveQuoteStatus(row, now),
     createdAt: row.createdAt.toISOString(),
     validUntil: row.validUntil?.toISOString() ?? null,
     total: row.total.toFixed(2),
@@ -136,9 +154,10 @@ export async function listMyQuotes(): Promise<
       take: 100,
       select: rowSelect,
     })
+    const now = new Date()
     return {
       success: true,
-      quotes: rows.map(toRow),
+      quotes: rows.map((row) => toRow(row, now)),
       companyWide: customer.seesCompanyQuotes,
     }
   } catch (error) {
@@ -186,10 +205,12 @@ export async function getMyQuote(
       },
     })
     if (!quote) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const row = toRow(quote, new Date())
     return {
       success: true,
       quote: {
-        ...toRow(quote),
+        ...row,
+        canRevalidate: row.status === "EXPIRED" && customer.canRequest,
         notes: quote.notes,
         subtotal: quote.subtotal.toFixed(2),
         discount: quote.discount.toFixed(2),
@@ -208,6 +229,55 @@ export async function getMyQuote(
     }
   } catch (error) {
     return toActionError(error, { action: "getMyQuote" })
+  }
+}
+
+/**
+ * Asks for the revalidation of the prices of an expired quote (RN02).
+ * In one transaction the lines get the current catalog prices, the
+ * discount and shipping negotiated before are dropped, the validity
+ * restarts and the quote returns to the sales queue; the audit log
+ * keeps the old and the new values (RNF12). Only who may request
+ * quotes revalidates, and only quotes they follow.
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true, validUntil, total }` or `{ success: false, error }`.
+ */
+export async function revalidateMyQuote(
+  input: RevalidateQuoteInput
+): Promise<ActionResult<{ validUntil: string; total: string }>> {
+  try {
+    const parsed = revalidateQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    const customer = await loadQuoteCustomer()
+    if (!customer.canRequest) {
+      throw new AppError(FORBIDDEN_MESSAGE, "forbidden")
+    }
+    await enforceActionRateLimit("quote-revalidate", {
+      limit: 10,
+      windowMs: 60_000,
+    })
+    const owned = await prisma.quote.findFirst({
+      where: { id: parsed.data.quoteId, ...customerQuoteScope(customer) },
+      select: { id: true },
+    })
+    if (!owned) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const result = await prisma.$transaction((tx) =>
+      revalidateExpiredQuote(tx, {
+        quoteId: owned.id,
+        userId: customer.user.id,
+        now: new Date(),
+      })
+    )
+    return {
+      success: true,
+      validUntil: result.validUntil.toISOString(),
+      total: result.total,
+    }
+  } catch (error) {
+    return toActionError(error, { action: "revalidateMyQuote" })
   }
 }
 

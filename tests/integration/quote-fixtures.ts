@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import type { PrismaClient } from "@/generated/prisma/client"
 import { orderFixtures } from "./order-fixtures"
 
@@ -35,6 +36,57 @@ export function quoteFixtures(prisma: PrismaClient) {
         select: { product: { select: { slug: true } } },
       })
       return { ...sku, slug: row.product.slug }
+    },
+
+    /**
+     * Creates a quote of a seed customer straight in the database, with
+     * one line of the SKU at the catalog price (R$ 100,00) and a number
+     * outside the yearly sequence.
+     *
+     * @param input - Customer e-mail, SKU, quantity and quote fields.
+     * @returns The quote id and number.
+     */
+    async createQuote(input: {
+      email: string
+      sku: { id: string }
+      quantity?: number
+      status?: "REQUESTED" | "IN_REVIEW" | "ANSWERED" | "ACCEPTED"
+      validUntil?: Date | null
+    }) {
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { email: input.email },
+        select: { id: true, members: { select: { organizationId: true } } },
+      })
+      const sku = await prisma.sku.findUniqueOrThrow({
+        where: { id: input.sku.id },
+        select: { productId: true, product: { select: { name: true } } },
+      })
+      const quantity = input.quantity ?? 1
+      const total = (100 * quantity).toFixed(2)
+      return prisma.quote.create({
+        data: {
+          number: `COT-T-${randomUUID().slice(0, 8)}`,
+          userId: user.id,
+          organizationId: user.members[0]?.organizationId ?? null,
+          status: input.status ?? "REQUESTED",
+          subtotal: total,
+          total,
+          validUntil:
+            input.validUntil === undefined
+              ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+              : input.validUntil,
+          items: {
+            create: {
+              productId: sku.productId,
+              skuId: input.sku.id,
+              description: sku.product.name,
+              quantity,
+              unitPrice: "100.00",
+            },
+          },
+        },
+        select: { id: true, number: true },
+      })
     },
 
     /**

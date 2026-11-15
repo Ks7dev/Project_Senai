@@ -42,7 +42,8 @@ export const settings: SettingSeed[] = [
   {
     key: "quote.validity_days",
     value: 15,
-    description: "Validade da cotação respondida, em dias (RN02)",
+    description:
+      "Validade da cotação em dias corridos, contada da solicitação, da resposta do comercial e da revalidação (RN02)",
   },
   {
     key: "shipping.correios_max_weight_kg",

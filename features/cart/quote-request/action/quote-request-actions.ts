@@ -25,6 +25,7 @@ import {
 import { logger } from "@/features/shared/lib/logger/logger"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { requireQuoteRequester } from "@/features/shared/lib/quotes/quote-access"
+import { loadQuoteValidityDays } from "@/features/shared/lib/quotes/quote-expiration"
 import {
   detectQuoteAttachmentType,
   QUOTE_ATTACHMENT_FORMATS,
@@ -40,6 +41,7 @@ import {
   catalogUnitPrice,
   quoteTotals,
 } from "@/features/shared/lib/quotes/quote-pricing"
+import { quoteValidUntil } from "@/features/shared/lib/quotes/quote-validity"
 import { deleteFile, saveFile } from "@/features/shared/lib/storage/storage"
 
 /** A variation the customer may pick for a line. */
@@ -262,8 +264,9 @@ function readPayload(formData: FormData): unknown {
  * attached plans or specifications (RF08). Validates the lines and the
  * files, stores the files in the private storage and, in one
  * transaction, numbers the quote (RF06), copies the lines with the
- * current catalog price as reference, records the attachments, queues
- * the "quote received" e-mail (RF53) and writes the audit log (RNF12).
+ * current catalog price as reference, valid for the configured number
+ * of calendar days (RN02), records the attachments, queues the "quote
+ * received" e-mail (RF53) and writes the audit log (RNF12).
  * Files of a request that fails are removed.
  *
  * @param formData - `payload` (JSON with lines and notes) and the
@@ -325,6 +328,7 @@ export async function requestQuote(
     const run = () =>
       prisma.$transaction(async (tx) => {
         const number = await nextQuoteNumber(tx, now)
+        const validUntil = quoteValidUntil(now, await loadQuoteValidityDays(tx))
         const quote = await tx.quote.create({
           data: {
             number,
@@ -334,6 +338,7 @@ export async function requestQuote(
             notes: data.notes || null,
             subtotal: totals.subtotal,
             total: totals.total,
+            validUntil,
             createdAt: now,
             items: { create: lines },
             attachments: {
@@ -364,6 +369,7 @@ export async function requestQuote(
             lines: lines.length,
             attachments: attachments.length,
             total: totals.total,
+            validUntil,
           },
         })
         return { quoteId: quote.id, number }
