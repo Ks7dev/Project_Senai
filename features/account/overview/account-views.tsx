@@ -138,6 +138,14 @@ export function AccountOrdersTable({
                 >
                   {order.number}
                 </Link>
+                {order.addressChangeable && (
+                  <Link
+                    href={`/conta/pedidos/${order.id}/endereco`}
+                    className="block text-label-sm text-ink-muted underline hover:text-ink"
+                  >
+                    Alterar endereço
+                  </Link>
+                )}
               </td>
               <td className="p-sm">
                 {new Date(order.createdAt).toLocaleDateString("pt-BR")}

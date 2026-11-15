@@ -8,7 +8,10 @@ import {
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { getCorporateContext } from "@/features/shared/lib/db/corporate"
 import { prisma } from "@/features/shared/lib/db/prisma"
-import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
+import {
+  canChangeAddress,
+  type OrderStatusKey,
+} from "@/features/shared/lib/orders/order-status"
 
 /** A link of the account menu. */
 export type AccountLink = { href: string; label: string }
@@ -102,6 +105,8 @@ export type AccountOrder = {
   total: string
   createdAt: string
   buyer: string
+  /** Whether the user may change the delivery address (RN15, #45). */
+  addressChangeable: boolean
 }
 
 /**
@@ -126,6 +131,7 @@ export async function listAccountOrders(
       status: true,
       total: true,
       createdAt: true,
+      userId: true,
       user: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -138,6 +144,8 @@ export async function listAccountOrders(
     total: row.total.toFixed(2),
     createdAt: row.createdAt.toISOString(),
     buyer: row.user.name,
+    addressChangeable:
+      row.userId === context.userId && canChangeAddress(row.status),
   }))
 }
 
