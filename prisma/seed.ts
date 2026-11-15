@@ -7,6 +7,7 @@ import {
   accounts,
   categories,
   corporateAccount,
+  demoSettings,
   permissions,
   priceTables,
   products,
@@ -38,7 +39,7 @@ const seedPassword = process.env.SEED_PASSWORD ?? "atelier-demo-2026"
  * idempotent: running it again updates the same rows (upsert).
  */
 async function main() {
-  for (const setting of settings) {
+  for (const setting of [...settings, ...demoSettings]) {
     await prisma.setting.upsert({
       where: { key: setting.key },
       create: {

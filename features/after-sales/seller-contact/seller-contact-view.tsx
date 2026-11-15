@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { MessageCircleIcon, WrenchIcon } from "lucide-react"
+import { CalendarClockIcon, MessageCircleIcon, WrenchIcon } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import type { SellerContact } from "@/features/after-sales/seller-contact/action/seller-contact-actions"
 
@@ -96,6 +96,19 @@ export function SellerContactView({ contact }: { contact: SellerContact }) {
             >
               <WrenchIcon className="size-4" aria-hidden /> Garantia e
               assistência técnica
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={
+                contact.product
+                  ? `/demonstracao?produto=${encodeURIComponent(contact.product.slug)}`
+                  : "/demonstracao"
+              }
+              className="inline-flex items-center gap-sm text-primary underline"
+            >
+              <CalendarClockIcon className="size-4" aria-hidden /> Agendar
+              demonstração
             </Link>
           </li>
           <li>
