@@ -71,12 +71,72 @@ export const cardFormSchema = z.object({
 /** Card form data of the Payment Brick. */
 export type CardFormData = z.output<typeof cardFormSchema>
 
-/** Order payment fields (RF28, RF36). */
-const payOrderFields = z.object({
-  orderId: z.uuid("Pedido inválido."),
-  method: z.literal("CARD", "Forma de pagamento inválida."),
-  formData: cardFormSchema,
+/** Pix form data of the Payment Brick (RF29). */
+export const pixFormSchema = z.object({
+  payment_method_id: z.literal("pix", "Pagamento inválido."),
+  payer: z.object({ email: z.string().optional() }).optional(),
 })
+
+const text = (max: number, message: string) =>
+  z.string(message).trim().min(1, message).max(max, message)
+
+/** Boleto form data of the Payment Brick: payer name, document and address (RF29). */
+export const boletoFormSchema = z.object({
+  payment_method_id: z
+    .string("Pagamento inválido.")
+    .regex(/^bol[a-z_]{0,30}$/, "Pagamento inválido."),
+  payer: z.object({
+    email: z.string().optional(),
+    first_name: text(80, "Informe o nome do pagador."),
+    last_name: text(80, "Informe o sobrenome do pagador."),
+    identification: identificationSchema,
+    address: z.object({
+      zip_code: z
+        .string("CEP do pagador inválido.")
+        .transform(digits)
+        .refine((value) => value.length === 8, "CEP do pagador inválido."),
+      federal_unit: z
+        .string("UF do pagador inválida.")
+        .trim()
+        .regex(/^[A-Za-z]{2}$/, "UF do pagador inválida.")
+        .transform((value) => value.toUpperCase()),
+      city: text(120, "Informe a cidade do pagador."),
+      neighborhood: text(120, "Informe o bairro do pagador."),
+      street_name: text(191, "Informe a rua do pagador."),
+      street_number: text(20, "Informe o número do endereço do pagador."),
+      complement: z.string().trim().max(120).optional(),
+    }),
+  }),
+})
+
+/** Pix form data of the Payment Brick. */
+export type PixFormData = z.output<typeof pixFormSchema>
+
+/** Boleto form data of the Payment Brick. */
+export type BoletoFormData = z.output<typeof boletoFormSchema>
+
+/** Order payment fields by method (RF28, RF29, RF36). */
+const payOrderFields = z.discriminatedUnion(
+  "method",
+  [
+    z.object({
+      orderId: z.uuid("Pedido inválido."),
+      method: z.literal("CARD"),
+      formData: cardFormSchema,
+    }),
+    z.object({
+      orderId: z.uuid("Pedido inválido."),
+      method: z.literal("PIX"),
+      formData: pixFormSchema,
+    }),
+    z.object({
+      orderId: z.uuid("Pedido inválido."),
+      method: z.literal("BOLETO"),
+      formData: boletoFormSchema,
+    }),
+  ],
+  "Forma de pagamento inválida."
+)
 
 /**
  * Payment of an order through the Payment Brick (RF28, RF36). The raw

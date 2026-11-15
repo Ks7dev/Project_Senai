@@ -3,7 +3,12 @@
 import { useId, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CreditCardIcon, TruckIcon } from "lucide-react"
+import {
+  BarcodeIcon,
+  CreditCardIcon,
+  QrCodeIcon,
+  TruckIcon,
+} from "lucide-react"
 import { OrderSummary } from "@/components/commerce/order-summary"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -33,6 +38,21 @@ const brl = new Intl.NumberFormat("pt-BR", {
  */
 function optionKey(option: CheckoutOption): string {
   return `${option.method}|${option.carrier}|${option.service}`
+}
+
+/**
+ * Icon of a payment method.
+ *
+ * @param props - Method key.
+ * @returns The icon.
+ */
+function MethodIcon({ method }: { method: CheckoutPaymentMethod }) {
+  const className = "size-5 shrink-0 text-primary"
+  if (method === "PIX") return <QrCodeIcon className={className} aria-hidden />
+  if (method === "BOLETO") {
+    return <BarcodeIcon className={className} aria-hidden />
+  }
+  return <CreditCardIcon className={className} aria-hidden />
 }
 
 /**
@@ -255,10 +275,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
                 onChange={() => setMethod(item.method)}
                 className="mt-1 accent-primary"
               />
-              <CreditCardIcon
-                className="size-5 shrink-0 text-primary"
-                aria-hidden
-              />
+              <MethodIcon method={item.method} />
               <span>
                 <strong className="block">{item.label}</strong>
                 <span className="text-ink-muted">{item.note}</span>

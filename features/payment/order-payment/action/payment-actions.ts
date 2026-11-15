@@ -4,8 +4,10 @@ import type { Prisma } from "@/generated/prisma/client"
 import {
   orderPaymentSchema,
   payOrderSchema,
+  type BoletoFormData,
   type CardFormData,
   type PayOrderInput,
+  type PixFormData,
 } from "@/features/payment/order-payment/schema/payment-schema"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
@@ -32,11 +34,16 @@ import {
   PAYMENT_STATUS,
   paymentStatusMessage,
 } from "@/features/shared/lib/payments/payment-messages"
+import {
+  loadPaymentDeadlines,
+  paymentExpiresAt,
+  toMercadoPagoDate,
+} from "@/features/shared/lib/payments/payment-deadlines"
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 
 /** Methods paid online through the Payment Brick (RF29). */
-const ONLINE_METHODS = ["CARD"] as const
+const ONLINE_METHODS = ["CARD", "PIX", "BOLETO"] as const
 
 /** A payment attempt as the customer sees it (RF31, RF32). */
 export type PaymentView = {
@@ -60,6 +67,12 @@ export type PaymentView = {
   installments: number
   /** Creation date, ISO string. */
   createdAt: string
+  /** Until when a Pix or boleto may be paid, ISO string (RN14). */
+  expiresAt: string | null
+  /** Pix copy-and-paste code and QR Code image (RF29). */
+  pix: { qrCode: string; qrCodeImage: string | null } | null
+  /** Boleto PDF link and digitable line (RF29). */
+  boleto: { url: string | null; line: string | null } | null
 }
 
 /** What the payment page of an order shows. */
@@ -124,6 +137,11 @@ const paymentSelect = {
   amount: true,
   installments: true,
   createdAt: true,
+  expiresAt: true,
+  pixQrCode: true,
+  pixQrCodeImage: true,
+  boletoUrl: true,
+  boletoLine: true,
 } satisfies Prisma.PaymentSelect
 
 type PaymentRow = Prisma.PaymentGetPayload<{ select: typeof paymentSelect }>
@@ -146,6 +164,17 @@ function toPaymentView(row: PaymentRow): PaymentView {
     amount: row.amount.toFixed(2),
     installments: row.installments,
     createdAt: row.createdAt.toISOString(),
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    pix: row.pixQrCode
+      ? { qrCode: row.pixQrCode, qrCodeImage: row.pixQrCodeImage }
+      : null,
+    boleto:
+      row.boletoUrl || row.boletoLine
+        ? {
+            url: row.boletoUrl?.startsWith("https://") ? row.boletoUrl : null,
+            line: row.boletoLine,
+          }
+        : null,
   }
 }
 
@@ -272,49 +301,89 @@ export async function getOrderPayment(input: {
   }
 }
 
+/** Brick data of the chosen method. */
+type MethodFormData =
+  | { method: "CARD"; formData: CardFormData }
+  | { method: "PIX"; formData: PixFormData }
+  | { method: "BOLETO"; formData: BoletoFormData }
+
 /**
- * Builds the `/v1/payments` body of a card payment (RF36). The amount
- * comes from the order, never from the browser; the card is only the
- * Brick token (RF35, RN19); 3DS runs when the issuer asks (RF37).
+ * Builds the `/v1/payments` body (RF36). The amount comes from the
+ * order, never from the browser. A card is only the Brick token (RF35,
+ * RN19), with 3DS when the issuer asks (RF37); Pix and boleto carry the
+ * configured expiration (RN14).
  *
- * @param input - Order, payment row and Brick data.
+ * @param input - Order, payment row, expiration and Brick data.
  * @returns The body.
  */
-function cardPaymentBody(input: {
-  order: PayableOrder
-  paymentRowId: string
-  formData: CardFormData
-}): CreatePaymentBody {
-  const { order, formData } = input
+function paymentBody(
+  input: {
+    order: PayableOrder
+    paymentRowId: string
+    expiresAt: Date | null
+  } & MethodFormData
+): CreatePaymentBody {
+  const { order } = input
   const notificationUrl = mercadoPagoNotificationUrl()
-  return {
+  const document = {
+    type: order.user.personType === "PJ" ? "CNPJ" : "CPF",
+    number: order.user.document,
+  }
+  const common = {
     transaction_amount: Number(order.total.toFixed(2)),
     description: `Pedido ${order.number} — Atelier Bureau`,
-    payment_method_id: formData.payment_method_id,
-    token: formData.token,
-    installments: formData.installments,
-    ...(formData.issuer_id ? { issuer_id: formData.issuer_id } : {}),
     external_reference: input.paymentRowId,
-    three_d_secure_mode: "optional",
-    statement_descriptor: "ATELIERBUREAU",
     ...(notificationUrl ? { notification_url: notificationUrl } : {}),
     metadata: { order_number: order.number },
+    ...(input.expiresAt
+      ? { date_of_expiration: toMercadoPagoDate(input.expiresAt) }
+      : {}),
+  }
+  if (input.method === "CARD") {
+    const { formData } = input
+    return {
+      ...common,
+      payment_method_id: formData.payment_method_id,
+      token: formData.token,
+      installments: formData.installments,
+      ...(formData.issuer_id ? { issuer_id: formData.issuer_id } : {}),
+      three_d_secure_mode: "optional",
+      statement_descriptor: "ATELIERBUREAU",
+      payer: {
+        email: order.user.email,
+        identification: formData.payer?.identification ?? document,
+      },
+    }
+  }
+  if (input.method === "PIX") {
+    return {
+      ...common,
+      payment_method_id: "pix",
+      payer: { email: order.user.email, identification: document },
+    }
+  }
+  const { payer } = input.formData
+  return {
+    ...common,
+    payment_method_id: input.formData.payment_method_id,
     payer: {
       email: order.user.email,
-      identification: formData.payer?.identification ?? {
-        type: order.user.personType === "PJ" ? "CNPJ" : "CPF",
-        number: order.user.document,
-      },
+      first_name: payer.first_name,
+      last_name: payer.last_name,
+      identification: payer.identification,
+      address: payer.address,
     },
   }
 }
 
 /**
- * Pays an order with the Payment Brick (RF28, RF35, RF36, RF37):
+ * Pays an order with the Payment Brick by card, Pix or boleto (RF28,
+ * RF29, RF35, RF36, RF37):
  * 1. checks the payload has no card data and validates it (RN19);
  * 2. takes the buyer from the session;
  * 3. locks the order, checks it waits for this payment and opens a
- *    payment row with the order total;
+ *    payment row with the order total and, for Pix and boleto, the
+ *    configured expiration (RN14);
  * 4. creates the payment in Mercado Pago with the row id as the
  *    idempotency key and external reference;
  * 5. applies the answer: payment_id, status and, only when approved,
@@ -353,26 +422,36 @@ export async function payOrder(
       if (order.paymentMethod !== data.method) {
         throw new AppError("Forma de pagamento inválida.", "invalid_method")
       }
+      const expiresAt =
+        data.method === "CARD"
+          ? null
+          : paymentExpiresAt(
+              data.method,
+              new Date(),
+              await loadPaymentDeadlines(tx)
+            )
       const payment = await tx.payment.create({
         data: {
           orderId: order.id,
           method: data.method,
           status: "PENDING",
           amount: order.total,
-          installments: data.formData.installments,
+          installments: data.method === "CARD" ? data.formData.installments : 1,
+          expiresAt,
         },
         select: { id: true },
       })
-      return { order, paymentRowId: payment.id }
+      return { order, paymentRowId: payment.id, expiresAt }
     })
 
     let provider: ProviderPayment
     try {
       provider = await createMercadoPagoPayment(
-        cardPaymentBody({
+        paymentBody({
           order: opened.order,
           paymentRowId: opened.paymentRowId,
-          formData: data.formData,
+          expiresAt: opened.expiresAt,
+          ...data,
         }),
         opened.paymentRowId
       )

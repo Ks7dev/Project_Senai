@@ -85,7 +85,8 @@ export function nextPaymentStatus(
  * 1. finds our row by the Mercado Pago id or by the external reference;
  * 2. locks the order and then the payment (always in this order, so
  *    concurrent notifications never deadlock);
- * 3. stores the payment_id, status and detail (RF32);
+ * 3. stores the payment_id, status and detail (RF32), and the Pix code
+ *    or boleto line to show (RF29);
  * 4. moves the order to "paid" only with "approved" (RN13), which writes
  *    off the stock reserved at checkout (RF43);
  * 5. writes the audit log of the change (RNF12).
@@ -177,6 +178,19 @@ export async function applyProviderPayment(
       statusDetail: next.statusDetail?.slice(0, 64) ?? null,
       refundedAmount,
       ...(approvedNow ? { paidAt: provider.approvedAt ?? now } : {}),
+      // Pix code and boleto line shown to the customer (RF29)
+      ...(provider.pix
+        ? {
+            pixQrCode: provider.pix.qrCode,
+            pixQrCodeImage: provider.pix.qrCodeBase64,
+          }
+        : {}),
+      ...(provider.boleto
+        ? {
+            boletoUrl: provider.boleto.url,
+            boletoLine: provider.boleto.digitableLine?.slice(0, 64) ?? null,
+          }
+        : {}),
     },
   })
 

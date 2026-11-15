@@ -9,7 +9,7 @@ const QUOTED_METHODS = [
 ] as const
 
 /** Payment methods offered at checkout (RF29). */
-export const CHECKOUT_PAYMENT_METHODS = ["CARD"] as const
+export const CHECKOUT_PAYMENT_METHODS = ["CARD", "PIX", "BOLETO"] as const
 
 /** A payment method offered at checkout. */
 export type CheckoutPaymentMethod = (typeof CHECKOUT_PAYMENT_METHODS)[number]
