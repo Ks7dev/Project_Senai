@@ -4,6 +4,9 @@ import { PageContainer } from "@/components/layout/page-container"
 import { AccountNav } from "@/features/account/overview/account-views"
 import { loadAccountContext } from "@/features/account/overview/load-account"
 
+/** Private area: never indexed by search engines (RNF14, #31). */
+export const metadata = { robots: { index: false, follow: false } }
+
 /**
  * Loads the account menu; visitors go to the login.
  *

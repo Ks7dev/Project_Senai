@@ -1,7 +1,10 @@
 import { Suspense } from "react"
 import { ResetPasswordView } from "@/features/access/password-reset/password-reset-view"
 
-export const metadata = { title: "Redefinir senha — Atelier Bureau" }
+export const metadata = {
+  title: "Redefinir senha — Atelier Bureau",
+  description: "Defina uma nova senha para a sua conta na Atelier Bureau.",
+}
 
 /**
  * Reads the reset token from the e-mailed link.

@@ -3,7 +3,11 @@ import { CompareView } from "@/features/catalog/compare/compare-view"
 import { getComparisonProducts } from "@/features/shared/lib/catalog/catalog-query"
 import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
 
-export const metadata = { title: "Comparar produtos — Atelier Bureau" }
+export const metadata = {
+  title: "Comparar produtos — Atelier Bureau",
+  description:
+    "Compare lado a lado preço, garantia, prazo e especificações de produtos da Atelier Bureau.",
+}
 
 /**
  * Loads the products named in the "p" query parameter.

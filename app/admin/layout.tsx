@@ -2,6 +2,12 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { AdminNav } from "@/features/backoffice/shell/admin-nav"
 
+/** Back office: never indexed by search engines (RNF14, #31). */
+export const metadata = {
+  title: "Back office — Atelier Bureau",
+  robots: { index: false, follow: false },
+}
+
 /**
  * Back office layout: sidebar with the modules allowed for the user
  * and the page content. Pages check their own permission on the

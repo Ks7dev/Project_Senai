@@ -5,7 +5,11 @@ import { getQuoteRequestForm } from "@/features/cart/quote-request/action/quote-
 import { QuoteRequestView } from "@/features/cart/quote-request/quote-request-view"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
 
-export const metadata = { title: "Solicitar cotação — Atelier Bureau" }
+export const metadata = {
+  title: "Solicitar cotação — Atelier Bureau",
+  description:
+    "Solicite uma cotação personalizada para sua empresa: volumes, gravação, prazos e condições de pagamento.",
+}
 
 /** Query string of the page. */
 type SearchParams = { produto?: string; origem?: string }

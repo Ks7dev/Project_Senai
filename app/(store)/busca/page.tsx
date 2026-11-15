@@ -11,7 +11,11 @@ import {
 } from "@/features/shared/lib/catalog/catalog-query"
 import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
 
-export const metadata = { title: "Busca — Atelier Bureau" }
+export const metadata = {
+  title: "Busca — Atelier Bureau",
+  description:
+    "Busque papelaria nobre e mobiliário executivo por nome, marca ou material no catálogo da Atelier Bureau.",
+}
 
 type Search = Record<string, string | string[] | undefined>
 
