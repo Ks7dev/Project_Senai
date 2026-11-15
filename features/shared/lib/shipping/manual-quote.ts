@@ -139,6 +139,7 @@ export async function notifyManualQuoteRequested(input: {
   try {
     await sendEmail({
       to: input.to,
+      template: "shipping.manual_quote_requested",
       subject: `Pedido ${input.orderNumber}: frete em cotação`,
       text: [
         `Olá, ${input.name}.`,
@@ -180,6 +181,7 @@ export async function notifyManualQuoteAnswered(input: {
   try {
     await sendEmail({
       to: input.to,
+      template: "shipping.manual_quote_answered",
       subject: `Pedido ${input.orderNumber}: frete cotado`,
       text: [
         `Olá, ${input.name}.`,

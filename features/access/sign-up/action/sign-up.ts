@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { randomUUID } from "node:crypto"
 import { isAPIError } from "better-auth/api"
+import { welcomeEmail } from "@/emails/templates"
 import {
   signUpSchema,
   type SignUpInput,
@@ -12,12 +13,42 @@ import { mergeGuestCartAfterLogin } from "@/features/shared/lib/cart/cart-store"
 import { serializeRoles } from "@/features/shared/lib/auth/corporate-roles"
 import { lookupCnpj } from "@/features/shared/lib/brasilapi/cnpj"
 import { prisma } from "@/features/shared/lib/db/prisma"
+import { sendEmail } from "@/features/shared/lib/email/mailer"
+import { logger } from "@/features/shared/lib/logger/logger"
+import { siteUrl } from "@/features/shared/lib/email/site-url"
 import { isValidCnpj } from "@/features/shared/lib/validation/documents"
 import {
   AppError,
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
+
+/**
+ * Sends the welcome e-mail (RF53: cadastro). A failure is logged and
+ * never undoes the account.
+ *
+ * @param input - Recipient, name and account type.
+ */
+async function sendWelcomeEmail(input: {
+  to: string
+  name: string
+  corporate: boolean
+}): Promise<void> {
+  try {
+    await sendEmail({
+      to: input.to,
+      ...welcomeEmail({
+        name: input.name,
+        corporate: input.corporate,
+        url: `${siteUrl()}/conta`,
+      }),
+    })
+  } catch (error) {
+    logger.error("welcome email failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    })
+  }
+}
 
 /**
  * Creates a PF or PJ account (RF39). The password is hashed by Better
@@ -116,6 +147,12 @@ export async function signUp(input: SignUpInput): Promise<ActionResult> {
         })
       })
     }
+
+    await sendWelcomeEmail({
+      to: data.email,
+      name: data.name,
+      corporate: data.personType === "PJ",
+    })
 
     // Sign-up logs in: the visitor cart is kept (#46, RF07)
     if (result.token) await mergeGuestCartAfterLogin(result.user.id)

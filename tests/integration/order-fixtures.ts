@@ -14,6 +14,7 @@ export type OrderFixtures = ReturnType<typeof orderFixtures>
  */
 export function orderFixtures(prisma: PrismaClient) {
   const orders: string[] = []
+  const numbers: string[] = []
   const products: string[] = []
   let sequence = 0
 
@@ -108,6 +109,7 @@ export function orderFixtures(prisma: PrismaClient) {
         select: { id: true, number: true, userId: true },
       })
       orders.push(order.id)
+      numbers.push(order.number)
       return order
     },
 
@@ -124,8 +126,18 @@ export function orderFixtures(prisma: PrismaClient) {
       })
     },
 
-    /** Deletes the orders, payments and products created by the test. */
+    /**
+     * Deletes the orders, payments, queued order e-mails and products
+     * created by the test.
+     */
     async cleanup() {
+      if (numbers.length > 0) {
+        await prisma.emailOutbox.deleteMany({
+          where: {
+            OR: numbers.map((number) => ({ subject: { contains: number } })),
+          },
+        })
+      }
       await prisma.payment.deleteMany({ where: { orderId: { in: orders } } })
       await prisma.order.deleteMany({ where: { id: { in: orders } } })
       await prisma.product.deleteMany({ where: { id: { in: products } } })
