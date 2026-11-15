@@ -10,6 +10,7 @@ import {
   coverageMessage,
   deliveryTimeMessage,
   manualQuoteReasonMessage,
+  manualQuoteResponseMessage,
 } from "@/features/shared/lib/shipping/shipping-messages"
 import type { ShippingQuote } from "@/features/shared/lib/shipping/strategies"
 import {
@@ -123,6 +124,8 @@ export function ShippingEstimate({
         {quote?.status === "manual_quote" && (
           <p className="rounded bg-clay-tint p-sm text-body-sm text-ink">
             {manualQuoteReasonMessage(quote.reason)}
+            {quote.responseBusinessDays !== undefined &&
+              ` ${manualQuoteResponseMessage(quote.responseBusinessDays)}`}
           </p>
         )}
       </div>

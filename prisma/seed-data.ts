@@ -65,6 +65,12 @@ export const settings: SettingSeed[] = [
     description: "Fator de cubagem: peso cubado = C × L × A (cm) ÷ fator (#40)",
   },
   {
+    key: "shipping.manual_quote_response_business_days",
+    value: 2,
+    description:
+      "Prazo de retorno da cotação manual de frete, em dias úteis (RN20)",
+  },
+  {
     key: "payment.invoiced_due_days",
     value: [28, 56],
     description: "Vencimentos do pagamento faturado, em dias (RN03)",

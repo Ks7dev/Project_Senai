@@ -4,6 +4,7 @@ import { prisma } from "@/features/shared/lib/db/prisma"
 import { AppError } from "@/features/shared/lib/errors/action-result"
 import { logger } from "@/features/shared/lib/logger/logger"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
+import { loadManualQuoteResponseDays } from "@/features/shared/lib/shipping/manual-quote"
 import {
   calculateShipping,
   shippingStrategies,
@@ -87,7 +88,7 @@ export async function findCoverageRegion(
  *
  * @param input - Destination CEP (8 digits) and lines by SKU code.
  * @param options - Prisma client and strategies (replaced in tests).
- * @returns The options or the manual quote.
+ * @returns The options, or the manual quote with the return time.
  * @throws AppError when a SKU is unknown or not for sale.
  */
 export async function quoteShippingForItems(
@@ -140,8 +141,13 @@ export async function quoteShippingForItems(
     loadShippingRules(client),
     findCoverageRegion(input.cep, client),
   ])
-  return calculateShipping(
+  const quote = await calculateShipping(
     { cep: input.cep, volumes, rules, region },
     options.strategies ?? shippingStrategies
   )
+  if (quote.status === "quoted") return quote
+  return {
+    ...quote,
+    responseBusinessDays: await loadManualQuoteResponseDays(client),
+  }
 }

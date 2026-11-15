@@ -10,6 +10,8 @@ import {
   ORDER_STATUS,
   type OrderStatusKey,
 } from "@/features/shared/lib/orders/order-status"
+import { loadManualQuoteResponseDays } from "@/features/shared/lib/shipping/manual-quote"
+import { manualQuoteResponseMessage } from "@/features/shared/lib/shipping/shipping-messages"
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Meus pedidos — Atelier Bureau" }
@@ -38,6 +40,10 @@ async function Orders({
   const valid =
     status && status in ORDER_STATUS ? (status as OrderStatusKey) : undefined
   const orders = await listAccountOrders(context, { status: valid, take: 100 })
+  const waitingQuote = orders.some(
+    (order) => order.status === "AWAITING_SHIPPING_QUOTE"
+  )
+  const responseDays = waitingQuote ? await loadManualQuoteResponseDays() : 0
   return (
     <>
       <header>
@@ -66,6 +72,16 @@ async function Orders({
           )
         })}
       </nav>
+      {waitingQuote && (
+        <p
+          role="status"
+          className="rounded bg-clay-tint p-sm text-body-sm text-ink"
+        >
+          Há pedidos aguardando a cotação de frete.{" "}
+          {manualQuoteResponseMessage(responseDays)} O prazo conta a partir da
+          data do pedido, e você recebe o valor por e-mail.
+        </p>
+      )}
       <AccountOrdersTable
         orders={orders}
         showBuyer={context.seesCompanyOrders}
