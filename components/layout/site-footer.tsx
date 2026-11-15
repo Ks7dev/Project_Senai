@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { PageContainer, PageGrid } from "@/components/layout/page-container"
 import type { NavLink } from "@/features/shared/config/navigation"
@@ -9,6 +10,8 @@ type SiteFooterProps = {
   services: NavLink[]
   /** Institutional pages: terms, privacy, returns and warranty (RF57). */
   institutional: NavLink[]
+  /** Extra control in the bottom bar, e.g. the cookie preferences. */
+  legal?: ReactNode
 }
 
 /**
@@ -48,6 +51,7 @@ export function SiteFooter({
   categories,
   services,
   institutional,
+  legal,
 }: SiteFooterProps) {
   return (
     <footer className="mt-auto border-t border-line-subtle bg-subtle">
@@ -67,6 +71,7 @@ export function SiteFooter({
         </PageGrid>
         <div className="mt-xl flex flex-col gap-xs border-t border-line-subtle pt-md text-body-sm text-ink-muted md:flex-row md:justify-between">
           <p>© 2026 Atelier Bureau. Projeto acadêmico SENAI.</p>
+          {legal}
           <p>CNPJ 00.000.000/0001-00 (fictício)</p>
         </div>
       </PageContainer>

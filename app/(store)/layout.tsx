@@ -5,6 +5,10 @@ import { CartDrawer } from "@/components/commerce/cart-drawer"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
 import { CompareBar } from "@/features/shared/components/compare-controls"
+import {
+  CookieConsent,
+  CookiePreferencesButton,
+} from "@/features/shared/components/cookie-consent"
 import { getMenuCategoryLinks } from "@/features/app/shell/store-navigation"
 import { loadCurrentCart } from "@/features/shared/lib/cart/cart-store"
 import { logger } from "@/features/shared/lib/logger/logger"
@@ -76,6 +80,7 @@ async function StoreFooter() {
       categories={categories}
       services={serviceLinks}
       institutional={institutionalLinks}
+      legal={<CookiePreferencesButton />}
     />
   )
 }
@@ -112,12 +117,14 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
             categories={categoryLinks}
             services={serviceLinks}
             institutional={institutionalLinks}
+            legal={<CookiePreferencesButton />}
           />
         }
       >
         <StoreFooter />
       </Suspense>
       <CompareBar />
+      <CookieConsent />
     </>
   )
 }

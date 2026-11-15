@@ -58,6 +58,7 @@ export async function loadAccountContext(): Promise<AccountContext | null> {
     { href: "/conta/favoritos", label: "Favoritos" },
     { href: "/conta/listas", label: "Listas de projeto" },
     { href: "/conta/seguranca", label: "Dados e segurança" },
+    { href: "/conta/privacidade", label: "Privacidade" },
   ]
   if (corporate && hasCorporatePermission(roles, "member:manage")) {
     links.splice(5, 0, { href: "/conta/usuarios", label: "Usuários" })
