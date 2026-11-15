@@ -66,6 +66,16 @@ import {
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
 import { loadPaymentDeadlines } from "@/features/shared/lib/payments/payment-deadlines"
 import { PAYMENT_METHOD_LABEL } from "@/features/shared/lib/payments/payment-messages"
+import {
+  COUPON_STATUS_MESSAGE,
+  type AppliedPromotion,
+} from "@/features/shared/lib/promotions/promotion-math"
+import {
+  applyShippingBenefits,
+  loadCartCoupon,
+  priceCart,
+  type CartPricing,
+} from "@/features/shared/lib/promotions/promotion-service"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import { addBusinessDays } from "@/features/shared/lib/shipping/business-days"
@@ -105,10 +115,26 @@ export type CheckoutPaymentOption = {
   note: string
 }
 
+/** Promotions of the cart at checkout (RF46). */
+export type CheckoutPromotions = {
+  /** Total discount, decimal string. */
+  discount: string
+  /** Order total after the discount, before shipping, decimal string. */
+  total: string
+  /** Promotions applied. */
+  applied: AppliedPromotion[]
+  /** Coupon kept on the cart, or null. */
+  couponCode: string | null
+  /** Why the coupon does not apply, or null when it applies. */
+  couponMessage: string | null
+}
+
 /** What the checkout page shows. */
 export type CheckoutContext = {
   /** Active cart with its totals. */
   cart: CartView
+  /** Discounts of the promotions in force (RF46). */
+  promotions: CheckoutPromotions
   /** Saved addresses of the account (of the company for PJ members). */
   addresses: CheckoutAddress[]
   /** Whether the buyer orders for a corporate account. */
@@ -268,20 +294,45 @@ async function loadBuyerAddress(
 }
 
 /**
- * Loads the active cart of the buyer.
+ * Loads the active cart of the buyer with the promotions in force
+ * (RF46): the coupon kept on the cart is checked again here.
  *
  * @param userId - Session user id.
  * @param client - Prisma client or transaction.
- * @returns The cart id and view.
+ * @param now - Moment of the pricing.
+ * @returns The cart id, view and pricing.
  */
 async function loadBuyerCart(
   userId: string,
-  client: Prisma.TransactionClient | typeof prisma = prisma
-): Promise<{ cartId: string | null; cart: CartView }> {
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+  now: Date = new Date()
+): Promise<{ cartId: string | null; cart: CartView; pricing: CartPricing }> {
   const cartId = await findActiveCartId({ userId }, client)
+  const cart = cartId ? await loadCartView(cartId, client) : EMPTY_CART
+  const couponCode = await loadCartCoupon(cartId, client)
   return {
     cartId,
-    cart: cartId ? await loadCartView(cartId, client) : EMPTY_CART,
+    cart,
+    pricing: await priceCart(cart, { couponCode, now, client }),
+  }
+}
+
+/**
+ * What the checkout shows of the promotions.
+ *
+ * @param pricing - Cart pricing.
+ * @returns The promotions block.
+ */
+function toCheckoutPromotions(pricing: CartPricing): CheckoutPromotions {
+  return {
+    discount: pricing.discount,
+    total: pricing.total,
+    applied: pricing.applied,
+    couponCode: pricing.coupon?.code ?? null,
+    couponMessage:
+      pricing.coupon && pricing.coupon.status !== "applied"
+        ? COUPON_STATUS_MESSAGE[pricing.coupon.status]
+        : null,
   }
 }
 
@@ -393,20 +444,28 @@ async function paymentOptions(buyer: Buyer): Promise<CheckoutPaymentOption[]> {
 }
 
 /**
- * Quotes the shipping of the cart lines to a CEP (RF25, RN20).
+ * Quotes the shipping of the cart lines to a CEP (RF25, RN20), with the
+ * courtesy shipping of a promotion or the regional free shipping
+ * minimum applied (RN23).
  *
  * @param cart - Cart view.
+ * @param pricing - Cart pricing with the promotions.
  * @param cep - Destination CEP.
  * @returns The quote.
  */
-async function quoteCart(cart: CartView, cep: string): Promise<ShippingQuote> {
-  return quoteShippingForItems({
+async function quoteCart(
+  cart: CartView,
+  pricing: CartPricing,
+  cep: string
+): Promise<ShippingQuote> {
+  const quote = await quoteShippingForItems({
     cep,
     items: cart.lines.map((line) => ({
       skuCode: line.skuCode,
       quantity: line.quantity,
     })),
   })
+  return applyShippingBenefits(quote, { pricing, cep })
 }
 
 /**
@@ -436,7 +495,7 @@ export async function getCheckout(): Promise<
 > {
   try {
     const buyer = await loadBuyer()
-    const [{ cart }, addresses, paymentMethods] = await Promise.all([
+    const [{ cart, pricing }, addresses, paymentMethods] = await Promise.all([
       loadBuyerCart(buyer.user.id),
       prisma.address.findMany({
         where: addressScope(buyer),
@@ -451,6 +510,7 @@ export async function getCheckout(): Promise<
       success: true,
       context: {
         cart,
+        promotions: toCheckoutPromotions(pricing),
         addresses: addresses.map((address) => ({
           id: address.id,
           label: address.label,
@@ -491,10 +551,10 @@ export async function quoteCheckoutShipping(
     const buyer = await loadBuyer()
     await enforceActionRateLimit("shipping", { limit: 30, windowMs: 60_000 })
     const address = await loadBuyerAddress(buyer, parsed.data.addressId)
-    const { cart } = await loadBuyerCart(buyer.user.id)
+    const { cart, pricing } = await loadBuyerCart(buyer.user.id)
     assertCartReady(cart)
-    const quote = await quoteCart(cart, address.cep)
-    const base = toCents(cart.total)
+    const quote = await quoteCart(cart, pricing, address.cep)
+    const base = toCents(pricing.total)
     const now = new Date()
     const schedule =
       installationProducts(cart).length > 0
@@ -598,7 +658,7 @@ export async function placeOrder(
     }
     // The APIs are called outside the transaction, so no row stays
     // locked while they answer
-    const quote = await quoteCart(preview.cart, address.cep)
+    const quote = await quoteCart(preview.cart, preview.pricing, address.cep)
 
     let chosen: ShippingOption | null = null
     if (data.option) {
@@ -628,9 +688,23 @@ export async function placeOrder(
         await tx.$queryRaw`SELECT id FROM carts WHERE id = ${cartId} FOR UPDATE`
         const cart = await loadCartView(cartId, tx)
         assertCartReady(cart)
+        const pricing = await priceCart(cart, {
+          couponCode: await loadCartCoupon(cartId, tx),
+          now,
+          client: tx,
+        })
+        if (pricing.courtesyShipping !== preview.pricing.courtesyShipping) {
+          throw new AppError(PRICES_CHANGED_MESSAGE, "prices_changed")
+        }
+        const couponCode =
+          pricing.coupon?.status === "applied" ? pricing.coupon.code : null
 
         const shipping = chosen ? chosen.price : "0.00"
-        const total = fromCents(toCents(cart.total) + toCents(shipping))
+        // pricing.total already has the volume discounts of cart.total
+        const total = fromCents(toCents(pricing.total) + toCents(shipping))
+        const orderDiscount = fromCents(
+          toCents(cart.discount) + toCents(pricing.discount)
+        )
         if (total !== data.expectedTotal) {
           throw new AppError(PRICES_CHANGED_MESSAGE, "prices_changed")
         }
@@ -699,11 +773,17 @@ export async function placeOrder(
             status: initialStatus,
             paymentMethod: data.paymentMethod,
             subtotal: cart.subtotal,
-            // Automatic volume discounts, priced again on the server (RN04)
-            discount: cart.discount,
             servicesTotal: cart.servicesTotal,
+            // Automatic volume discounts (RN04) plus promotions and coupon
+            // (RF46), both priced again on the server
+            discount: orderDiscount,
             shippingTotal: shipping,
             total,
+            couponCode,
+            appliedPromotions:
+              pricing.applied.length > 0
+                ? (pricing.applied as Prisma.InputJsonValue)
+                : undefined,
             shippingAddress: address,
             scheduledDeliveryAt,
             extraLeadBusinessDays: cart.extraBusinessDays,
@@ -754,6 +834,8 @@ export async function placeOrder(
                 source: "checkout",
                 quotedAt: now.toISOString(),
                 strategy: quote.status === "quoted" ? quote.strategy : null,
+                originalPrice: chosen.originalPrice ?? null,
+                freeShippingReason: chosen.freeShippingReason ?? null,
               },
             },
           })
@@ -802,6 +884,10 @@ export async function placeOrder(
           })
         }
         await tx.cartItem.deleteMany({ where: { cartId } })
+        await tx.cart.update({
+          where: { id: cartId },
+          data: { couponCode: null },
+        })
         await writeAudit(tx, {
           userId: buyer.user.id,
           action: "order.create",
@@ -812,9 +898,14 @@ export async function placeOrder(
             status,
             paymentMethod: data.paymentMethod,
             total,
-            discount: cart.discount,
+            discount: orderDiscount,
+            volumeDiscount: cart.discount,
             priceTable: cart.priceTableName,
+            promotionDiscount: pricing.discount,
+            couponCode,
+            promotions: pricing.applied,
             shippingTotal: shipping,
+            freeShippingReason: chosen?.freeShippingReason ?? null,
             method: chosen?.method ?? "MANUAL_QUOTE",
             requiresApproval,
             scheduledDeliveryAt: scheduledDeliveryAt?.toISOString() ?? null,

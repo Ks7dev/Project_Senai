@@ -17,19 +17,30 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { FormField, fieldAria } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import {
+  applyCartCoupon,
+  quoteCartShipping,
+  removeCartCoupon,
   removeCartItem,
   saveCartAsProjectList,
   updateCartItem,
+  type CartPromotions,
 } from "@/features/cart/cart-page/action/cart-page-actions"
 import {
+  applyCouponSchema,
   saveProjectListSchema,
+  type ApplyCouponInput,
   type SaveProjectListInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
 import { CartLineExtras } from "@/features/cart/cart-page/cart-line-extras"
 import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
+import { PromotionsNote } from "@/features/shared/components/promotions-note"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
 import type { CartExtrasRules } from "@/features/shared/lib/cart/cart-extras"
-import { MAX_LINE_QUANTITY } from "@/features/shared/lib/cart/cart-math"
+import {
+  centsToMoney,
+  MAX_LINE_QUANTITY,
+  moneyToCents,
+} from "@/features/shared/lib/cart/cart-math"
 import type { CartLine, CartView } from "@/features/shared/lib/cart/cart-types"
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -44,25 +55,35 @@ type CartPageViewProps = {
   loggedIn: boolean
   /** Engraving and additional service rules (RF51, RF52). */
   rules: CartExtrasRules
+  /** Promotions in force on the cart (RF46), or null when unavailable. */
+  promotions: CartPromotions | null
 }
 
 /**
  * Cart page (#46, RF07): lines with quantity and removal, laser
  * engraving and additional services (#47, RF51, RF52), prices of the
  * customer table (RF21), automatic volume discounts (RN04), order
- * summary with the extras cost and lead time, shipping estimate by CEP and the
- * option to save the cart as a project list to resume later.
+ * summary with the extras cost and lead time, promotions and coupon
+ * (#73, RF46), shipping estimate by CEP with free shipping rules (RN23)
+ * and the option to save the cart as a project list to resume later.
  *
- * @param props - Cart, login state and extras rules.
+ * @param props - Cart, login state, extras rules and promotions.
  * @returns The page content.
  */
 export function CartPageView({
   cart: initialCart,
   loggedIn,
   rules,
+  promotions,
 }: CartPageViewProps) {
   const router = useRouter()
   const [cart, setCart] = useState(initialCart)
+  // Volume discounts (RN04) plus promotions and coupon (RF46); the
+  // promotions total is already priced over the cart total
+  const discount = centsToMoney(
+    moneyToCents(cart.discount) + moneyToCents(promotions?.discount ?? "0")
+  )
+  const total = promotions?.total ?? cart.total
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
 
@@ -140,8 +161,8 @@ export function CartPageView({
             <OrderSummary
               subtotal={cart.subtotal}
               services={cart.servicesTotal}
-              discount={cart.discount}
-              total={cart.total}
+              discount={discount}
+              total={total}
               note={
                 cart.extraBusinessDays > 0
                   ? `Personalização e serviços acrescentam ${cart.extraBusinessDays} ${cart.extraBusinessDays === 1 ? "dia útil" : "dias úteis"} ao prazo de entrega.`
@@ -152,15 +173,26 @@ export function CartPageView({
               priceTableName={cart.priceTableName}
               volumeDiscounts={cart.volumeDiscounts}
             />
+            {promotions &&
+              (promotions.applied.length > 0 || promotions.couponCode) && (
+                <PromotionsNote promotions={promotions} />
+              )}
+            {purchasable.length > 0 && promotions && (
+              <CouponForm
+                couponCode={promotions.couponCode}
+                onChanged={() => router.refresh()}
+              />
+            )}
             {purchasable.length > 0 && (
               <ShippingEstimate
-                key={purchasable
+                key={`${purchasable
                   .map((line) => `${line.skuCode}:${line.quantity}`)
-                  .join(",")}
+                  .join(",")}|${total}`}
                 items={purchasable.map((line) => ({
                   skuCode: line.skuCode,
                   quantity: line.quantity,
                 }))}
+                quoteAction={({ cep }) => quoteCartShipping({ cep })}
               />
             )}
             {purchasable.length > 0 &&
@@ -401,6 +433,109 @@ function SaveProjectListForm() {
             </Link>
           </>
         )}
+      </p>
+    </form>
+  )
+}
+
+/**
+ * Coupon of the cart (RF46): applies a code or removes the one kept.
+ *
+ * @param props - Coupon kept on the cart and the refresh handler.
+ * @returns The form.
+ */
+function CouponForm({
+  couponCode,
+  onChanged,
+}: {
+  couponCode: string | null
+  onChanged: () => void
+}) {
+  const id = useId()
+  const [error, setError] = useState<string>()
+  const [message, setMessage] = useState<string>()
+  const [pending, startTransition] = useTransition()
+  const form = useForm<ApplyCouponInput>({
+    resolver: zodResolver(applyCouponSchema),
+    defaultValues: { code: "" },
+  })
+  const fieldError = form.formState.errors.code?.message ?? error
+
+  const onSubmit = form.handleSubmit((values) => {
+    setError(undefined)
+    setMessage(undefined)
+    startTransition(async () => {
+      const result = await applyCartCoupon(values)
+      if (!result.success) return setError(result.error)
+      form.reset()
+      setMessage("Cupom aplicado.")
+      onChanged()
+    })
+  })
+
+  const remove = () => {
+    setError(undefined)
+    setMessage(undefined)
+    startTransition(async () => {
+      const result = await removeCartCoupon()
+      if (!result.success) return setError(result.error)
+      setMessage("Cupom removido.")
+      onChanged()
+    })
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-labelledby={`${id}-title`}
+      className="flex flex-col gap-sm border-t border-line-subtle pt-md"
+    >
+      <h2 id={`${id}-title`} className="text-label">
+        Cupom de desconto
+      </h2>
+      {couponCode ? (
+        <div className="flex flex-wrap items-center justify-between gap-sm text-body-sm">
+          <span>
+            Cupom <strong>{couponCode}</strong>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={remove}
+          >
+            Remover cupom
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-end gap-sm">
+          <FormField
+            id={`${id}-code`}
+            label="Código do cupom"
+            error={fieldError}
+            className="min-w-40 flex-1"
+          >
+            <Input
+              id={`${id}-code`}
+              autoComplete="off"
+              {...form.register("code")}
+              {...fieldAria(`${id}-code`, fieldError)}
+            />
+          </FormField>
+          <Button type="submit" variant="ghost" disabled={pending}>
+            {pending ? "Aplicando…" : "Aplicar"}
+          </Button>
+        </div>
+      )}
+      {couponCode && error && (
+        <p role="alert" className="text-body-sm text-error">
+          {error}
+        </p>
+      )}
+      <p role="status" className="text-body-sm text-ink empty:hidden">
+        {message}
       </p>
     </form>
   )
