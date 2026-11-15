@@ -10,6 +10,7 @@ import {
 import { PRODUCTS_CACHE_TAG } from "@/features/shared/lib/catalog/product-cache"
 import { CATEGORIES_CACHE_TAG } from "@/features/shared/lib/catalog/category-cache"
 import { prisma } from "@/features/shared/lib/db/prisma"
+import { availableQuantity } from "@/features/shared/lib/stock/stock-math"
 import type { ComparisonProduct } from "@/features/shared/lib/catalog/comparison-rows"
 
 /** Product summary shown in cards (listing, search, favorites). */
@@ -205,9 +206,7 @@ function toCard(
     price: row.basePrice.toFixed(2),
     imageKey: row.images[0]?.storageKey ?? null,
     imageAlt: row.images[0]?.alt ?? row.name,
-    available: row.skus.some(
-      (sku) => (sku.stock?.onHand ?? 0) - (sku.stock?.reserved ?? 0) > 0
-    ),
+    available: row.skus.some((sku) => availableQuantity(sku.stock) > 0),
     leadTimeDays: row.leadTimeDays,
   }
 }
