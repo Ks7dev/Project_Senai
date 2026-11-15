@@ -64,6 +64,8 @@ enum QuoteStatus {
   CONVERTED
 }
 
+/// Order life cycle (RF54); allowed transitions live in
+/// features/shared/lib/orders/order-status.ts
 enum OrderStatus {
   AWAITING_APPROVAL
   AWAITING_SHIPPING_QUOTE
@@ -71,8 +73,10 @@ enum OrderStatus {
   PAID
   IN_PRODUCTION
   SEPARATING
+  INVOICED
   SHIPPED
   DELIVERED
+  INSTALLED
   CANCELED
   REFUNDED
 }
