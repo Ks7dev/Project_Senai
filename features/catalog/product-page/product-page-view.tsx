@@ -268,6 +268,7 @@ export function ProductPageView({ product }: ProductPageViewProps) {
         </section>
 
         {(product.datasheets.length > 0 ||
+          product.manuals.length > 0 ||
           product.certifications.length > 0) && (
           <aside
             aria-labelledby="documentos"
@@ -286,6 +287,18 @@ export function ProductPageView({ product }: ProductPageViewProps) {
                   >
                     <FileTextIcon className="size-4" aria-hidden />
                     {document.name} (PDF)
+                  </a>
+                </li>
+              ))}
+              {product.manuals.map((document) => (
+                <li key={document.key}>
+                  <a
+                    href={`/media/${document.key}`}
+                    download
+                    className="inline-flex items-center gap-sm text-primary underline"
+                  >
+                    <FileTextIcon className="size-4" aria-hidden />
+                    Manual: {document.name} (PDF)
                   </a>
                 </li>
               ))}

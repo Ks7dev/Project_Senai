@@ -24,6 +24,7 @@ export type ProductPageData = {
   lotNumber: string | null
   images: Array<{ key: string; alt: string }>
   datasheets: Array<{ name: string; key: string }>
+  manuals: Array<{ name: string; key: string }>
   certifications: Array<{ name: string; key: string }>
   skus: Array<{
     code: string
@@ -96,6 +97,7 @@ export async function loadProductPage(
       alt: image.alt,
     })),
     datasheets: documents("DATASHEET"),
+    manuals: documents("MANUAL"),
     certifications: documents("CERTIFICATION"),
     skus: product.skus.map((sku) => ({
       code: sku.code,
