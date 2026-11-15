@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button"
 import type { ProductPageData } from "@/features/catalog/product-page/load-product"
 import { CompareButton } from "@/features/shared/components/compare-controls"
 import { FavoriteButton } from "@/features/shared/components/favorite-button"
+import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
 import { cn } from "@/lib/utils"
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -188,6 +189,13 @@ export function ProductPageView({ product }: ProductPageViewProps) {
             <MessageCircleIcon className="size-4" aria-hidden /> Falar com um
             vendedor
           </Link>
+
+          {sku && (
+            <ShippingEstimate
+              key={sku.code}
+              items={[{ skuCode: sku.code, quantity: 1 }]}
+            />
+          )}
 
           <ul className="flex flex-col gap-sm border-t border-line-subtle pt-md text-body-sm">
             <li className="flex gap-sm">
