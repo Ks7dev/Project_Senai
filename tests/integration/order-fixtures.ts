@@ -138,9 +138,28 @@ export function orderFixtures(prisma: PrismaClient) {
           },
         })
       }
-      await prisma.payment.deleteMany({ where: { orderId: { in: orders } } })
-      await prisma.order.deleteMany({ where: { id: { in: orders } } })
+      await deleteOrders(prisma, orders)
       await prisma.product.deleteMany({ where: { id: { in: products } } })
     },
   }
+}
+
+/**
+ * Deletes test orders with the rows whose foreign keys block the
+ * delete (ON DELETE RESTRICT): tickets, refunds, invoiced installments,
+ * NF-e and payments. Items, history, approvals and shipments go by
+ * cascade.
+ *
+ * @param prisma - Prisma client of the test.
+ * @param orderIds - Orders created by the test.
+ */
+export async function deleteOrders(prisma: PrismaClient, orderIds: string[]) {
+  if (orderIds.length === 0) return
+  const where = { orderId: { in: orderIds } }
+  await prisma.supportTicket.deleteMany({ where })
+  await prisma.refund.deleteMany({ where })
+  await prisma.receivable.deleteMany({ where })
+  await prisma.invoice.deleteMany({ where })
+  await prisma.payment.deleteMany({ where })
+  await prisma.order.deleteMany({ where: { id: { in: orderIds } } })
 }

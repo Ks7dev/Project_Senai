@@ -9,7 +9,7 @@ import {
 } from "vitest"
 import { createHmac, randomUUID } from "node:crypto"
 import { jar } from "./next-headers-stub"
-import { orderFixtures } from "./order-fixtures"
+import { deleteOrders, orderFixtures } from "./order-fixtures"
 
 try {
   process.loadEnvFile()
@@ -338,8 +338,7 @@ afterAll(async () => {
   await prisma.paymentNotification.deleteMany({
     where: { resourceId: { in: [...issued.keys()] } },
   })
-  await prisma.payment.deleteMany({ where: { orderId: { in: placedOrders } } })
-  await prisma.order.deleteMany({ where: { id: { in: placedOrders } } })
+  await deleteOrders(prisma, placedOrders)
   await prisma.address.deleteMany({ where: { id: { in: addresses } } })
   await emptyCart(customer)
   await fixtures.cleanup()
