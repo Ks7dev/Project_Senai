@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import Link from "next/link"
 import { listSupportQueue } from "@/features/after-sales/support-desk/action/support-desk-actions"
 import { supportQueueSchema } from "@/features/after-sales/support-desk/schema/support-desk-schema"
 import { SupportQueueView } from "@/features/after-sales/support-desk/support-queue-view"
@@ -61,6 +62,14 @@ export default function AdminSupportPage(
         <p className="text-body text-ink-muted">
           Chamados de garantia e assistência técnica abertos pelos clientes.
         </p>
+        <nav aria-label="Seções do atendimento" className="pt-sm">
+          <Link
+            href="/admin/atendimento/vendedores"
+            className="text-body-sm text-primary underline"
+          >
+            Vendedores dedicados e WhatsApp
+          </Link>
+        </nav>
       </header>
       <Suspense fallback={<p className="text-body">Carregando chamados…</p>}>
         <QueueSection searchParams={props.searchParams as Promise<Search>} />
