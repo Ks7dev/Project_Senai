@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto"
 import {
   afterAll,
   afterEach,
+  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -681,5 +683,113 @@ describe("manual shipping quote queue (#44, RN16, RN20)", () => {
     })
     expect(stored.requiresApproval).toBe(true)
     expect(stored.total.toFixed(2)).toBe("10100.00")
+  })
+})
+
+describe("carrier aggregator for large volumes (#42, RF49, RN20)", () => {
+  let productId: string
+  let skuCode: string
+
+  beforeAll(async () => {
+    const category = await prisma.category.findFirstOrThrow({
+      select: { id: true },
+    })
+    const tag = randomUUID().slice(0, 8)
+    skuCode = `TST-ARQ-${tag}`
+    const product = await prisma.product.create({
+      data: {
+        categoryId: category.id,
+        slug: `teste-arquivo-${tag}`,
+        name: `Arquivo de teste ${tag}`,
+        description:
+          "Produto fictício grande, sem montagem, criado pelo teste.",
+        basePrice: "1500.00",
+        status: "ACTIVE",
+        weightKg: "20.000",
+        lengthCm: "120.00",
+        widthCm: "60.00",
+        heightCm: "10.00",
+        requiresInstallation: false,
+        skus: { create: { code: skuCode, name: "Único" } },
+      },
+      select: { id: true },
+    })
+    productId = product.id
+  })
+
+  afterAll(async () => {
+    await prisma.product.deleteMany({ where: { id: productId } })
+  })
+
+  it("shows carrier, delivery time and price from the aggregator", async () => {
+    vi.stubEnv("CARRIER_API_TOKEN", "token-sandbox-ficticio")
+    vi.stubEnv("CARRIER_API_BASE_URL", "https://carrier.test")
+    const fetcher = vi.fn<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          JSON.stringify([
+            {
+              name: ".Package",
+              price: "310.50",
+              delivery_time: 7,
+              company: { name: "Jadlog" },
+            },
+            {
+              name: "PAC",
+              error: "Dimensões acima do limite.",
+              company: { name: "Correios" },
+            },
+          ]),
+          { status: 200 }
+        )
+    )
+    vi.stubGlobal("fetch", fetcher)
+    const result = await quoteShipping({
+      cep: "70040-010",
+      items: [{ skuCode, quantity: 1 }],
+    })
+    expect(result).toEqual({
+      success: true,
+      quote: {
+        status: "quoted",
+        strategy: "carrier",
+        options: [
+          {
+            method: "CARRIER",
+            carrier: "Jadlog",
+            service: ".Package",
+            price: "310.50",
+            deliveryDays: 7,
+          },
+        ],
+        coverage: { ownDelivery: false, regionName: null },
+      },
+    })
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))
+    expect(body.from.postal_code).toBe("04538133")
+    expect(body.products[0]).toMatchObject({ weight: 20, length: 120 })
+  })
+
+  it("falls back to the manual quote when the aggregator fails", async () => {
+    vi.stubEnv("CARRIER_API_TOKEN", "token-sandbox-ficticio")
+    vi.stubEnv("CARRIER_API_BASE_URL", "https://carrier.test")
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 500 }))
+    )
+    const result = await quoteShipping({
+      cep: "70040-010",
+      items: [{ skuCode, quantity: 1 }],
+    })
+    expect(result).toMatchObject({
+      success: true,
+      quote: {
+        status: "manual_quote",
+        reason: "no_option",
+        responseBusinessDays: 2,
+      },
+    })
   })
 })
