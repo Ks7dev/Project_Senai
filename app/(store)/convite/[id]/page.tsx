@@ -3,7 +3,13 @@ import { AuthCard } from "@/components/layout/auth-card"
 import { getInvitation } from "@/features/access/corporate-members/action/members-actions"
 import { InvitationView } from "@/features/access/corporate-members/invitation-view"
 
-export const metadata = { title: "Convite — Atelier Bureau" }
+export const metadata = {
+  title: "Convite — Atelier Bureau",
+  description:
+    "Aceite o convite para entrar na conta corporativa da sua empresa no Atelier Bureau.",
+  // Personal link: kept out of search results
+  robots: { index: false, follow: false },
+}
 
 /**
  * Loads the invitation.
