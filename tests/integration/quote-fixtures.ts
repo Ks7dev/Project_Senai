@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { PrismaClient } from "@/generated/prisma/client"
-import { orderFixtures } from "./order-fixtures"
+import { deleteOrders, orderFixtures } from "./order-fixtures"
 
 /** Fixture builders for the quote integration tests. */
 export type QuoteFixtures = ReturnType<typeof quoteFixtures>
@@ -139,10 +139,7 @@ export function quoteFixtures(prisma: PrismaClient) {
         await prisma.stockMovement.deleteMany({
           where: { orderId: { in: orderIds } },
         })
-        await prisma.payment.deleteMany({
-          where: { orderId: { in: orderIds } },
-        })
-        await prisma.order.deleteMany({ where: { id: { in: orderIds } } })
+        await deleteOrders(prisma, orderIds)
         await prisma.quote.deleteMany({ where: { id: { in: quoteIds } } })
       }
       await orders.cleanup()

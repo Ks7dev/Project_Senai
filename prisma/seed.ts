@@ -33,7 +33,7 @@ const prisma = new PrismaClient({
 })
 
 /** Development password for the fictitious accounts (never production). */
-const seedPassword = process.env.SEED_PASSWORD ?? "atelier-demo-2026"
+const seedPassword = process.env.SEED_PASSWORD || "atelier-demo-2026"
 
 /**
  * Seeds configuration, permissions, catalog and test accounts. It is

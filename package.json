@@ -20,7 +20,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "db:docs": "tsx scripts/db-docs/generate-db-docs.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

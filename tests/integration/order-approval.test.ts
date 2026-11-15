@@ -417,8 +417,12 @@ describe("corporate order approval (#51, RF11, RN01)", () => {
     ).toEqual({ success: true, number: order.number, status: "PAID" })
     expect(await fixtures.counters(sku.id)).toEqual({ onHand: 1, reserved: 0 })
     const emails = await emailsFor(order.number)
+    // The invoiced order also sends its installments (#60, RF33)
     expect(
-      emails.map(({ template, recipient }) => [template, recipient])
-    ).toEqual([["order.paid", requester]])
+      emails.map(({ template, recipient }) => [template, recipient]).sort()
+    ).toEqual([
+      ["order.invoiced_installments", requester],
+      ["order.paid", requester],
+    ])
   })
 })
