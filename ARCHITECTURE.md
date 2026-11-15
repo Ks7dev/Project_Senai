@@ -119,7 +119,12 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
   - A porta 3306 é publicada só em `127.0.0.1` por padrão. No Docker Desktop, toda conexão que entra pela porta publicada chega ao MySQL com o IP do gateway do Docker, então o MySQL não consegue separar quem vem da LAN. Por isso, abrir o banco à rede é uma decisão explícita: `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env`, com o firewall no perfil Privado e senhas fortes em todos os usuários.
   - As configurações do servidor (charset, fuso UTC, TLS e conexões) vão como flags do `mysqld` no `docker-compose.yml`. Um `.cnf` montado do Windows chega com permissão de escrita para todos, e o MySQL o ignora.
   - O MySQL 8 autentica com `caching_sha2_password`. Sem TLS, o driver do app busca a chave pública RSA do servidor (`allowPublicKeyRetrieval`, em `features/shared/lib/db/connection-config.ts`).
-- **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, serviço opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago`. Se o webhook não chegar, uma reconciliação consulta `GET /v1/payments/{id}` (#57).
+- **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, perfil opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago` (#57):
+  - `docker compose --profile tunnel up -d` sobe o `tunnel` e o `webhook-gate`. O túnel fica sozinho com o gate na rede `tunnel` e não alcança o app, o proxy nem o banco.
+  - O gate (`deploy/caddy/Caddyfile.webhook`, porta 8080 não publicada) repassa ao app só `POST /api/webhooks/mercadopago`. Qualquer outro método ou caminho recebe 404.
+  - No painel da Cloudflare, o hostname público do túnel aponta para `http://webhook-gate:8080`. A URL pública completa vai em `MERCADOPAGO_NOTIFICATION_URL` (ou no painel de webhooks do Mercado Pago), e a chave secreta do webhook vai em `MERCADOPAGO_WEBHOOK_SECRET`.
+  - A rota valida a assinatura `x-signature`, é idempotente pelo `x-request-id` (tabela `payment_notifications`), relê o pagamento em `GET /v1/payments/{id}` e só confirma o pedido com `approved` (RN13).
+  - Se o webhook não chegar, a reconciliação (job a cada 5 minutos e antes de expirar Pix e boleto) consulta `GET /v1/payments/{id}`, ou busca pelo `external_reference` quando a criação ficou sem resposta.
 - **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O app depende de a máquina servidora estar ligada e na rede, e o monitoramento fica na #80.
 - **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
 

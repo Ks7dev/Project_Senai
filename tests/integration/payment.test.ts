@@ -7,6 +7,7 @@ import {
   it,
   vi,
 } from "vitest"
+import { createHmac, randomUUID } from "node:crypto"
 import { jar } from "./next-headers-stub"
 import { orderFixtures } from "./order-fixtures"
 
@@ -43,6 +44,10 @@ const { saveInstallmentRules } =
   await import("@/features/payment/installments/action/installment-actions")
 const { expireUnpaidOrders } =
   await import("@/features/shared/lib/orders/order-expiration")
+const { reconcilePendingPayments } =
+  await import("@/features/shared/lib/payments/payment-reconciliation")
+const { POST: mercadoPagoWebhook } =
+  await import("@/app/api/webhooks/mercadopago/route")
 
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 const fixtures = orderFixtures(prisma)
@@ -55,6 +60,8 @@ const placedOrders: string[] = []
 type MercadoPagoScript =
   | { kind: "answer"; status: string; detail: string; threeDs?: boolean }
   | { kind: "timeout" }
+  /** Mercado Pago creates the payment but the answer never arrives. */
+  | { kind: "lost"; status: string; detail: string }
 
 let mercadoPago: MercadoPagoScript = {
   kind: "answer",
@@ -67,6 +74,8 @@ let mercadoPagoRequests: Array<{
   body: Record<string, unknown>
 }> = []
 let nextProviderId = 7_000_000_000
+/** Payments the fake Mercado Pago created, by id (read by GET). */
+const issued = new Map<string, Record<string, unknown>>()
 
 /**
  * Logs in with a seed account through the real sign-in action.
@@ -104,51 +113,66 @@ function stubApis() {
           headers: init?.headers as Record<string, string>,
           body,
         })
+        if (init?.method === "GET") {
+          const search = url.split("/v1/payments/search?")[1]
+          if (search !== undefined) {
+            const reference = new URLSearchParams(search).get(
+              "external_reference"
+            )
+            const results = [...issued.values()].filter(
+              (payment) => payment.external_reference === reference
+            )
+            return new Response(JSON.stringify({ results }), { status: 200 })
+          }
+          const found = issued.get(url.split("/v1/payments/")[1])
+          return found
+            ? new Response(JSON.stringify(found), { status: 200 })
+            : new Response("{}", { status: 404 })
+        }
         if (mercadoPago.kind === "timeout") {
           throw new DOMException("timeout", "TimeoutError")
         }
         nextProviderId += 1
-        return new Response(
-          JSON.stringify({
-            id: nextProviderId,
-            status: mercadoPago.status,
-            status_detail: mercadoPago.detail,
-            transaction_amount: body.transaction_amount,
-            currency_id: "BRL",
-            external_reference: body.external_reference,
-            payment_method_id: body.payment_method_id,
-            installments: body.installments,
-            date_approved:
-              mercadoPago.status === "approved"
-                ? new Date().toISOString()
-                : null,
-            point_of_interaction:
-              body.payment_method_id === "pix"
-                ? {
-                    transaction_data: {
-                      qr_code: "00020126580014br.gov.bcb.pix-teste",
-                      qr_code_base64: "iVBORw0KGgo=",
-                    },
-                  }
-                : null,
-            transaction_details: String(body.payment_method_id).startsWith(
-              "bol"
-            )
+        const created: Record<string, unknown> = {
+          id: nextProviderId,
+          status: mercadoPago.status,
+          status_detail: mercadoPago.detail,
+          transaction_amount: body.transaction_amount,
+          currency_id: "BRL",
+          external_reference: body.external_reference,
+          payment_method_id: body.payment_method_id,
+          installments: body.installments,
+          date_approved:
+            mercadoPago.status === "approved" ? new Date().toISOString() : null,
+          point_of_interaction:
+            body.payment_method_id === "pix"
               ? {
-                  external_resource_url: "https://boleto.test/123.pdf",
-                  digitable_line:
-                    "23793380296000000000000000000000000000000000000",
+                  transaction_data: {
+                    qr_code: "00020126580014br.gov.bcb.pix-teste",
+                    qr_code_base64: "iVBORw0KGgo=",
+                  },
                 }
               : null,
-            three_ds_info: mercadoPago.threeDs
+          transaction_details: String(body.payment_method_id).startsWith("bol")
+            ? {
+                external_resource_url: "https://boleto.test/123.pdf",
+                digitable_line:
+                  "23793380296000000000000000000000000000000000000",
+              }
+            : null,
+          three_ds_info:
+            mercadoPago.kind === "answer" && mercadoPago.threeDs
               ? {
                   external_resource_url: "https://acs.test/challenge",
                   creq: "creq-test",
                 }
               : null,
-          }),
-          { status: 201 }
-        )
+        }
+        issued.set(String(nextProviderId), created)
+        if (mercadoPago.kind === "lost") {
+          throw new DOMException("timeout", "TimeoutError")
+        }
+        return new Response(JSON.stringify(created), { status: 201 })
       }
       const isSedex = url.includes("/03220")
       const body = url.includes("/token/")
@@ -292,6 +316,9 @@ afterAll(async () => {
       },
     })
   }
+  await prisma.paymentNotification.deleteMany({
+    where: { resourceId: { in: [...issued.keys()] } },
+  })
   await prisma.payment.deleteMany({ where: { orderId: { in: placedOrders } } })
   await prisma.order.deleteMany({ where: { id: { in: placedOrders } } })
   await prisma.address.deleteMany({ where: { id: { in: addresses } } })
@@ -896,5 +923,267 @@ describe("configurable installments (#56, RF14)", () => {
         data: { value: original.value as never },
       })
     }
+  })
+})
+
+const webhookSecret = "segredo-do-webhook-de-teste"
+
+/**
+ * Builds a Mercado Pago notification signed like the real one.
+ *
+ * @param dataId - Payment id.
+ * @param options - Request id and the secret used to sign.
+ * @returns The request.
+ */
+function notification(
+  dataId: string,
+  options: { requestId?: string; secret?: string } = {}
+) {
+  const requestId = options.requestId ?? randomUUID()
+  const ts = String(Date.now())
+  const v1 = createHmac("sha256", options.secret ?? webhookSecret)
+    .update(`id:${dataId};request-id:${requestId};ts:${ts};`)
+    .digest("hex")
+  return new Request(
+    `https://loja.test/api/webhooks/mercadopago?data.id=${dataId}&type=payment`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": requestId,
+        "x-signature": `ts=${ts},v1=${v1}`,
+      },
+      body: JSON.stringify({
+        action: "payment.updated",
+        type: "payment",
+        data: { id: dataId },
+      }),
+    }
+  )
+}
+
+/**
+ * Places a Pix order and issues the Pix (pending in Mercado Pago).
+ *
+ * @returns The order, the SKU and the Mercado Pago payment id.
+ */
+async function pendingPix() {
+  const placed = await placeCardOrder({
+    onHand: 10,
+    quantity: 2,
+    paymentMethod: "PIX",
+  })
+  mercadoPago = {
+    kind: "answer",
+    status: "pending",
+    detail: "pending_waiting_transfer",
+  }
+  const result = await payOrder({
+    orderId: placed.order.orderId,
+    method: "PIX",
+    formData: { payment_method_id: "pix" },
+  })
+  if (!result.success || !result.attempt.payment.paymentId) {
+    throw new Error("pix not issued")
+  }
+  return { ...placed, paymentId: result.attempt.payment.paymentId }
+}
+
+/**
+ * Marks a payment as paid in the fake Mercado Pago.
+ *
+ * @param paymentId - Mercado Pago payment id.
+ * @param status - New status.
+ */
+function settle(paymentId: string, status = "approved") {
+  const payment = issued.get(paymentId)!
+  payment.status = status
+  payment.status_detail = status === "approved" ? "accredited" : status
+  payment.date_approved =
+    status === "approved" ? new Date().toISOString() : null
+}
+
+/**
+ * Status of an order and of its payments.
+ *
+ * @param orderId - Order id.
+ * @returns The statuses.
+ */
+async function statusOf(orderId: string) {
+  return prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: {
+      status: true,
+      payments: { select: { status: true }, orderBy: { createdAt: "asc" } },
+    },
+  })
+}
+
+describe("Mercado Pago webhook (#57, RF30, RN13)", () => {
+  beforeEach(() => {
+    vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", webhookSecret)
+  })
+
+  it("validates the signature and confirms the order only once", async () => {
+    const { order, sku, paymentId } = await pendingPix()
+    settle(paymentId)
+    const requestId = randomUUID()
+
+    const first = await mercadoPagoWebhook(
+      notification(paymentId, { requestId })
+    )
+    expect(first.status).toBe(200)
+    expect(await first.json()).toEqual({ ok: true, status: "processed" })
+    expect(await statusOf(order.orderId)).toEqual({
+      status: "PAID",
+      payments: [{ status: "APPROVED" }],
+    })
+    expect(await fixtures.counters(sku.id)).toEqual({ onHand: 8, reserved: 0 })
+
+    // The same delivery again and a new delivery of the same payment
+    const repeated = await mercadoPagoWebhook(
+      notification(paymentId, { requestId })
+    )
+    expect(await repeated.json()).toEqual({ ok: true, status: "duplicate" })
+    const again = await mercadoPagoWebhook(notification(paymentId))
+    expect(again.status).toBe(200)
+    expect(
+      await prisma.orderStatusHistory.count({
+        where: { orderId: order.orderId, toStatus: "PAID" },
+      })
+    ).toBe(1)
+    expect(await fixtures.counters(sku.id)).toEqual({ onHand: 8, reserved: 0 })
+  })
+
+  it("refuses a notification with an invalid signature", async () => {
+    const { order, paymentId } = await pendingPix()
+    settle(paymentId)
+    const forged = await mercadoPagoWebhook(
+      notification(paymentId, { secret: "outro-segredo" })
+    )
+    expect(forged.status).toBe(401)
+    const unsigned = await mercadoPagoWebhook(
+      new Request(
+        `https://loja.test/api/webhooks/mercadopago?data.id=${paymentId}&type=payment`,
+        { method: "POST", body: "{}" }
+      )
+    )
+    expect(unsigned.status).toBe(401)
+    expect((await statusOf(order.orderId)).status).toBe("AWAITING_PAYMENT")
+  })
+
+  it("refuses every notification without the secret configured", async () => {
+    vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", "")
+    const response = await mercadoPagoWebhook(notification("123"))
+    expect(response.status).toBe(503)
+  })
+
+  it("does not confirm the order without approved", async () => {
+    const { order, paymentId } = await pendingPix()
+    settle(paymentId, "in_process")
+    await mercadoPagoWebhook(notification(paymentId))
+    expect(await statusOf(order.orderId)).toEqual({
+      status: "AWAITING_PAYMENT",
+      payments: [{ status: "PENDING" }],
+    })
+
+    settle(paymentId, "rejected")
+    await mercadoPagoWebhook(notification(paymentId))
+    expect(await statusOf(order.orderId)).toEqual({
+      status: "AWAITING_PAYMENT",
+      payments: [{ status: "REJECTED" }],
+    })
+  })
+
+  it("ignores other topics, even when signed", async () => {
+    const signed = notification("123")
+    const url = signed.url.replace("type=payment", "type=merchant_order")
+    const response = await mercadoPagoWebhook(
+      new Request(url, {
+        method: "POST",
+        headers: signed.headers,
+        body: JSON.stringify({ type: "merchant_order", data: { id: "123" } }),
+      })
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, ignored: true })
+    expect(
+      await prisma.paymentNotification.count({ where: { resourceId: "123" } })
+    ).toBe(0)
+  })
+})
+
+describe("reconciliation by GET /v1/payments/{id} (#57)", () => {
+  it("confirms a payment whose webhook never arrived", async () => {
+    const { order, paymentId } = await pendingPix()
+    settle(paymentId)
+    await reconcilePendingPayments({
+      now: new Date(Date.now() + 2 * 60_000),
+    })
+    expect(await statusOf(order.orderId)).toEqual({
+      status: "PAID",
+      payments: [{ status: "APPROVED" }],
+    })
+  })
+
+  it("finds by the external reference a payment created without answer", async () => {
+    const { order } = await placeCardOrder({})
+    mercadoPago = { kind: "lost", status: "approved", detail: "accredited" }
+    const attempt = await payOrder({
+      orderId: order.orderId,
+      method: "CARD",
+      formData: brickCard,
+    })
+    expect(attempt).toMatchObject({
+      success: true,
+      attempt: { payment: { status: "PENDING", paymentId: null } },
+    })
+    await reconcilePendingPayments({
+      now: new Date(Date.now() + 2 * 60_000),
+    })
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.orderId },
+    })
+    expect(payment.status).toBe("APPROVED")
+    expect(payment.paymentId).toMatch(/^\d+$/)
+    expect((await statusOf(order.orderId)).status).toBe("PAID")
+  })
+
+  it("gives up an attempt Mercado Pago never registered, so the customer pays again", async () => {
+    const { order } = await placeCardOrder({})
+    mercadoPago = { kind: "timeout" }
+    await payOrder({
+      orderId: order.orderId,
+      method: "CARD",
+      formData: brickCard,
+    })
+    expect(
+      (await getOrderPayment({ orderId: order.orderId })).success &&
+        (await getOrderPayment({ orderId: order.orderId }))
+    ).toMatchObject({ context: { canPay: false } })
+
+    await reconcilePendingPayments({
+      now: new Date(Date.now() + 16 * 60_000),
+    })
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.orderId },
+    })
+    expect(payment).toMatchObject({
+      status: "CANCELED",
+      statusDetail: "provider_not_found",
+    })
+    expect(await getOrderPayment({ orderId: order.orderId })).toMatchObject({
+      success: true,
+      context: { canPay: true },
+    })
+  })
+
+  it("confirms a Pix paid at the last minute instead of expiring it", async () => {
+    const { order, paymentId } = await pendingPix()
+    settle(paymentId)
+    const later = new Date(Date.now() + 31 * 60_000)
+    await reconcilePendingPayments({ now: later, expiredOnly: true })
+    expect(await expireUnpaidOrders(later)).not.toContain(order.orderId)
+    expect((await statusOf(order.orderId)).status).toBe("PAID")
   })
 })

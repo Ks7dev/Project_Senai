@@ -724,6 +724,24 @@ model Payment {
   @@map("payments")
 }
 
+/// Mercado Pago webhook notifications already received (RF30, #57). The
+/// unique request id makes a repeated delivery a no-op (idempotency).
+model PaymentNotification {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  /// `x-request-id` header sent by Mercado Pago
+  requestId   String    @unique @map("request_id") @db.VarChar(128)
+  /// Notification type, e.g. "payment"
+  topic       String    @db.VarChar(40)
+  /// Mercado Pago resource id (`data.id`)
+  resourceId  String    @map("resource_id") @db.VarChar(64)
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.DateTime(3)
+  processedAt DateTime? @map("processed_at") @db.DateTime(3)
+  attempts    Int       @default(0)
+
+  @@index([resourceId])
+  @@map("payment_notifications")
+}
+
 model Shipment {
   id           String         @id @default(uuid(7)) @db.Char(36)
   orderId      String         @unique @map("order_id") @db.Char(36)

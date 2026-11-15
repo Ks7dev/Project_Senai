@@ -1,4 +1,5 @@
 import "server-only"
+import { createHmac, timingSafeEqual } from "node:crypto"
 import { z } from "zod"
 import { logger } from "@/features/shared/lib/logger/logger"
 
@@ -370,6 +371,91 @@ export async function createMercadoPagoPayment(
     fetcher
   )
   return toProviderPayment(raw)
+}
+
+/**
+ * Secret of the webhook signature, from the Mercado Pago panel
+ * ("Your integrations" → Webhooks). Without it, notifications are
+ * refused and the reconciliation keeps the payments up to date.
+ *
+ * @returns The secret, or null.
+ */
+export function mercadoPagoWebhookSecret(): string | null {
+  return process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim() || null
+}
+
+/**
+ * Checks the `x-signature` header of a Mercado Pago notification
+ * (RF30, #57). The manifest is `id:<data.id>;request-id:<x-request-id>;
+ * ts:<ts>;` (parts without a value are left out, alphanumeric ids in
+ * lower case) signed with HMAC-SHA256 and the webhook secret; the hex
+ * digests are compared in constant time.
+ *
+ * @param input - Signature header, request id header, `data.id` of the
+ * query string and the secret.
+ * @returns True when the signature matches.
+ */
+export function verifyWebhookSignature(input: {
+  signature: string | null
+  requestId: string | null
+  dataId: string | null
+  secret: string
+}): boolean {
+  if (!input.signature) return false
+  const parts = new Map(
+    input.signature.split(",").map((part) => {
+      const [key, ...value] = part.split("=")
+      return [key.trim(), value.join("=").trim()] as const
+    })
+  )
+  const ts = parts.get("ts")
+  const v1 = parts.get("v1")
+  if (!ts || !v1 || !/^[0-9a-f]{64}$/i.test(v1)) return false
+  const dataId = input.dataId
+    ? /^[a-z0-9]+$/i.test(input.dataId)
+      ? input.dataId.toLowerCase()
+      : input.dataId
+    : null
+  const manifest = [
+    dataId ? `id:${dataId};` : "",
+    input.requestId ? `request-id:${input.requestId};` : "",
+    `ts:${ts};`,
+  ].join("")
+  const expected = createHmac("sha256", input.secret).update(manifest).digest()
+  const received = Buffer.from(v1, "hex")
+  return (
+    received.length === expected.length && timingSafeEqual(received, expected)
+  )
+}
+
+/**
+ * Finds the payment created for one of our payment rows, by the
+ * `external_reference`, when the creation call got no answer (#57).
+ *
+ * @param externalReference - Our payment row id.
+ * @param fetcher - Fetch implementation (replaced in tests).
+ * @returns The newest payment found, or null.
+ * @throws MercadoPagoError.
+ */
+export async function findMercadoPagoPaymentByReference(
+  externalReference: string,
+  fetcher: typeof fetch = fetch
+): Promise<ProviderPayment | null> {
+  const query = new URLSearchParams({
+    external_reference: externalReference,
+    sort: "date_created",
+    criteria: "desc",
+    limit: "1",
+  })
+  const raw = await callMercadoPago(
+    "search_payment",
+    `/v1/payments/search?${query}`,
+    { method: "GET" },
+    fetcher
+  )
+  const results = (raw as { results?: unknown } | null)?.results
+  if (!Array.isArray(results) || results.length === 0) return null
+  return toProviderPayment(results[0])
 }
 
 /**
