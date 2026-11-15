@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 
 /** Fictitious customer created by prisma/seed.ts. */
 const CUSTOMER_EMAIL = "cliente.pf@atelierbureau.test"
@@ -54,6 +54,50 @@ async function addAddress(page: Page, label: string) {
   await expect(page.getByText(label)).toBeVisible()
 }
 
+/**
+ * Presses Tab until the element has the focus, as a keyboard user does.
+ *
+ * @param page - Browser page.
+ * @param target - Element to reach.
+ * @param limit - Most Tab presses before giving up.
+ */
+async function tabTo(page: Page, target: Locator, limit = 120) {
+  for (let i = 0; i < limit; i++) {
+    if (await target.evaluate((el) => el === document.activeElement)) return
+    await page.keyboard.press("Tab")
+  }
+  await expect(target).toBeFocused()
+}
+
+/**
+ * Checks a radio with the keyboard only: Tab reaches its group, then the
+ * arrow keys move the choice, as in a native radio group.
+ *
+ * @param page - Browser page.
+ * @param radio - Radio to check.
+ */
+async function chooseRadio(page: Page, radio: Locator) {
+  const name = await radio.getAttribute("name")
+  for (let i = 0; i < 120; i++) {
+    const inGroup = await page.evaluate(
+      (group) =>
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.type === "radio" &&
+        document.activeElement.name === group,
+      name
+    )
+    if (inGroup) break
+    await page.keyboard.press("Tab")
+  }
+  if (await radio.evaluate((el) => el === document.activeElement)) {
+    await page.keyboard.press("Space")
+  }
+  for (let i = 0; i < 60 && !(await radio.isChecked()); i++) {
+    await page.keyboard.press("ArrowDown")
+  }
+  await expect(radio).toBeChecked()
+}
+
 test.describe("purchase flow (RNF07, #77)", () => {
   test("customer finds a product, adds it to the cart and places the order", async ({
     page,
@@ -93,21 +137,47 @@ test.describe("purchase flow (RNF07, #77)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
   })
 
-  test("the whole purchase flow works with the keyboard only (RNF13)", async ({
+  test("the whole purchase flow works with the keyboard only (RNF13, #20)", async ({
     page,
   }) => {
+    // Setup: the signed-in customer with a delivery address
+    const label = `E2E teclado ${Date.now()}`
+    await signIn(page, "/conta")
+    await addAddress(page, label)
+
+    // Product page: skip link, then Tab to the buy button
     await page.goto(`/produto/${PRODUCT_SLUG}`)
     await page.keyboard.press("Tab")
     const skip = page.getByRole("link", { name: "Pular para o conteúdo" })
     await expect(skip).toBeFocused()
     await page.keyboard.press("Enter")
     await expect(page.locator("main#conteudo")).toBeFocused()
+    await tabTo(
+      page,
+      page.getByRole("button", { name: /^(Comprar|Encomendar)$/ })
+    )
+    await page.keyboard.press("Enter")
+    await page.waitForURL("**/carrinho")
 
-    const buy = page.getByRole("button", { name: /^(Comprar|Encomendar)$/ })
-    for (let i = 0; i < 60; i++) {
-      if (await buy.evaluate((el) => el === document.activeElement)) break
-      await page.keyboard.press("Tab")
-    }
-    await expect(buy).toBeFocused()
+    // Cart: Tab to checkout
+    await tabTo(page, page.getByRole("link", { name: "Finalizar compra" }))
+    await page.keyboard.press("Enter")
+    await page.waitForURL("**/checkout")
+
+    // Checkout: address and payment chosen with the arrow keys
+    await chooseRadio(
+      page,
+      page.getByRole("radio", { name: new RegExp(label) })
+    )
+    const confirm = page.getByRole("button", { name: "Confirmar pedido" })
+    await expect(confirm).toBeEnabled({ timeout: 30_000 })
+    await chooseRadio(page, page.getByRole("radio", { name: /Pix/ }))
+    await tabTo(page, confirm)
+    await page.keyboard.press("Enter")
+
+    await page.waitForURL(/\/conta\/pedidos(\/[^/]+\/pagamento)?$/, {
+      timeout: 30_000,
+    })
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
   })
 })
