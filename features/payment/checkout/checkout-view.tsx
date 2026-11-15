@@ -23,6 +23,7 @@ import {
 import type { CheckoutPaymentMethod } from "@/features/payment/checkout/schema/checkout-schema"
 import { CartPricingNotes } from "@/features/shared/components/cart-pricing-notes"
 import { PromotionsNote } from "@/features/shared/components/promotions-note"
+import { institutionalLinks } from "@/features/shared/config/navigation"
 import {
   centsToMoney,
   moneyToCents,
@@ -492,6 +493,26 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
         <p className="text-label-sm text-ink-muted">
           Ao confirmar, os itens ficam reservados e você segue para o pagamento.
         </p>
+        <nav
+          aria-label="Políticas da loja"
+          className="flex flex-col gap-xs border-t border-line-subtle pt-sm text-label-sm text-ink-muted"
+        >
+          <p>Ao confirmar o pedido, você concorda com as nossas políticas:</p>
+          <ul className="flex flex-wrap gap-x-md gap-y-xs">
+            {institutionalLinks.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  target="_blank"
+                  className="text-primary underline"
+                >
+                  {link.label}
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </aside>
     </div>
   )
