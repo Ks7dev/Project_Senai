@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useCallback, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -22,6 +22,11 @@ import {
   type AddressData,
   type AddressInput,
 } from "@/features/account/addresses/schema/address-schema"
+import {
+  cepLookupMessage,
+  useCepLookup,
+} from "@/features/shared/lib/viacep/use-cep-lookup"
+import type { CepAddress } from "@/features/shared/lib/viacep/viacep"
 
 const empty: AddressInput = {
   label: "",
@@ -62,6 +67,21 @@ export function AddressesView({
     defaultValues: empty,
   })
   const errors = form.formState.errors
+
+  // ViaCEP fills the fields; they stay editable whatever happens (RF23)
+  const fillFromCep = useCallback(
+    (address: CepAddress) => {
+      const options = { shouldValidate: true, shouldDirty: true }
+      if (address.street) form.setValue("street", address.street, options)
+      if (address.district) form.setValue("district", address.district, options)
+      form.setValue("city", address.city, options)
+      const state = STATES.find((uf) => uf === address.state)
+      if (state) form.setValue("state", state, options)
+    },
+    [form]
+  )
+  const cepLookup = useCepLookup(fillFromCep)
+  const cepMessage = cepLookupMessage(cepLookup.state)
 
   const run = (action: () => Promise<{ success: boolean; error?: string }>) =>
     startTransition(async () => {
@@ -184,10 +204,32 @@ export function AddressesView({
               placeholder: "Matriz, Filial Centro, Obra…",
             })}
             {field("recipient", "Quem recebe")}
-            {field("cep", "CEP", {
-              inputMode: "numeric",
-              autoComplete: "postal-code",
-            })}
+            <FormField id="address-cep" label="CEP" error={errors.cep?.message}>
+              <Input
+                id="address-cep"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={9}
+                aria-invalid={errors.cep ? true : undefined}
+                aria-describedby={
+                  errors.cep
+                    ? "address-cep-error address-cep-status"
+                    : "address-cep-status"
+                }
+                {...form.register("cep", {
+                  onChange: (event) =>
+                    void cepLookup.lookup(event.target.value),
+                })}
+              />
+              <p
+                id="address-cep-status"
+                role="status"
+                aria-live="polite"
+                className="text-body-sm text-ink-muted"
+              >
+                {cepMessage}
+              </p>
+            </FormField>
             {field("street", "Rua", { autoComplete: "address-line1" })}
             {field("number", "Número")}
             {field("complement", "Complemento")}
