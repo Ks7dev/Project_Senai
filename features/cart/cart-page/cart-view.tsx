@@ -160,6 +160,18 @@ export function CartPageView({
                   Finalizar compra
                 </Link>
               )}
+            {purchasable.length > 0 && (
+              <Link
+                href={
+                  loggedIn
+                    ? "/cotacao/nova?origem=carrinho"
+                    : `/entrar?redirect=${encodeURIComponent("/cotacao/nova?origem=carrinho")}`
+                }
+                className={buttonVariants({ variant: "ghost" })}
+              >
+                Solicitar cotação do carrinho
+              </Link>
+            )}
             {purchasable.length > 0 &&
               purchasable.length < cart.lines.length && (
                 <p className="text-body-sm text-ink-muted">

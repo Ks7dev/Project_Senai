@@ -10,7 +10,8 @@ import { dirname, join, normalize, sep } from "node:path"
  * @returns The absolute storage root.
  */
 export function storageRoot(): string {
-  return process.env.STORAGE_DIR ?? join(process.cwd(), "storage", "uploads")
+  // An empty STORAGE_DIR (as in .env.example) also means the default
+  return process.env.STORAGE_DIR || join(process.cwd(), "storage", "uploads")
 }
 
 /**
