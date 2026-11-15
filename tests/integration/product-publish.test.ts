@@ -65,7 +65,7 @@ beforeEach(() => {
 })
 
 afterAll(async () => {
-  await prisma.auditLog.deleteMany({ where: { entityId: { in: productIds } } })
+  // audit_logs is append-only (database trigger), so its rows stay
   await prisma.product.deleteMany({ where: { id: { in: productIds } } })
   await prisma.$disconnect()
 })

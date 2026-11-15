@@ -48,9 +48,7 @@ afterAll(async () => {
     select: { id: true },
   })
   await prisma.userRole.deleteMany({ where: { userId: user.id } })
-  await prisma.auditLog.deleteMany({
-    where: { action: "user.roles", entityId: user.id },
-  })
+  // audit_logs is append-only (database trigger), so its rows stay
   await prisma.$disconnect()
 })
 
