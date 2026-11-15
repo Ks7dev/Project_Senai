@@ -151,6 +151,21 @@ export function CartPageView({
                 }))}
               />
             )}
+            {purchasable.length > 0 &&
+              purchasable.length === cart.lines.length && (
+                <Link
+                  href={loggedIn ? "/checkout" : "/entrar?redirect=%2Fcheckout"}
+                  className={buttonVariants()}
+                >
+                  Finalizar compra
+                </Link>
+              )}
+            {purchasable.length > 0 &&
+              purchasable.length < cart.lines.length && (
+                <p className="text-body-sm text-ink-muted">
+                  Remova os itens indisponíveis para finalizar a compra.
+                </p>
+              )}
             {loggedIn ? (
               <SaveProjectListForm />
             ) : (

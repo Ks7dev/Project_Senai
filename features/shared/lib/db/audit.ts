@@ -3,8 +3,11 @@ import type { Prisma } from "@/generated/prisma/client"
 
 /** A sensitive action to record (RNF12). */
 export type AuditEntry = {
-  /** User who performed the action (from the session). */
-  userId: string
+  /**
+   * User who performed the action (from the session), or null for the
+   * system (payment webhook, reconciliation job).
+   */
+  userId: string | null
   /** Action name in English, e.g. "category.update". */
   action: string
   /** Affected entity, e.g. "category". */

@@ -1,6 +1,5 @@
 "use server"
 
-import { z } from "zod"
 import type { Prisma } from "@/generated/prisma/client"
 import {
   addressChangeQuoteSchema,
@@ -8,6 +7,11 @@ import {
   type AddressChangeQuoteInput,
   type ConfirmAddressChangeInput,
 } from "@/features/orders/address-change/schema/address-change-schema"
+import {
+  addressLine as describeAddress,
+  toAddressSnapshot,
+  type AddressSnapshot,
+} from "@/features/shared/lib/addresses/address-snapshot"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { writeAudit } from "@/features/shared/lib/db/audit"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
@@ -127,63 +131,6 @@ const PAYMENT_IN_PROGRESS_MESSAGE =
 const QUOTE_CHANGED_MESSAGE =
   "O valor do frete mudou desde a cotação. Confira a nova cotação antes de confirmar."
 
-/** Address snapshot stored on the order (no later edit changes it). */
-type AddressSnapshot = {
-  addressId: string
-  label: string
-  recipient: string
-  cep: string
-  street: string
-  number: string
-  complement: string | null
-  district: string
-  city: string
-  state: string
-}
-
-const snapshotSchema = z
-  .object({
-    cep: z.string().optional(),
-    street: z.string().optional(),
-    number: z.string().optional(),
-    complement: z.string().nullable().optional(),
-    district: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-  })
-  .passthrough()
-
-/**
- * Formats a CEP as 00000-000.
- *
- * @param cep - 8 digits.
- * @returns The formatted CEP.
- */
-function formatCep(cep: string): string {
-  return cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")
-}
-
-/**
- * One-line description of an address snapshot or a saved address.
- *
- * @param value - Address fields.
- * @returns "Rua, 10 – Sala 2 · Bairro · Cidade/UF · CEP 00000-000".
- */
-function describeAddress(value: unknown): string {
-  const parsed = snapshotSchema.safeParse(value)
-  if (!parsed.success) return "—"
-  const { cep, street, number, complement, district, city, state } = parsed.data
-  const parts = [
-    street
-      ? `${street}${number ? `, ${number}` : ""}${complement ? ` – ${complement}` : ""}`
-      : null,
-    district || null,
-    city ? `${city}${state ? `/${state}` : ""}` : null,
-    cep ? `CEP ${formatCep(cep)}` : null,
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(" · ") : "—"
-}
-
 /**
  * Logged-in user, from the session (never from the request).
  *
@@ -300,18 +247,7 @@ async function loadAddress(
       "address_not_found"
     )
   }
-  return {
-    addressId: address.id,
-    label: address.label,
-    recipient: address.recipient,
-    cep: address.cep,
-    street: address.street,
-    number: address.number,
-    complement: address.complement,
-    district: address.district,
-    city: address.city,
-    state: address.state,
-  }
+  return toAddressSnapshot(address)
 }
 
 /**
