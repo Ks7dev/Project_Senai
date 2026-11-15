@@ -350,6 +350,43 @@ export function invoicedInstallmentsEmail(
 }
 
 /**
+ * Refund done (RF34): how much went back and how.
+ *
+ * @param input - Order data, refunded amount, whether it was the whole
+ * remaining value and how the money goes back.
+ * @returns The e-mail.
+ */
+export function refundCompletedEmail(
+  input: OrderEmailData & {
+    amount: string
+    full: boolean
+    channel: "MERCADO_PAGO" | "MANUAL_TRANSFER"
+  }
+): RenderedEmail {
+  return render(
+    "order.refunded",
+    `Pedido ${input.number}: estorno ${input.full ? "total" : "parcial"}`,
+    {
+      preheader: "O estorno do seu pedido foi processado.",
+      heading: input.full
+        ? "Estorno total processado"
+        : "Estorno parcial processado",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        input.channel === "MERCADO_PAGO"
+          ? "O valor abaixo foi estornado pelo mesmo meio de pagamento. No cartão, o crédito aparece na fatura conforme o prazo do emissor."
+          : `O valor abaixo será devolvido por transferência bancária para a conta da empresa.${input.full ? " As parcelas em aberto do faturado foram canceladas." : ""}`,
+      ],
+      details: [
+        ...orderDetails(input),
+        { label: "Valor estornado", value: brl.format(Number(input.amount)) },
+      ],
+      action: { label: "Ver pedido", url: input.url },
+    }
+  )
+}
+
+/**
  * Support ticket opened or updated (RF53: chamados, RF18).
  *
  * @param input - Name, ticket number, status text and link.

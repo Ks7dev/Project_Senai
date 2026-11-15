@@ -98,6 +98,18 @@ export const settings: SettingSeed[] = [
     description: "Vencimentos do pagamento faturado, em dias (RN03)",
   },
   {
+    key: "refund.withdrawal_days",
+    value: 7,
+    description:
+      "Prazo do direito de arrependimento de PF, em dias corridos do recebimento, com reembolso integral (RN22)",
+  },
+  {
+    key: "refund.max_days_after_payment",
+    value: 180,
+    description:
+      "Prazo máximo para estornar pelo Mercado Pago, em dias após a aprovação do pagamento, salvo arrependimento (RN18)",
+  },
+  {
     key: "personalization.engraving",
     value: { price: "90.00", extraBusinessDays: 3, maxLength: 30 },
     description:

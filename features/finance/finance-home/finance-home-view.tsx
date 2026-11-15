@@ -29,6 +29,13 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
       "Boletos próprios das compras faturadas, vencimentos, baixa manual e pedidos faturados aguardando confirmação.",
     permission: "payment:refund",
   },
+  {
+    href: "/admin/financeiro/estornos",
+    title: "Estornos",
+    description:
+      "Estornos totais e parciais pelo Mercado Pago ou por transferência no faturado, arrependimento de PF e aprovação do financeiro.",
+    permission: "payment:refund",
+  },
 ]
 
 /**

@@ -117,6 +117,35 @@ enum SettlementMethod {
   BANK_RETURN
 }
 
+/// Status of a refund (RF34, #59)
+enum RefundStatus {
+  PENDING_APPROVAL
+  PROCESSING
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+/// Why the money goes back (RF34, RN07, RN18, RN22)
+enum RefundReason {
+  CANCELLATION
+  WITHDRAWAL
+  EVALUATED_RETURN
+  ADJUSTMENT
+}
+
+/// Whole remaining amount or part of it (RF34)
+enum RefundKind {
+  FULL
+  PARTIAL
+}
+
+/// How the money goes back: Mercado Pago API or bank transfer (invoiced)
+enum RefundChannel {
+  MERCADO_PAGO
+  MANUAL_TRANSFER
+}
+
 enum EmailStatus {
   PENDING
   SENT
@@ -175,6 +204,8 @@ model User {
   creditLimitChanges CreditLimitChange[]
   updatedSettings    Setting[]
   settledReceivables Receivable[]
+  requestedRefunds   Refund[]             @relation("RefundRequester")
+  decidedRefunds     Refund[]             @relation("RefundDecider")
 
   @@index([priceTableId])
   @@map("users")
@@ -706,6 +737,7 @@ model Order {
   shipment       Shipment?
   stockMovements StockMovement[]
   receivables    Receivable[]
+  refunds        Refund[]
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -796,10 +828,51 @@ model Payment {
   createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
   order          Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds        Refund[]
 
   @@index([orderId])
   @@index([status, expiresAt])
   @@map("payments")
+}
+
+/// Full or partial refund of an order (RF34, RN07, RN18, RN22): through
+/// the Mercado Pago API, or by bank transfer for invoiced orders. A
+/// refund of a corporate order already invoiced waits for the finance
+/// approval (RN07). Every step is also in the audit log (RNF12).
+model Refund {
+  id               String        @id @default(uuid(7)) @db.Char(36)
+  orderId          String        @map("order_id") @db.Char(36)
+  /// Mercado Pago payment refunded; null for invoiced orders
+  paymentRowId     String?       @map("payment_row_id") @db.Char(36)
+  kind             RefundKind
+  reason           RefundReason
+  channel          RefundChannel
+  amount           Decimal       @db.Decimal(12, 2)
+  status           RefundStatus
+  /// Refund id returned by Mercado Pago
+  providerRefundId String?       @unique @map("provider_refund_id") @db.VarChar(64)
+  /// Justification of the request (evaluation report, cancellation, etc.)
+  note             String        @db.VarChar(500)
+  /// Why the Mercado Pago call failed, safe to show
+  failureReason    String?       @map("failure_reason") @db.VarChar(255)
+  requestedById    String        @map("requested_by_id") @db.VarChar(36)
+  decidedById      String?       @map("decided_by_id") @db.VarChar(36)
+  decidedAt        DateTime?     @map("decided_at") @db.DateTime(3)
+  decisionNote     String?       @map("decision_note") @db.VarChar(255)
+  completedAt      DateTime?     @map("completed_at") @db.DateTime(3)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment          Payment?      @relation(fields: [paymentRowId], references: [id], onDelete: Restrict)
+  requestedBy      User          @relation("RefundRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy        User?         @relation("RefundDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentRowId])
+  @@index([requestedById])
+  @@index([decidedById])
+  @@map("refunds")
 }
 
 /// Installment of an invoiced order (RF12, RF33, RN03, RN17): own boleto
