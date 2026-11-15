@@ -3,6 +3,10 @@ import { redirect } from "next/navigation"
 import { FavoritesView } from "@/features/account/favorites/favorites-view"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { getFavoriteCards } from "@/features/shared/lib/catalog/catalog-query"
+import {
+  loadCustomerPricing,
+  priceCards,
+} from "@/features/shared/lib/pricing/customer-pricing"
 
 export const metadata = { title: "Favoritos — Atelier Bureau" }
 
@@ -14,7 +18,12 @@ export const metadata = { title: "Favoritos — Atelier Bureau" }
 async function Favorites() {
   const user = await getCurrentUser()
   if (!user) redirect("/entrar?redirect=%2Fconta%2Ffavoritos")
-  return <FavoritesView products={await getFavoriteCards(user.id)} />
+  const pricing = await loadCustomerPricing(user.id)
+  return (
+    <FavoritesView
+      products={priceCards(await getFavoriteCards(user.id), pricing)}
+    />
+  )
 }
 
 /**
