@@ -7,6 +7,7 @@ import {
   type OrderApprovalInput,
 } from "@/features/orders/order-approval/schema/order-approval-schema"
 import { canDecideOrderApproval } from "@/features/shared/lib/auth/corporate-roles"
+import { assertInvoicedCredit } from "@/features/shared/lib/credit/credit-service"
 import { writeAudit } from "@/features/shared/lib/db/audit"
 import { requireCorporatePermission } from "@/features/shared/lib/db/corporate"
 import { prisma } from "@/features/shared/lib/db/prisma"
@@ -230,7 +231,7 @@ export async function decideOrderApproval(
     const result = await prisma.$transaction(async (tx) => {
       const scoped = await tx.order.findFirst({
         where: { id: orderId, organizationId: context.organizationId },
-        select: { id: true, userId: true, paymentMethod: true },
+        select: { id: true, userId: true, paymentMethod: true, total: true },
       })
       if (!scoped) throw new AppError(NOT_FOUND_MESSAGE, "not_found")
       const memberCount = await tx.member.count({
@@ -244,6 +245,15 @@ export async function decideOrderApproval(
         })
       ) {
         throw new AppError(SELF_APPROVAL_MESSAGE, "self_approval")
+      }
+      // An invoiced order is only confirmed with credit available (RN10,
+      // RN13): a limit lowered or used up since the checkout blocks it
+      if (approved && scoped.paymentMethod === "INVOICED") {
+        await assertInvoicedCredit(tx, {
+          organizationId: context.organizationId,
+          amount: scoped.total.toFixed(2),
+          excludeOrderId: scoped.id,
+        })
       }
 
       const to: OrderStatusKey = !approved
