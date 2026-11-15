@@ -87,6 +87,7 @@ function StatusForm({
       orderId: order.id,
       to: order.nextStatuses[0],
       note: "",
+      trackingCode: "",
       cancellationReason: undefined,
     },
   })
@@ -102,6 +103,7 @@ function StatusForm({
         ...values,
         cancellationReason:
           values.to === "CANCELED" ? values.cancellationReason : undefined,
+        trackingCode: values.to === "SHIPPED" ? values.trackingCode : "",
       })
       if (!result.success) return setError(result.error)
       onDone(
@@ -157,6 +159,20 @@ function StatusForm({
                 </option>
               ))}
             </select>
+          </FormField>
+        )}
+        {to === "SHIPPED" && (
+          <FormField
+            id={`${prefix}-tracking`}
+            label="Código de rastreio (opcional)"
+            error={errors.trackingCode?.message}
+          >
+            <Input
+              id={`${prefix}-tracking`}
+              autoComplete="off"
+              {...fieldAria(`${prefix}-tracking`, errors.trackingCode?.message)}
+              {...form.register("trackingCode")}
+            />
           </FormField>
         )}
         <FormField
@@ -271,6 +287,11 @@ export function OrderManagementView({
                     {order.company && ` · ${order.company}`} ·{" "}
                     {dateTime.format(new Date(order.createdAt))}
                   </span>
+                  {order.trackingCode && (
+                    <span className="text-body-sm text-ink-muted">
+                      Rastreio {order.trackingCode}
+                    </span>
+                  )}
                   {order.scheduledDeliveryAt && (
                     <span className="text-body-sm text-ink">
                       Entrega e instalação agendadas para{" "}

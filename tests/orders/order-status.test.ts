@@ -92,6 +92,23 @@ describe("status change form (#65)", () => {
         to: "SEPARATING",
         cancellationReason: "",
       })
-    ).toEqual({ orderId, to: "SEPARATING", note: "" })
+    ).toEqual({ orderId, to: "SEPARATING", note: "", trackingCode: "" })
+  })
+
+  it("accepts only a plain tracking code (#66)", () => {
+    expect(
+      updateOrderStatusSchema.parse({
+        orderId,
+        to: "SHIPPED",
+        trackingCode: " AA123456789BR ",
+      }).trackingCode
+    ).toBe("AA123456789BR")
+    expect(
+      updateOrderStatusSchema.safeParse({
+        orderId,
+        to: "SHIPPED",
+        trackingCode: "<script>",
+      }).success
+    ).toBe(false)
   })
 })
