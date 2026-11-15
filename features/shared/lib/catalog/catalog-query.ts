@@ -41,6 +41,43 @@ export type CatalogPage = {
 
 type FilterPart = "brand" | "material" | "price" | "leadTime"
 
+/** Most products a search matches by technical specification. */
+const MAX_SPEC_MATCHES = 500
+
+/**
+ * Escapes the LIKE wildcards of a search text, so "%" and "_" typed by
+ * the user are matched literally.
+ *
+ * @param text - Search text.
+ * @returns The text with `\`, `%` and `_` escaped.
+ */
+export function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+/**
+ * Ids of the published products whose technical specification values
+ * contain the search text (RF02, #25). The specification is a JSON
+ * column, which Prisma cannot search across every key, so this is the
+ * one justified `$queryRaw`: the values are extracted and compared with
+ * the accent and case insensitive utf8mb4_0900_ai_ci collation.
+ *
+ * @param q - Search text.
+ * @returns Matching product ids (at most MAX_SPEC_MATCHES).
+ */
+export async function findProductIdsBySpecs(q: string): Promise<string[]> {
+  const pattern = `%${escapeLike(q)}%`
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM products
+    WHERE status = 'ACTIVE'
+      AND deleted_at IS NULL
+      AND specs IS NOT NULL
+      AND CONVERT(CAST(JSON_EXTRACT(specs, '$.*') AS CHAR) USING utf8mb4)
+        COLLATE utf8mb4_0900_ai_ci LIKE ${pattern}
+    LIMIT ${MAX_SPEC_MATCHES}`
+  return rows.map((row) => row.id)
+}
+
 /**
  * Builds the Prisma filter of the listing: only published, not deleted
  * products (RF42), in the given categories, matching the search text
@@ -51,25 +88,30 @@ type FilterPart = "brand" | "material" | "price" | "leadTime"
  * @param filters - Parsed filters.
  * @param categoryIds - Category subtree ids, or undefined for all.
  * @param skip - Filter to ignore (for facet counts).
+ * @param specMatchIds - Products whose technical specification matches
+ * the search text (from findProductIdsBySpecs).
  * @returns The Prisma where clause.
  */
 export function buildProductWhere(
   filters: CatalogFilters,
   categoryIds?: string[],
-  skip?: FilterPart
+  skip?: FilterPart,
+  specMatchIds: string[] = []
 ): Prisma.ProductWhereInput {
   const and: Prisma.ProductWhereInput[] = [
     { status: "ACTIVE", deletedAt: null, category: { active: true } },
   ]
   if (categoryIds) and.push({ categoryId: { in: categoryIds } })
   if (filters.q) {
-    const q = filters.q
+    // Prisma's `contains` becomes a LIKE without escaping the wildcards
+    const q = escapeLike(filters.q)
     and.push({
       OR: [
         { name: { contains: q } },
         { description: { contains: q } },
         { brand: { contains: q } },
         { skus: { some: { code: { contains: q.toUpperCase() } } } },
+        ...(specMatchIds.length > 0 ? [{ id: { in: specMatchIds } }] : []),
       ],
     })
   }
@@ -216,7 +258,10 @@ export async function queryCatalog(
   cacheTag(PRODUCTS_CACHE_TAG, CATEGORIES_CACHE_TAG)
   cacheLife("minutes")
 
-  const where = buildProductWhere(filters, categoryIds)
+  const specMatchIds = filters.q ? await findProductIdsBySpecs(filters.q) : []
+  const whereWithout = (skip?: FilterPart) =>
+    buildProductWhere(filters, categoryIds, skip, specMatchIds)
+  const where = whereWithout()
   const [total, rows, brandRows, materialRows, leadTimeRows] =
     await Promise.all([
       prisma.product.count({ where }),
@@ -229,18 +274,18 @@ export async function queryCatalog(
       }),
       prisma.product.groupBy({
         by: ["brand"],
-        where: buildProductWhere(filters, categoryIds, "brand"),
+        where: whereWithout("brand"),
         _count: { _all: true },
       }),
       prisma.sku.findMany({
         where: {
           active: true,
-          product: buildProductWhere(filters, categoryIds, "material"),
+          product: whereWithout("material"),
         },
         select: { productId: true, attributes: true },
       }),
       prisma.product.findMany({
-        where: buildProductWhere(filters, categoryIds, "leadTime"),
+        where: whereWithout("leadTime"),
         select: { leadTimeDays: true },
       }),
     ])
@@ -291,7 +336,8 @@ export function countMaterials(
 
 /**
  * Search suggestions: categories and product names that contain the
- * typed text (RF02).
+ * typed text (RF02). Like the results, only published products of
+ * active categories are suggested.
  *
  * @param q - Search text.
  * @returns Up to 4 categories and 6 product names.
@@ -303,14 +349,20 @@ export async function searchSuggestions(q: string): Promise<{
   "use cache"
   cacheTag(PRODUCTS_CACHE_TAG, CATEGORIES_CACHE_TAG)
   cacheLife("minutes")
+  const text = escapeLike(q)
   const [categories, products] = await Promise.all([
     prisma.category.findMany({
-      where: { active: true, name: { contains: q } },
+      where: { active: true, name: { contains: text } },
       select: { name: true, slug: true },
       take: 4,
     }),
     prisma.product.findMany({
-      where: { status: "ACTIVE", deletedAt: null, name: { contains: q } },
+      where: {
+        status: "ACTIVE",
+        deletedAt: null,
+        category: { active: true },
+        name: { contains: text },
+      },
       select: { name: true, slug: true },
       take: 6,
     }),

@@ -7,6 +7,7 @@ import {
 import {
   buildProductWhere,
   countMaterials,
+  escapeLike,
   productOrderBy,
 } from "@/features/shared/lib/catalog/catalog-query"
 
@@ -79,6 +80,23 @@ describe("product query (#24, #25)", () => {
       (part) => "OR" in part
     ) as { OR: unknown[] }
     expect(search.OR).toHaveLength(4)
+  })
+
+  it("also matches the products found by technical specification", () => {
+    const where = buildProductWhere(
+      parseCatalogFilters({ q: "pólen" }),
+      undefined,
+      undefined,
+      ["p1", "p2"]
+    )
+    const search = (where.AND as Array<Record<string, unknown>>).find(
+      (part) => "OR" in part
+    ) as { OR: unknown[] }
+    expect(search.OR).toContainEqual({ id: { in: ["p1", "p2"] } })
+  })
+
+  it("escapes LIKE wildcards typed by the user", () => {
+    expect(escapeLike("50%_off\\")).toBe("50\\%\\_off\\\\")
   })
 
   it("leaves out one filter when counting its facet", () => {
