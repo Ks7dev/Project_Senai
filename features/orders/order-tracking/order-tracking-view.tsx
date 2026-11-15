@@ -145,6 +145,14 @@ export function OrderTrackingView({ tracking }: { tracking: OrderTracking }) {
             Entrega
           </h2>
           <p className="text-body-sm text-ink">{tracking.address}</p>
+          {tracking.extraLeadBusinessDays > 0 && (
+            <p className="text-body-sm text-ink-muted">
+              Personalização e serviços acrescentam{" "}
+              {tracking.extraLeadBusinessDays}{" "}
+              {tracking.extraLeadBusinessDays === 1 ? "dia útil" : "dias úteis"}{" "}
+              ao prazo de entrega.
+            </p>
+          )}
           {tracking.scheduledDeliveryAt && (
             <p className="flex items-start gap-xs text-body-sm text-ink">
               <CalendarDaysIcon

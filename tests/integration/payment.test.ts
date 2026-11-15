@@ -34,6 +34,10 @@ vi.mock("@/features/shared/lib/rate-limit/action-limit", () => ({
 const { prisma } = await import("@/features/shared/lib/db/prisma")
 const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
+const { loadCurrentCart } =
+  await import("@/features/shared/lib/cart/cart-store")
+const { setCartItemExtras } =
+  await import("@/features/cart/cart-page/action/cart-page-actions")
 const { resetCorreiosToken } =
   await import("@/features/shared/lib/correios/correios")
 const { getCheckout, placeOrder, quoteCheckoutShipping } =
@@ -249,6 +253,7 @@ async function placeCardOrder(input: {
   onHand?: number
   quantity?: number
   paymentMethod?: "CARD" | "PIX" | "BOLETO"
+  packaging?: boolean
 }) {
   const sku = await sellableSku(input.onHand ?? 10)
   const user = await prisma.user.findUniqueOrThrow({
@@ -262,6 +267,16 @@ async function placeCardOrder(input: {
   expect(
     await addToCart({ skuCode: sku.code, quantity: input.quantity ?? 2 })
   ).toMatchObject({ success: true })
+  if (input.packaging) {
+    const [line] = (await loadCurrentCart()).lines
+    expect(
+      await setCartItemExtras({
+        itemId: line!.id,
+        personalization: null,
+        services: ["institutional_packaging"],
+      })
+    ).toMatchObject({ success: true })
+  }
   const quote = await quoteCheckoutShipping({ addressId })
   if (!quote.success || quote.quote.status !== "quoted") {
     throw new Error("quote failed")
@@ -392,6 +407,24 @@ describe("checkout (#54, RF25, RF43)", () => {
       where: { cart: { user: { email: customer }, kind: "CART" } },
     })
     expect(cart).toBe(0)
+  })
+
+  it("stores the extra lead time of services on the order (#47, RF08)", async () => {
+    const plain = await placeCardOrder({ onHand: 10, quantity: 1 })
+    const packed = await placeCardOrder({
+      onHand: 10,
+      quantity: 1,
+      packaging: true,
+    })
+    const rows = await prisma.order.findMany({
+      where: { id: { in: [plain.order.orderId, packed.order.orderId] } },
+      select: { id: true, extraLeadBusinessDays: true, servicesTotal: true },
+    })
+    const byId = new Map(rows.map((row) => [row.id, row]))
+    expect(byId.get(plain.order.orderId)?.extraLeadBusinessDays).toBe(0)
+    const withService = byId.get(packed.order.orderId)
+    expect(withService?.extraLeadBusinessDays).toBeGreaterThan(0)
+    expect(Number(withService?.servicesTotal)).toBeGreaterThan(0)
   })
 
   it("refuses the order when the total changed since the review", async () => {

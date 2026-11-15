@@ -422,6 +422,13 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
               : undefined
           }
         />
+        {cart.extraBusinessDays > 0 && (
+          <p className="text-body-sm text-ink-muted">
+            Personalização e serviços acrescentam {cart.extraBusinessDays}{" "}
+            {cart.extraBusinessDays === 1 ? "dia útil" : "dias úteis"} ao prazo
+            de entrega.
+          </p>
+        )}
         {needsApproval && (
           <p
             role="note"
