@@ -1,6 +1,10 @@
 import "server-only"
 import type { Prisma } from "@/generated/prisma/client"
 import { AppError } from "@/features/shared/lib/errors/action-result"
+import {
+  cancelOpenInstallments,
+  createInvoicedInstallments,
+} from "@/features/shared/lib/invoiced/invoiced-billing"
 import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
 import {
   canTransition,
@@ -64,7 +68,9 @@ export function invalidTransitionMessage(
  * 2. refuses transitions the life cycle does not allow (and, with
  *    `expectedFrom`, orders that already left the expected statuses);
  * 3. applies the stock effect: write-off when the order is paid or
- *    approved, release when it is canceled (RF43, RN14);
+ *    approved, release when it is canceled (RF43, RN14); an invoiced
+ *    order gets its installments when confirmed and loses the open ones
+ *    when canceled or refunded (RF33);
  * 4. stamps the shipment dates when it ships or is delivered;
  * 5. writes the status history with the date and who did it (null for
  *    the system: payment webhook, expiration job);
@@ -119,6 +125,8 @@ export async function transitionOrder(
       orderId: input.orderId,
       userId: input.changedById,
     })
+    // Invoiced orders get their own boletos on confirmation (RF33)
+    await createInvoicedInstallments(tx, { orderId: input.orderId, now })
   }
   if (input.to === "CANCELED") {
     await releaseOrderStock(tx, {
@@ -126,6 +134,9 @@ export async function transitionOrder(
       userId: input.changedById,
       note: "Liberação por cancelamento do pedido",
     })
+  }
+  if (input.to === "CANCELED" || input.to === "REFUNDED") {
+    await cancelOpenInstallments(tx, input.orderId)
   }
   if (input.to === "SHIPPED" || input.to === "DELIVERED") {
     await tx.shipment.updateMany({

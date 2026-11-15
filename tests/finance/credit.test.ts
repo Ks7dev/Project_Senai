@@ -14,6 +14,7 @@ const tx = {
   creditLimitChange: { create: vi.fn() },
   auditLog: { create: vi.fn() },
   order: { groupBy: vi.fn() },
+  receivable: { findMany: vi.fn() },
 }
 
 vi.mock("@/features/shared/lib/db/permissions", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/features/shared/lib/db/prisma", () => ({
     $transaction: (run: (client: typeof tx) => unknown) => run(tx),
     organization: { findMany: vi.fn() },
     order: { groupBy: (args: unknown) => tx.order.groupBy(args) },
+    receivable: { findMany: (args: unknown) => tx.receivable.findMany(args) },
   },
 }))
 
@@ -165,6 +167,7 @@ describe("credit decision action (#61, RF58)", () => {
       { organizationId: "org-1", _sum: { total: decimal("2000.00") } },
     ])
     tx.creditLimitChange.create.mockResolvedValue({ id: "change-1" })
+    tx.receivable.findMany.mockResolvedValue([])
   })
 
   it("checks credit:approve and records the change with the history and audit", async () => {
@@ -255,9 +258,13 @@ describe("invoiced credit guard (RN10)", () => {
     tx.$queryRaw.mockReset()
     tx.organization.findFirst.mockReset()
     tx.order.groupBy.mockReset()
+    tx.receivable.findMany.mockReset()
+    tx.receivable.findMany.mockResolvedValue([
+      { amount: decimal("500.00"), order: { organizationId: "org-1" } },
+    ])
   })
 
-  it("locks the account and blocks an order above the available credit", async () => {
+  it("locks the account, gives back the settled installments and blocks an order above the available credit", async () => {
     tx.organization.findFirst.mockResolvedValue({
       creditStatus: "APPROVED",
       creditLimit: decimal("10000.00"),
@@ -268,7 +275,7 @@ describe("invoiced credit guard (RN10)", () => {
     await expect(
       assertInvoicedCredit(tx as never, {
         organizationId: "org-1",
-        amount: "2500.00",
+        amount: "2500.01",
       })
     ).rejects.toMatchObject({ code: "credit_limit_exceeded" })
     expect(tx.$queryRaw).toHaveBeenCalled()
@@ -278,7 +285,8 @@ describe("invoiced credit guard (RN10)", () => {
       amount: "2000.00",
       excludeOrderId: "order-1",
     })
-    expect(position.available).toBe("2000.00")
+    expect(position.used).toBe("7500.00")
+    expect(position.available).toBe("2500.00")
     expect(tx.order.groupBy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
