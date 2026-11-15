@@ -15,10 +15,27 @@ export type ReturnReasonKey =
 export type ReturnOutcomeKey = "EXCHANGE" | "REPAIR" | "REFUND"
 
 /**
- * Days of the PF withdrawal right, counted from the receipt (CDC, art.
- * 49; RN22). Law, not a business setting.
+ * Legal minimum of the PF withdrawal right, in days counted from the
+ * receipt (CDC, art. 49; RN22). The days in force come from the
+ * `refund.withdrawal_days` setting and never go below this minimum.
  */
 export const WITHDRAWAL_DAYS = 7
+
+/** Setting with the withdrawal days (RN22), shared with the refunds. */
+export const WITHDRAWAL_DAYS_SETTING = "refund.withdrawal_days"
+
+/**
+ * Withdrawal days in force: the configured value, never below the legal
+ * minimum.
+ *
+ * @param configured - Value of the `refund.withdrawal_days` setting.
+ * @returns Whole days, at least {@link WITHDRAWAL_DAYS}.
+ */
+export function effectiveWithdrawalDays(configured?: number | null): number {
+  if (configured === undefined || configured === null) return WITHDRAWAL_DAYS
+  if (!Number.isFinite(configured)) return WITHDRAWAL_DAYS
+  return Math.max(WITHDRAWAL_DAYS, Math.floor(configured))
+}
 
 /** Every exchange or return reason, in form order. */
 export const RETURN_REASONS = [
@@ -67,8 +84,19 @@ export const PJ_PERSONALIZED_BLOCKED_MESSAGE =
 export const WITHDRAWAL_PF_ONLY_MESSAGE =
   "O direito de arrependimento vale para compras de pessoa física feitas pelo site (CDC, art. 49). Para empresas, solicite troca ou devolução."
 
-/** Message when the withdrawal period ended. */
-export const WITHDRAWAL_EXPIRED_MESSAGE = `O prazo de arrependimento de ${WITHDRAWAL_DAYS} dias após o recebimento terminou. Você ainda pode pedir troca ou devolução por defeito, com avaliação técnica.`
+/**
+ * Message when the withdrawal period ended.
+ *
+ * @param days - Withdrawal days in force.
+ * @returns The message, in Portuguese.
+ */
+export function withdrawalExpiredMessage(days: number): string {
+  return `O prazo de arrependimento de ${effectiveWithdrawalDays(days)} dias após o recebimento terminou. Você ainda pode pedir troca ou devolução por defeito, com avaliação técnica.`
+}
+
+/** Message when the withdrawal period of the legal minimum ended. */
+export const WITHDRAWAL_EXPIRED_MESSAGE =
+  withdrawalExpiredMessage(WITHDRAWAL_DAYS)
 
 /** Message when the order was not delivered yet. */
 export const NOT_DELIVERED_MESSAGE =
@@ -85,15 +113,22 @@ export function isReturnKind(kind: string): kind is ReturnKind {
 }
 
 /**
- * Last moment of the PF withdrawal right: the end of the seventh
- * calendar day after the receipt, in the São Paulo calendar (RN22).
+ * Last moment of the PF withdrawal right: the end of the last calendar
+ * day of the period after the receipt, in the São Paulo calendar
+ * (RN22). The same deadline is used by the ticket and by the refund, so
+ * both sides always agree.
  *
  * @param deliveredAt - Receipt date.
+ * @param days - Withdrawal days in force (setting); defaults to the
+ * legal minimum.
  * @returns The deadline (exclusive).
  */
-export function withdrawalDeadline(deliveredAt: Date): Date {
+export function withdrawalDeadline(
+  deliveredAt: Date,
+  days: number = WITHDRAWAL_DAYS
+): Date {
   return startOfDateKey(
-    addDaysToKey(toDateKey(deliveredAt), WITHDRAWAL_DAYS + 1)
+    addDaysToKey(toDateKey(deliveredAt), effectiveWithdrawalDays(days) + 1)
   )
 }
 
@@ -110,7 +145,8 @@ export type ReturnEligibility =
  * Checks an exchange, return or withdrawal request against the
  * commercial policy (RN12, RN22):
  * - nothing before the receipt;
- * - withdrawal only for PF, within 7 days of the receipt, with full
+ * - withdrawal only for PF, within the configured days of the receipt
+ *   (never below the legal 7 days), with full
  *   refund and never conditioned on the evaluation; a personalized item
  *   is accepted and flagged for the legal opinion still pending;
  * - PJ personalized or made-to-measure items are refused unless the
@@ -128,6 +164,8 @@ export function checkReturnEligibility(input: {
   personalized: boolean
   deliveredAt: Date | null
   now: Date
+  /** Withdrawal days in force (setting); defaults to the legal minimum. */
+  withdrawalDays?: number
 }): ReturnEligibility {
   if (!input.deliveredAt) {
     return { allowed: false, message: NOT_DELIVERED_MESSAGE }
@@ -136,10 +174,12 @@ export function checkReturnEligibility(input: {
     if (input.personType !== "PF") {
       return { allowed: false, message: WITHDRAWAL_PF_ONLY_MESSAGE }
     }
+    const days = effectiveWithdrawalDays(input.withdrawalDays)
     if (
-      input.now.getTime() >= withdrawalDeadline(input.deliveredAt).getTime()
+      input.now.getTime() >=
+      withdrawalDeadline(input.deliveredAt, days).getTime()
     ) {
-      return { allowed: false, message: WITHDRAWAL_EXPIRED_MESSAGE }
+      return { allowed: false, message: withdrawalExpiredMessage(days) }
     }
     return { allowed: true, legalReview: input.personalized }
   }

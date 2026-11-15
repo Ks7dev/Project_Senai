@@ -19,6 +19,8 @@ import {
   WITHDRAWAL_EXPIRED_MESSAGE,
   WITHDRAWAL_PF_ONLY_MESSAGE,
   withdrawalDeadline,
+  withdrawalExpiredMessage,
+  effectiveWithdrawalDays,
 } from "@/features/shared/lib/support/return-policy"
 
 const orderId = "019a7b1e-0000-7000-8000-000000000001"
@@ -68,6 +70,22 @@ describe("PF withdrawal within 7 days (#71, RN22)", () => {
         now: new Date("2026-11-18T03:00:00.000Z"),
       })
     ).toEqual({ allowed: false, message: WITHDRAWAL_EXPIRED_MESSAGE })
+  })
+
+  it("follows the configured days, never below the legal 7 days", () => {
+    const now = new Date("2026-11-20T12:00:00.000Z")
+    expect(
+      checkReturnEligibility({ ...base, now, withdrawalDays: 10 })
+    ).toEqual({ allowed: true, legalReview: false })
+    expect(checkReturnEligibility({ ...base, now, withdrawalDays: 3 })).toEqual(
+      { allowed: false, message: withdrawalExpiredMessage(7) }
+    )
+    expect(withdrawalDeadline(deliveredAt, 10).toISOString()).toBe(
+      "2026-11-21T03:00:00.000Z"
+    )
+    expect(effectiveWithdrawalDays(3)).toBe(7)
+    expect(effectiveWithdrawalDays(Number.NaN)).toBe(7)
+    expect(effectiveWithdrawalDays(10)).toBe(10)
   })
 
   it("is only for PF purchases", () => {

@@ -1,5 +1,9 @@
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
 import { toCents } from "@/features/shared/lib/shipping/strategies"
+import {
+  effectiveWithdrawalDays,
+  withdrawalDeadline as returnWithdrawalDeadline,
+} from "@/features/shared/lib/support/return-policy"
 
 /** Refund statuses (RF34). */
 export type RefundStatusKey =
@@ -119,6 +123,12 @@ export type RefundContext = {
   hasInFlightRefund: boolean
   /** When the customer received the order, if delivered. */
   deliveredAt: Date | null
+  /**
+   * When the customer asked for the withdrawal (first withdrawal ticket
+   * of the order), or null. The deadline is checked against this moment,
+   * so the refund made after the receipt check is never lost (RN22).
+   */
+  withdrawalRequestedAt?: Date | null
 }
 
 /** Business rule values from the settings table. */
@@ -167,15 +177,17 @@ function fromCents(cents: number): string {
 }
 
 /**
- * Last moment of the withdrawal right (RN22): the receipt plus the
- * configured days.
+ * Last moment of the withdrawal right (RN22): the end of the last
+ * calendar day of the configured period after the receipt, in the São
+ * Paulo calendar, never below the legal 7 days. It is the same deadline
+ * the customer sees when opening the withdrawal ticket.
  *
  * @param deliveredAt - When the order was delivered.
  * @param days - Withdrawal days.
- * @returns The deadline.
+ * @returns The deadline (exclusive).
  */
 export function withdrawalDeadline(deliveredAt: Date, days: number): Date {
-  return new Date(deliveredAt.getTime() + days * DAY_MS)
+  return returnWithdrawalDeadline(deliveredAt, days)
 }
 
 /**
@@ -297,10 +309,11 @@ export function decideRefund(
         context.deliveredAt,
         settings.withdrawalDays
       )
-      if (now.getTime() > deadline.getTime()) {
+      const requestedAt = context.withdrawalRequestedAt ?? now
+      if (requestedAt.getTime() >= deadline.getTime()) {
         return {
           ok: false,
-          message: `O prazo de arrependimento de ${settings.withdrawalDays} dias do recebimento terminou. Use devolução após avaliação.`,
+          message: `O prazo de arrependimento de ${effectiveWithdrawalDays(settings.withdrawalDays)} dias do recebimento terminou. Use devolução após avaliação.`,
         }
       }
       if (request.kind !== "FULL") {

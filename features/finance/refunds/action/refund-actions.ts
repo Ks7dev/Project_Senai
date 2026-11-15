@@ -56,9 +56,7 @@ import {
 } from "@/features/shared/lib/refunds/refund-rules"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import { toCents } from "@/features/shared/lib/shipping/strategies"
-
-/** Setting with the withdrawal days (RN22). */
-const WITHDRAWAL_DAYS_KEY = "refund.withdrawal_days"
+import { WITHDRAWAL_DAYS_SETTING } from "@/features/shared/lib/support/return-policy"
 
 /** Setting with the Mercado Pago refund deadline (RN18). */
 const MAX_DAYS_KEY = "refund.max_days_after_payment"
@@ -99,6 +97,13 @@ const orderRefundSelect = {
   },
   receivables: { where: { status: "PAID" }, select: { amount: true } },
   refunds: { select: { id: true, status: true, amount: true } },
+  // First withdrawal ticket: the moment the customer used the right (RN22)
+  supportTickets: {
+    where: { kind: "WITHDRAWAL", status: { not: "DENIED" } },
+    orderBy: { createdAt: "asc" },
+    take: 1,
+    select: { createdAt: true },
+  },
 } satisfies Prisma.OrderSelect
 
 type OrderForRefund = Prisma.OrderGetPayload<{
@@ -211,7 +216,7 @@ async function loadRefundSettings(
   client: Pick<Prisma.TransactionClient, "setting">
 ): Promise<RefundSettings> {
   const [withdrawalDays, maxDaysAfterPayment] = await Promise.all([
-    getNumberSetting(WITHDRAWAL_DAYS_KEY, client),
+    getNumberSetting(WITHDRAWAL_DAYS_SETTING, client),
     getNumberSetting(MAX_DAYS_KEY, client),
   ])
   return { withdrawalDays, maxDaysAfterPayment }
@@ -270,6 +275,7 @@ function toContext(
       IN_FLIGHT_REFUND_STATUSES.includes(refund.status)
     ),
     deliveredAt: order.shipment?.deliveredAt ?? null,
+    withdrawalRequestedAt: order.supportTickets?.[0]?.createdAt ?? null,
   }
 }
 

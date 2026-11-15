@@ -193,7 +193,10 @@ function RequestForm({
           <li>
             Arrependimento (RN22) até{" "}
             <time dateTime={order.withdrawalUntil}>
-              {dateTime.format(new Date(order.withdrawalUntil))}
+              {/* The deadline is exclusive: show its last minute */}
+              {dateTime.format(
+                new Date(new Date(order.withdrawalUntil).getTime() - 1)
+              )}
             </time>
             .
           </li>
