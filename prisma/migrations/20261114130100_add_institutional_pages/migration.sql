@@ -9,7 +9,7 @@ CREATE TABLE `institutional_pages` (
 
     INDEX `institutional_pages_updated_by_id_idx`(`updated_by_id`),
     PRIMARY KEY (`slug`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- AddForeignKey
 ALTER TABLE `institutional_pages` ADD CONSTRAINT `institutional_pages_updated_by_id_fkey` FOREIGN KEY (`updated_by_id`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

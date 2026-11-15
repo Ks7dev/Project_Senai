@@ -17,7 +17,7 @@ CREATE TABLE `price_tables` (
 
     INDEX `price_tables_active_deleted_at_idx`(`active`, `deleted_at`),
     PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- CreateTable
 CREATE TABLE `price_table_items` (
@@ -30,7 +30,7 @@ CREATE TABLE `price_table_items` (
     INDEX `price_table_items_product_id_idx`(`product_id`),
     UNIQUE INDEX `price_table_items_price_table_id_product_id_key`(`price_table_id`, `product_id`),
     PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- CreateTable
 CREATE TABLE `volume_discounts` (
@@ -46,7 +46,7 @@ CREATE TABLE `volume_discounts` (
 
     INDEX `volume_discounts_category_id_active_idx`(`category_id`, `active`),
     PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- CreateIndex
 CREATE INDEX `users_price_table_id_idx` ON `users`(`price_table_id`);
