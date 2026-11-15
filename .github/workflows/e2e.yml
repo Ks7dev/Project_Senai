@@ -1,0 +1,84 @@
+name: E2E
+
+# End-to-end purchase flow with Playwright (RNF07, #77). Runs the built
+# app against a throwaway MySQL 8 service with the migrations and the
+# fictitious seed data. External services (Mercado Pago, Correios,
+# carrier) have no credentials here and use their fallbacks.
+
+on:
+  pull_request:
+    branches: [develop, master]
+  push:
+    branches: [develop, master]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Purchase flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-root
+          MYSQL_DATABASE: atelier_bureau
+          MYSQL_USER: atelier_ci
+          MYSQL_PASSWORD: ci-only-app
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-only-root"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      # Throwaway CI database and fictitious seed accounts only
+      DATABASE_URL: mysql://root:ci-only-root@127.0.0.1:3306/atelier_bureau
+      MIGRATION_DATABASE_URL: mysql://root:ci-only-root@127.0.0.1:3306/atelier_bureau
+      SEED_PASSWORD: e2e-fictitious-2026
+      BETTER_AUTH_URL: http://localhost:3000
+      JOBS_DISABLED: "true"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Auth secret
+        run: echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      - name: Migrate and seed the database
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

@@ -39,6 +39,9 @@ const eslintConfig = defineConfig([
     "prisma/migrations/**",
     "components/ui/**",
     "generated/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ])
 
