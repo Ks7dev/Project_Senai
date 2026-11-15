@@ -44,6 +44,8 @@ export type ShippingContext = {
   rules: ShippingRules
   /** Region of the destination CEP, or null outside every range. */
   region: CoverageRegion | null
+  /** CEP the orders ship from (settings table); APIs need it. */
+  originCep?: string
 }
 
 /** A price offered to the customer. */
@@ -263,14 +265,32 @@ export function notConfiguredProvider(name: string): ShippingProvider {
 }
 
 /**
- * Registered modalities, in RN20 precedence. The Correios (#41) and
- * carrier (#42) clients replace the not configured providers.
+ * Builds the registered modalities, in RN20 precedence, with the API
+ * clients of the Correios (#41) and of the carrier aggregator (#42).
+ *
+ * @param providers - Correios and carrier aggregator clients.
+ * @returns The strategies.
  */
-export const shippingStrategies: ShippingStrategy[] = [
-  ownDeliveryStrategy,
-  correiosStrategy(notConfiguredProvider("correios")),
-  carrierStrategy(notConfiguredProvider("carrier")),
-]
+export function createShippingStrategies(providers: {
+  correios: ShippingProvider
+  carrier: ShippingProvider
+}): ShippingStrategy[] {
+  return [
+    ownDeliveryStrategy,
+    correiosStrategy(providers.correios),
+    carrierStrategy(providers.carrier),
+  ]
+}
+
+/**
+ * Modalities without the API clients (they never quote). The server
+ * wires the real clients in `shipping-service.ts`; this registry keeps
+ * the pure calculation usable without credentials.
+ */
+export const shippingStrategies: ShippingStrategy[] = createShippingStrategies({
+  correios: notConfiguredProvider("correios"),
+  carrier: notConfiguredProvider("carrier"),
+})
 
 /**
  * Coverage of the destination for the checkout (RF27).
