@@ -3,6 +3,7 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getOrderTracking } from "@/features/orders/order-tracking/action/order-tracking-actions"
 import { OrderTrackingView } from "@/features/orders/order-tracking/order-tracking-view"
+import { canOpenTicketForOrder } from "@/features/shared/lib/support/ticket-format"
 
 export const metadata = { title: "Acompanhar pedido — Atelier Bureau" }
 
@@ -44,6 +45,17 @@ async function OrderTrackingContent({
         </h1>
       </header>
       <OrderTrackingView tracking={result.tracking} />
+      {canOpenTicketForOrder(result.tracking.status) && (
+        <p className="text-body-sm text-ink-muted">
+          Algum problema com um produto deste pedido?{" "}
+          <Link
+            href={`/conta/chamados/novo?pedido=${result.tracking.orderId}`}
+            className="text-primary underline"
+          >
+            Abrir chamado de garantia ou assistência técnica
+          </Link>
+        </p>
+      )}
       <Link
         href="/conta/pedidos"
         className="text-body-sm text-primary underline"
