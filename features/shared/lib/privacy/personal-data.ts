@@ -7,6 +7,7 @@ import {
   ORDER_STATUS,
   type OrderStatusKey,
 } from "@/features/shared/lib/orders/order-status"
+import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 type Client = Prisma.TransactionClient | typeof prisma
 
@@ -144,8 +145,8 @@ export async function buildPersonalDataExport(
       "E-mail": user.email,
       "E-mail confirmado": user.emailVerified ? "Sim" : "Não",
       Tipo: user.personType === "PJ" ? "Pessoa jurídica" : "Pessoa física",
-      "CPF ou CNPJ": user.document,
-      Telefone: user.phone,
+      "CPF ou CNPJ": decryptPersonal(user.document),
+      Telefone: decryptPersonal(user.phone),
       "Criado em": formatDate(user.createdAt),
       "Anonimizado em": formatDate(user.deletedAt),
     },

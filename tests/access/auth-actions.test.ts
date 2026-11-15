@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { APIError } from "better-auth/api"
+import { encryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 const api = {
   signUpEmail: vi.fn(),
@@ -73,7 +74,7 @@ beforeEach(() => {
 })
 
 describe("signUp (RF39)", () => {
-  it("creates a PF account with the CPF digits as document", async () => {
+  it("creates a PF account with the CPF digits encrypted as document (RNF03)", async () => {
     expect(await signUp(pf)).toEqual({ success: true })
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -86,7 +87,7 @@ describe("signUp (RF39)", () => {
       expect.objectContaining({
         body: expect.objectContaining({
           personType: "PF",
-          document: "90000000175",
+          document: encryptPersonal("90000000175"),
           password: "senha-segura-123",
         }),
       })

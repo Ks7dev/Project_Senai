@@ -31,8 +31,8 @@ Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando 
 | `image` | TEXT | Sim | NULL | — | URL do avatar |
 | `two_factor_enabled` | BOOLEAN | Sim | `false` | — | Indica se o 2FA está ligado |
 | `person_type` | ENUM | Não | — | — | Tipo de pessoa: PF ou PJ. Valores: `PF`, `PJ` |
-| `document` | VARCHAR(14) | Não | — | UK | CPF (PF) ou CNPJ (PJ), só dígitos (único) |
-| `phone` | VARCHAR(20) | Sim | NULL | — | Telefone de contato |
+| `document` | VARCHAR(80) | Não | — | UK | CPF (PF) ou CNPJ (PJ), só dígitos, cifrado com AES-256-GCM determinístico (único, RNF03) |
+| `phone` | VARCHAR(80) | Sim | NULL | — | Telefone de contato, cifrado com AES-256-GCM (RNF03) |
 | `created_at` | DATETIME(3) | Não | `CURRENT_TIMESTAMP(3)` | — | Data e hora de criação (UTC) |
 | `updated_at` | DATETIME(3) | Não | — | — | Data e hora da última alteração (UTC) |
 | `deleted_at` | DATETIME(3) | Sim | NULL | — | Data e hora da exclusão lógica (soft delete); nulo quando ativo |
@@ -1443,7 +1443,7 @@ Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando 
 | `mode` | ENUM | Não | — | — | Modalidade (ver enumeração). Valores: `SHOWROOM`, `ONLINE`, `ON_SITE` |
 | `scheduled_at` | DATETIME(3) | Não | — | — | Data e hora combinadas (UTC) |
 | `status` | ENUM | Não | `REQUESTED` | — | Situação atual (ver enumeração). Valores: `REQUESTED`, `CONFIRMED`, `CANCELED`, `DONE` |
-| `phone` | VARCHAR(20) | Sim | NULL | — | Telefone de contato |
+| `phone` | VARCHAR(80) | Sim | NULL | — | Telefone de contato, cifrado com AES-256-GCM (RNF03) |
 | `notes` | TEXT | Sim | NULL | — | Observações do cliente |
 | `team_note` | TEXT | Sim | NULL | — | Observação interna da equipe |
 | `created_at` | DATETIME(3) | Não | `CURRENT_TIMESTAMP(3)` | — | Data e hora de criação (UTC) |

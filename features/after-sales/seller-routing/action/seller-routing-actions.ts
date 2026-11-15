@@ -20,6 +20,10 @@ import {
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
 import type { SellerSegment } from "@/features/shared/lib/sellers/seller-routing"
+import {
+  decryptPersonal,
+  encryptPersonal,
+} from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** Internal role whose users serve as dedicated sellers (RF55). */
 const SELLER_ROLE = "sales"
@@ -133,7 +137,10 @@ export async function getSellerRouting(): Promise<
     return {
       success: true,
       routing: {
-        sellers,
+        sellers: sellers.map((seller) => ({
+          ...seller,
+          phone: decryptPersonal(seller.phone),
+        })),
         rules: rules.map((rule) => ({
           id: rule.id,
           sellerName: rule.seller.name,
@@ -308,7 +315,7 @@ export async function updateSellerPhone(
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: seller.id },
-        data: { phone: parsed.data.phone },
+        data: { phone: encryptPersonal(parsed.data.phone) },
       })
       await writeAudit(tx, {
         userId: user.id,

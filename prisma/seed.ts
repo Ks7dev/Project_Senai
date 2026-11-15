@@ -3,6 +3,7 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 import { hashPassword } from "better-auth/crypto"
 import { PrismaClient } from "../generated/prisma/client"
 import { mariaDbConfig } from "../features/shared/lib/db/connection-config"
+import { encryptPersonal } from "../features/shared/lib/crypto/personal-data-cipher"
 import {
   accounts,
   categories,
@@ -172,7 +173,7 @@ async function main() {
         name: account.name,
         emailVerified: true,
         personType: account.personType,
-        document: account.document,
+        document: encryptPersonal(account.document),
       },
       update: { name: account.name },
     })
@@ -212,7 +213,7 @@ async function main() {
     if (!user.phone) {
       await prisma.user.update({
         where: { id: sellerId },
-        data: { phone: rule.sellerPhone },
+        data: { phone: encryptPersonal(rule.sellerPhone) },
       })
     }
     const existing = await prisma.sellerRule.findFirst({

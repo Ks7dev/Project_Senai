@@ -12,6 +12,7 @@ import {
   serializeConsent,
 } from "@/features/shared/lib/privacy/consent"
 import { roles } from "@/prisma/seed-data"
+import { encryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 const getCurrentUser = vi.fn()
 const rolePermissionFindMany = vi.fn()
@@ -314,7 +315,9 @@ describe("anonymization (#75, RF56)", () => {
     db.user.findMany.mockResolvedValue([])
     await findPrivacySubjects({ query: "123.456.789-09" })
     expect(db.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { document: "12345678909" } })
+      expect.objectContaining({
+        where: { document: encryptPersonal("12345678909") },
+      })
     )
   })
 })

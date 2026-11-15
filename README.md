@@ -38,7 +38,7 @@ O site abre em `http://localhost:3000`.
 A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam por `https://<ip-da-máquina>` (detalhes em `ARCHITECTURE.md`, seção 5.1).
 
 1. Instale o Docker Desktop e reserve um IP fixo para a máquina no roteador.
-2. Copie `.env.example` para `.env` e preencha `SITE_HOST`, as senhas do MySQL e o `BETTER_AUTH_SECRET`.
+2. Copie `.env.example` para `.env` e preencha `SITE_HOST`, as senhas do MySQL, o `BETTER_AUTH_SECRET` e a `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`). Guarde uma cópia da `DATA_ENCRYPTION_KEY` fora do servidor: sem ela, os CPFs e telefones gravados não podem ser lidos.
 3. Suba tudo:
 
    ```bash

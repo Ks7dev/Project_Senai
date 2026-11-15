@@ -32,6 +32,10 @@ import {
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
+import {
+  encryptPersonal,
+  encryptPersonalOptional,
+} from "@/features/shared/lib/crypto/personal-data-cipher"
 
 const INVITATION_DAYS = 7
 
@@ -530,7 +534,7 @@ export async function acceptInvitationWithSignUp(
       throw new AppError("Este convite expirou ou já foi usado.", "invalid")
     }
     const cpfInUse = await prisma.user.findUnique({
-      where: { document: data.cpf },
+      where: { document: encryptPersonal(data.cpf) },
       select: { id: true },
     })
     if (cpfInUse) throw new AppError("Este CPF já tem cadastro.", "cpf_in_use")
@@ -543,8 +547,8 @@ export async function acceptInvitationWithSignUp(
           email: invitation.email,
           password: data.password,
           personType: "PJ",
-          document: data.cpf,
-          phone: data.phone,
+          document: encryptPersonal(data.cpf),
+          phone: encryptPersonalOptional(data.phone),
         },
       })
       .catch((error: unknown) => {

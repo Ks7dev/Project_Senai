@@ -347,7 +347,7 @@ export const columns: Record<string, string> = {
   discount_percent: "Percentual de desconto, de 0 a 100",
   number: "Número legível e único para o cliente",
   email: "E-mail (único)",
-  phone: "Telefone de contato",
+  phone: "Telefone de contato, cifrado com AES-256-GCM (RNF03)",
   expires_at: "Data e hora de expiração (UTC)",
   ip_address: "Endereço IP de origem",
   user_agent: "Navegador de origem",
@@ -372,7 +372,8 @@ export const columns: Record<string, string> = {
   "users.email_verified": "Indica se o e-mail foi confirmado",
   "users.image": "URL do avatar",
   "users.two_factor_enabled": "Indica se o 2FA está ligado",
-  "users.document": "CPF (PF) ou CNPJ (PJ), só dígitos (único)",
+  "users.document":
+    "CPF (PF) ou CNPJ (PJ), só dígitos, cifrado com AES-256-GCM determinístico (único, RNF03)",
   "users.price_table_id":
     "Tabela de preço do cliente PF; membros de conta usam a tabela da conta (RF21)",
 

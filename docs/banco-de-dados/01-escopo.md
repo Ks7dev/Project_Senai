@@ -68,7 +68,7 @@ As faixas de CEP da entrega própria (RN16) e o mínimo de frete grátis por reg
 | Senha em texto | Em lugar nenhum | Só o hash fica em `accounts.password` (RF40) |
 | Imagens, PDFs e anexos | Armazenamento S3-compatível (disco local em dev) | O banco guarda só a chave (`storage_key`), o nome, o tipo e o tamanho |
 | PDF do DANFE e boleto | Emissor fiscal e Mercado Pago | O banco guarda a chave de acesso, o XML e o link |
-| Segredos de integração | `.env` do servidor | Nunca no banco nem no repositório |
+| Segredos de integração e chave de criptografia (`DATA_ENCRYPTION_KEY`) | `.env` do servidor | Nunca no banco nem no repositório |
 | Métricas e logs de aplicação | Saída do container | O banco guarda só a auditoria de negócio (`audit_logs`) |
 
 ## 5. Integridade
@@ -102,7 +102,10 @@ Os usuários são criados por `deploy/mysql/init/01-users.sh` no primeiro start 
   - IP e navegador em `sessions` e `audit_logs`;
   - textos livres em cotações e chamados.
 - **Direitos do titular (RF56):** a exportação e a anonimização ficam na área do cliente (#75). A anonimização preserva pedidos, notas e pagamentos, que têm guarda obrigatória.
-- **Pendência:** a criptografia em repouso de documento e telefone (RNF03) ainda não foi feita. Ela está registrada na #75.
+- **Criptografia em repouso (RNF03):** o CPF/CNPJ (`users.document`) e os telefones (`users.phone` e `demo_requests.phone`) são gravados cifrados com AES-256-GCM pela aplicação. A chave fica só na variável `DATA_ENCRYPTION_KEY` do `.env` do servidor, nunca no banco nem no backup.
+  - O vetor de inicialização é derivado do próprio valor (HMAC), então o mesmo CPF gera sempre o mesmo texto cifrado. Assim o índice `UNIQUE` e a busca por CPF continuam funcionando.
+  - Ao subir, a aplicação cifra as linhas antigas que ainda estiverem em texto (`encryptLegacyPersonalData`). O CPF fictício de uma conta anonimizada (iniciado por `X`) não é dado pessoal e fica como está.
+  - Sem a chave, os CPFs e telefones não podem ser lidos. Guarde uma cópia dela fora do servidor, junto com o plano de restauração do backup.
 
 ## 8. Backup e recuperação
 
