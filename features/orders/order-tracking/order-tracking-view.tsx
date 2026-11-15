@@ -207,6 +207,35 @@ export function OrderTrackingView({ tracking }: { tracking: OrderTracking }) {
           )}
         </section>
 
+        {tracking.approvals.length > 0 && (
+          <section
+            aria-labelledby="approval-title"
+            className="flex flex-col gap-sm rounded-lg border border-line-subtle p-md"
+          >
+            <h2 id="approval-title" className="text-subhead">
+              Aprovação da empresa
+            </h2>
+            <ul className="flex flex-col gap-sm text-body-sm">
+              {tracking.approvals.map((approval) => (
+                <li key={approval.id} className="flex flex-col">
+                  <span className="text-ink">
+                    {approval.decision === "APPROVED" ? "Aprovado" : "Recusado"}{" "}
+                    por {approval.decidedBy} em{" "}
+                    <time dateTime={approval.decidedAt}>
+                      {dateTime.format(new Date(approval.decidedAt))}
+                    </time>
+                  </span>
+                  {approval.note && (
+                    <span className="text-ink-muted">
+                      Justificativa: {approval.note}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section
           aria-labelledby="items-title"
           className="flex flex-col gap-sm rounded-lg border border-line-subtle p-md"

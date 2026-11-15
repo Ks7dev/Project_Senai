@@ -48,6 +48,8 @@ erDiagram
   orders ||--o{ order_items : ""
   skus ||--o{ order_items : ""
   orders ||--o{ order_status_history : "linha do tempo"
+  orders ||--o{ order_approvals : "aprovação ou recusa (RN01)"
+  users ||--o{ order_approvals : "aprovador"
   orders ||--o{ payments : "payment_id único"
   orders ||--o| shipments : "frete e rastreio"
   orders |o--o{ stock_movements : ""

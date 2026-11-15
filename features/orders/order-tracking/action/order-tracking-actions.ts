@@ -86,6 +86,14 @@ export type OrderTracking = {
   timeline: TimelineStep[]
   /** Delivery, or null before the shipping is chosen. */
   shipment: TrackingShipment | null
+  /** Decisions of the company approvers, oldest first (RF11, RN01). */
+  approvals: Array<{
+    id: string
+    decision: "APPROVED" | "REJECTED"
+    decidedBy: string
+    decidedAt: string
+    note: string | null
+  }>
 }
 
 /**
@@ -156,6 +164,16 @@ export async function getOrderTracking(
           orderBy: { createdAt: "asc" },
           select: { toStatus: true, createdAt: true },
         },
+        approvals: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            decision: true,
+            note: true,
+            createdAt: true,
+            decidedBy: { select: { name: true } },
+          },
+        },
         shipment: {
           select: {
             method: true,
@@ -221,6 +239,13 @@ export async function getOrderTracking(
               manualQuote: shipment.method === "MANUAL_QUOTE",
             }
           : null,
+        approvals: order.approvals.map((approval) => ({
+          id: approval.id,
+          decision: approval.decision,
+          decidedBy: approval.decidedBy.name,
+          decidedAt: approval.createdAt.toISOString(),
+          note: approval.note,
+        })),
       },
     }
   } catch (error) {

@@ -81,6 +81,12 @@ enum OrderStatus {
   REFUNDED
 }
 
+/// Decision of a corporate approver on an order (RF11, RN01)
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
 enum PaymentMethod {
   CARD
   PIX
@@ -143,6 +149,7 @@ model User {
   answeredQuotes     Quote[]              @relation("QuoteAnswerer")
   orders             Order[]              @relation("OrderCustomer")
   approvedOrders     Order[]              @relation("OrderApprover")
+  orderApprovals     OrderApproval[]
   orderStatusChanges OrderStatusHistory[]
   favorites          Favorite[]
   auditLogs          AuditLog[]
@@ -667,6 +674,7 @@ model Order {
   approvedBy     User?                @relation("OrderApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   items          OrderItem[]
   statusHistory  OrderStatusHistory[]
+  approvals      OrderApproval[]
   payments       Payment[]
   shipment       Shipment?
   stockMovements StockMovement[]
@@ -711,6 +719,27 @@ model OrderStatusHistory {
 
   @@index([orderId, createdAt])
   @@map("order_status_history")
+}
+
+/// Approval or refusal of a corporate order above the limit, with who
+/// decided, when and why (RF11, RN01). Append only.
+model OrderApproval {
+  id          String           @id @default(uuid(7)) @db.Char(36)
+  orderId     String           @map("order_id") @db.Char(36)
+  decision    ApprovalDecision
+  /// Approver, always a member of the order's corporate account
+  decidedById String           @map("decided_by_id") @db.VarChar(36)
+  /// Justification written by the approver
+  note        String?          @db.Text
+  /// Order total the approver decided on
+  orderTotal  Decimal          @map("order_total") @db.Decimal(12, 2)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  decidedBy   User             @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@index([decidedById])
+  @@map("order_approvals")
 }
 
 model Payment {

@@ -10,7 +10,10 @@ import {
   type OrderEmailData,
   type RenderedEmail,
 } from "@/emails/templates"
-import { parseRoles } from "@/features/shared/lib/auth/corporate-roles"
+import {
+  canDecideOrderApproval,
+  parseRoles,
+} from "@/features/shared/lib/auth/corporate-roles"
 import { enqueueEmail } from "@/features/shared/lib/email/mailer"
 import { siteUrl } from "@/features/shared/lib/email/site-url"
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
@@ -31,17 +34,19 @@ const CANCELED_DEFAULT =
 
 /**
  * Queues the e-mails of an order status change in the same transaction
- * (RF53): approval pending goes to the company approvers (RN01); paid,
- * NF-e, shipped, delivered and canceled go to the customer. Statuses
- * of the manual shipping quote have their own e-mails (#44).
+ * (RF53): approval pending goes to the company approvers other than the
+ * requester (RN01) or, in a single-user account, to its holder (RN08);
+ * paid, NF-e, shipped, delivered and canceled go to the customer.
+ * Statuses of the manual shipping quote have their own e-mails (#44).
  *
  * @param tx - Prisma transaction of the status change.
- * @param input - Order and new status.
+ * @param input - Order, new status and, for a cancellation, the reason
+ * shown to the customer instead of the default text.
  * @returns How many e-mails were queued.
  */
 export async function enqueueOrderStatusEmails(
   tx: Prisma.TransactionClient,
-  input: { orderId: string; to: OrderStatusKey }
+  input: { orderId: string; to: OrderStatusKey; cancelReason?: string | null }
 ): Promise<number> {
   if (!NOTIFIED_STATUSES.includes(input.to)) return 0
   const order = await tx.order.findUnique({
@@ -67,18 +72,26 @@ export async function enqueueOrderStatusEmails(
   const emails: Array<{ to: string; email: RenderedEmail }> = []
   if (input.to === "AWAITING_APPROVAL" && order.organizationId) {
     const members = await tx.member.findMany({
-      where: {
-        organizationId: order.organizationId,
-        userId: { not: order.userId },
+      where: { organizationId: order.organizationId },
+      select: {
+        userId: true,
+        role: true,
+        user: { select: { name: true, email: true } },
       },
-      select: { role: true, user: { select: { name: true, email: true } } },
     })
-    for (const member of members) {
-      if (!parseRoles(member.role).includes("approver")) continue
+    const approvers = members.filter((member) =>
+      canDecideOrderApproval({
+        roles: parseRoles(member.role),
+        isRequester: member.userId === order.userId,
+        memberCount: members.length,
+      })
+    )
+    for (const member of approvers) {
       emails.push({
         to: member.user.email,
         email: approvalPendingEmail({
           ...base,
+          url: `${siteUrl()}/conta/aprovacoes`,
           name: member.user.name,
           requester: order.user.name,
         }),
@@ -108,7 +121,10 @@ export async function enqueueOrderStatusEmails(
   if (input.to === "CANCELED") {
     emails.push({
       to: customer,
-      email: orderCanceledEmail({ ...base, reason: CANCELED_DEFAULT }),
+      email: orderCanceledEmail({
+        ...base,
+        reason: input.cancelReason?.trim() || CANCELED_DEFAULT,
+      }),
     })
   }
 

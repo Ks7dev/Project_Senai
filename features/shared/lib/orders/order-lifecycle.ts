@@ -72,8 +72,9 @@ export function invalidTransitionMessage(
  *    so it is sent only if the change is saved.
  *
  * @param tx - Prisma transaction.
- * @param input - Order, new status, responsible user, note and the
- * optional expected current statuses with their error message.
+ * @param input - Order, new status, responsible user, note, the
+ * optional expected current statuses with their error message and, for
+ * a cancellation, the reason shown in the customer e-mail.
  * @returns The transition done.
  * @throws AppError("not_found") or AppError("invalid_transition").
  */
@@ -86,6 +87,7 @@ export async function transitionOrder(
     note?: string | null
     expectedFrom?: readonly OrderStatusKey[]
     unexpectedMessage?: string
+    cancelReason?: string | null
     now?: Date
   }
 ): Promise<OrderTransition> {
@@ -142,6 +144,10 @@ export async function transitionOrder(
       createdAt: now,
     },
   })
-  await enqueueOrderStatusEmails(tx, { orderId: input.orderId, to: input.to })
+  await enqueueOrderStatusEmails(tx, {
+    orderId: input.orderId,
+    to: input.to,
+    cancelReason: input.cancelReason,
+  })
   return { orderId: input.orderId, number: order.number, from, to: input.to }
 }

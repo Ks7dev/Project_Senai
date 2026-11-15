@@ -157,6 +157,33 @@ export function approvalPendingEmail(
 }
 
 /**
+ * Order approved by the corporate approver, sent to the requester
+ * (RF11, RN01): the order now waits for the payment.
+ *
+ * @param input - Order data, approver name and the optional note.
+ * @returns The e-mail.
+ */
+export function orderApprovedEmail(
+  input: OrderEmailData & { approver: string; note?: string | null }
+): RenderedEmail {
+  return render(
+    "order.approved",
+    `Pedido ${input.number} aprovado pela empresa`,
+    {
+      preheader: "Seu pedido foi aprovado e aguarda o pagamento.",
+      heading: "Pedido aprovado",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        `${input.approver} aprovou o seu pedido. Agora ele aguarda o pagamento para seguir.`,
+        ...(input.note ? [`Justificativa: ${input.note}`] : []),
+      ],
+      details: orderDetails(input),
+      action: { label: "Pagar o pedido", url: input.url },
+    }
+  )
+}
+
+/**
  * Payment confirmed or invoiced order approved (RF53: pagamento, RN13).
  *
  * @param input - Order data.
