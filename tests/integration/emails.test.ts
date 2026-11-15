@@ -100,12 +100,11 @@ describe("order e-mails on each event (#67, RF53)", () => {
       )
     }
     expect(await emailsFor(since, order.number)).toEqual(
-      ["order.paid", "order.invoiced", "order.shipped", "order.delivered"].map(
-        (template) => ({
-          template,
-          recipient: "cliente.pf@atelierbureau.test",
-        })
-      )
+      // The NF-e e-mail comes from the NF-e issuance, not the status
+      ["order.paid", "order.shipped", "order.delivered"].map((template) => ({
+        template,
+        recipient: "cliente.pf@atelierbureau.test",
+      }))
     )
   })
 

@@ -25,6 +25,7 @@ const db = {
   },
   setting: { findUnique: vi.fn() },
   user: { findMany: vi.fn() },
+  order: { findUnique: vi.fn() },
   emailOutbox: { create: vi.fn() },
   auditLog: { create: vi.fn() },
 }
@@ -353,6 +354,11 @@ describe("NF-e issuance (#63)", () => {
     db.invoice.findUniqueOrThrow.mockResolvedValue(
       invoiceRow({ submittedAt: now })
     )
+    db.order.findUnique.mockResolvedValue({
+      number: "AB-2026-000302",
+      total: { toFixed: () => "1500.00" },
+      user: { name: "Cliente Fictício", email: "cliente@atelierbureau.test" },
+    })
     const fetcher = provider({
       [`GET /v2/nfe/${invoiceId}`]: () =>
         new Response(
@@ -393,6 +399,15 @@ describe("NF-e issuance (#63)", () => {
     expect(db.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: "invoice.issue" }),
     })
+    // The customer is told about the NF-e in the same transaction (RF53)
+    expect(db.emailOutbox.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          template: "order.invoiced",
+          recipient: "cliente@atelierbureau.test",
+        }),
+      })
+    )
   })
 
   it("alerts the team and retries when the provider is down", async () => {
