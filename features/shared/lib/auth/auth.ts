@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { nextCookies } from "better-auth/next-js"
 import { organization, twoFactor } from "better-auth/plugins"
+import { passwordResetLink } from "@/features/shared/lib/auth/reset-link"
 import { getPrisma } from "@/features/shared/lib/db/prisma"
 import { sendEmail } from "@/features/shared/lib/email/mailer"
 
@@ -23,7 +24,8 @@ function createAuth() {
       // Reset token expires in 1 hour and is consumed on use (RF40)
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => {
+      sendResetPassword: async ({ user, token }) => {
+        const url = passwordResetLink(process.env.BETTER_AUTH_URL, token)
         await sendEmail({
           to: user.email,
           subject: "Redefinição de senha — Atelier Bureau",
