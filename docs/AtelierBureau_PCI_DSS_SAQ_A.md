@@ -1,4 +1,4 @@
-# Atelier Bureau — Checklist PCI-DSS SAQ A
+# Atelier Bureau — Checklist PCI-DSS SAQ A #173 | #174 | #175 | #176 | #177 | #178 | #179 | #180 | #181 | #182 |
 
 Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente com o Payment Brick do Mercado Pago (RN19, issue #62). O documento revisa o código real do checkout e lista as pendências encontradas.
 
@@ -121,20 +121,20 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 ## 6. Pendências (viram issues)
 
-Cada pendência deve virar uma issue no GitHub com os labels indicados, o milestone da versão em que entrar e o vínculo com a RN19.
+Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados, o milestone v1.0.0 e o vínculo com a RN19. A coluna "Issue" leva a ela.
 
-| # | Pendência | Requisito | Prioridade sugerida | Labels sugeridos |
-|---|---|---|---|---|
-| P1 | Trocar `'unsafe-inline'` de `script-src` por nonce ou hash nas páginas de pagamento, aprovar o inventário de scripts e monitorar mudanças de scripts e cabeçalhos na página de pagamento | 6.4.3, 11.6.1, E6 | P1 | `tipo: task`, `área: pagamento`, `segurança` |
-| P2 | Restringir os curingas de domínio da CSP (`*.mercadopago.com`, `*.mlstatic.com`, `*.mercadolibre.com`, `*.mercadolivre.com`) aos hosts que o Brick usa de fato | 6.4.3, E6 | P2 | `tipo: task`, `área: pagamento`, `segurança` |
-| P3 | Aplicar rate limit às Server Actions de pagamento e estorno (tentativas de cartão por pedido e por IP) | 8, RNF05 | P1 | `tipo: task`, `área: pagamento`, `segurança` |
-| P4 | Rodar `npm audit` (ou equivalente) no CI e tratar vulnerabilidades altas e críticas | 6.3 | P2 | `tipo: task`, `área: app`, `infra`, `segurança` |
-| P5 | Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos | 8 | P1 | `tipo: task`, `área: acesso`, `segurança` |
-| P6 | Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades | E2, E3, 12.8 | P1 | `tipo: task`, `área: pagamento`, `documentação` |
-| P7 | No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD` | 2.2.2 | P1 | `tipo: task`, `área: app`, `infra`, `segurança` |
-| P8 | Usar certificado de CA pública ao publicar fora da rede local | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` |
-| P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` |
-| P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` |
+| # | Pendência | Requisito | Prioridade | Labels | Issue |
+|---|---|---|---|---|---|
+| P1 | Trocar `'unsafe-inline'` de `script-src` por nonce ou hash nas páginas de pagamento, aprovar o inventário de scripts e monitorar mudanças de scripts e cabeçalhos na página de pagamento | 6.4.3, 11.6.1, E6 | P1 | `tipo: task`, `área: pagamento`, `segurança` | #173 |
+| P2 | Restringir os curingas de domínio da CSP (`*.mercadopago.com`, `*.mlstatic.com`, `*.mercadolibre.com`, `*.mercadolivre.com`) aos hosts que o Brick usa de fato | 6.4.3, E6 | P2 | `tipo: task`, `área: pagamento`, `segurança` | #174 |
+| P3 | Aplicar rate limit às Server Actions de pagamento e estorno (tentativas de cartão por pedido e por IP) | 8, RNF05 | P1 | `tipo: task`, `área: pagamento`, `segurança` | #175 |
+| P4 | Rodar `npm audit` (ou equivalente) no CI e tratar vulnerabilidades altas e críticas | 6.3 | P2 | `tipo: task`, `área: app`, `infra`, `segurança` | #176 |
+| P5 | Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos | 8 | P1 | `tipo: task`, `área: acesso`, `segurança` | #177 |
+| P6 | Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades | E2, E3, 12.8 | P1 | `tipo: task`, `área: pagamento`, `documentação` | #178 |
+| P7 | No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD` | 2.2.2 | P1 | `tipo: task`, `área: app`, `infra`, `segurança` | #179 |
+| P8 | Usar certificado de CA pública ao publicar fora da rede local | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
+| P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #181 |
+| P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` | #182 |
 
 ## 7. Pontos que já atendem (resumo)
 

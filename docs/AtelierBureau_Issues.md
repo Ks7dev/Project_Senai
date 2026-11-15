@@ -2,7 +2,7 @@
 
 Repositório: `Ks7dev/Project_Senai` · Base: Levantamento de Requisitos v2.0 · Padrão: [`ARCHITECTURE.md`](../ARCHITECTURE.md), seção 7
 
-Total: 82 issues (`AB-001` = #1 … `AB-082` = #82). Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
+Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checklist PCI-DSS (#62), `AB-173` = #173 … `AB-182` = #182, criadas em 15/11/2026. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
 
 ## Como usar
 
@@ -158,6 +158,16 @@ Total: 82 issues (`AB-001` = #1 … `AB-082` = #82). Os códigos entre parêntes
 | #80 AB-080 | Monitoramento de disponibilidade e alertas | task | app | v1.0.0 | E6 | P1 | Backlog |
 | #81 AB-081 | Backup e teste de restauração | task | app | v1.0.0 | E6 | P1 | Backlog |
 | #82 AB-082 | Deploy e checklist de lançamento | task | app | v1.0.0 | E6 | P0 | Backlog |
+| #173 AB-173 | Trocar unsafe-inline da CSP por nonce nas páginas de pagamento | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
+| #174 AB-174 | Restringir os curingas de domínio da CSP do Mercado Pago | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
+| #175 AB-175 | Rate limit nas Server Actions de pagamento e estorno | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
+| #176 AB-176 | Rodar npm audit no CI | task | app | v1.0.0 | E6 | P2 | Backlog |
+| #177 AB-177 | 2FA obrigatório para perfis internos com acesso financeiro | task | acesso | v1.0.0 | E6 | P1 | Backlog |
+| #178 AB-178 | Arquivar a AOC do Mercado Pago e a matriz de responsabilidades | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
+| #179 AB-179 | Trocar as contas fictícias do seed no servidor de entrega | task | app | v1.0.0 | E6 | P1 | Backlog |
+| #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Backlog |
+| #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Backlog |
+| #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
 
 ---
 
@@ -1340,8 +1350,8 @@ Verificar os requisitos mínimos do SAQ A para o checkout transparente.
 
 **Critérios de aceite**
 
-- [ ] Checklist preenchido e versionado
-- [ ] Pendências viram issues
+- [x] Checklist preenchido e versionado
+- [x] Pendências viram issues (#173 a #182)
 
 ## Financeiro
 
@@ -1629,3 +1639,180 @@ Registro de aprovações, preços, crédito, estornos e perfis.
 
 - [ ] Log com usuário, data/hora, IP e valores anterior e novo
 - [ ] Log não editável pela interface
+
+## Pendências do PCI-DSS SAQ A
+
+Issues criadas em 15/11/2026 a partir da seção 6 do [checklist SAQ A](AtelierBureau_PCI_DSS_SAQ_A.md), como pede o critério da #62.
+
+### AB-173 — Trocar unsafe-inline da CSP por nonce nas páginas de pagamento
+
+**Issue:** #173  
+**Labels:** `tipo: task`, `área: pagamento`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 6.4.3, 11.6.1, E6 (pendência P1 do checklist SAQ A, #62)
+
+**Descrição**
+
+Trocar `'unsafe-inline'` de `script-src` por nonce ou hash nas páginas de pagamento, aprovar o inventário de scripts e monitorar mudanças de scripts e cabeçalhos na página de pagamento.
+
+**Critérios de aceite**
+
+- [ ] `script-src` das páginas de pagamento sem `'unsafe-inline'`, com nonce ou hash
+- [ ] Inventário de scripts da página de pagamento aprovado e versionado
+- [ ] Mudança de script ou cabeçalho na página de pagamento detectada e alertada
+
+### AB-174 — Restringir os curingas de domínio da CSP do Mercado Pago
+
+**Issue:** #174  
+**Labels:** `tipo: task`, `área: pagamento`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 6.4.3, E6 (pendência P2 do checklist SAQ A, #62)
+
+**Descrição**
+
+Restringir os curingas de domínio da CSP (`*.mercadopago.com`, `*.mlstatic.com`, `*.mercadolibre.com`, `*.mercadolivre.com`) aos hosts que o Brick usa de fato.
+
+**Critérios de aceite**
+
+- [ ] CSP lista só os hosts usados pelo Brick
+- [ ] Pagamento em sandbox funciona com a CSP restrita
+
+### AB-175 — Rate limit nas Server Actions de pagamento e estorno
+
+**Issue:** #175  
+**Labels:** `tipo: task`, `área: pagamento`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 8, RNF05 (pendência P3 do checklist SAQ A, #62)
+
+**Descrição**
+
+Aplicar rate limit às Server Actions de pagamento e estorno: tentativas de cartão por pedido e por IP.
+
+**Critérios de aceite**
+
+- [ ] Tentativas de pagamento limitadas por pedido e por IP
+- [ ] Solicitações de estorno limitadas por usuário
+- [ ] Recusa por limite mostra mensagem genérica e grava log
+
+### AB-176 — Rodar npm audit no CI
+
+**Issue:** #176  
+**Labels:** `tipo: task`, `área: app`, `infra`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 6.3 (pendência P4 do checklist SAQ A, #62)
+
+**Descrição**
+
+Rodar `npm audit` (ou equivalente) no CI e tratar as vulnerabilidades altas e críticas.
+
+**Critérios de aceite**
+
+- [ ] CI falha com vulnerabilidade alta ou crítica
+- [ ] Vulnerabilidades atuais tratadas ou justificadas
+
+### AB-177 — 2FA obrigatório para perfis internos com acesso financeiro
+
+**Issue:** #177  
+**Labels:** `tipo: task`, `área: acesso`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 8 (pendência P5 do checklist SAQ A, #62)
+
+**Descrição**
+
+Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos.
+
+**Critérios de aceite**
+
+- [ ] Perfil interno com acesso a pedidos, pagamentos ou estornos não entra sem 2FA
+- [ ] Primeiro acesso leva à ativação do 2FA
+
+### AB-178 — Arquivar a AOC do Mercado Pago e a matriz de responsabilidades
+
+**Issue:** #178  
+**Labels:** `tipo: task`, `área: pagamento`, `documentação`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI E2, E3, 12.8 (pendência P6 do checklist SAQ A, #62)
+
+**Descrição**
+
+Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades.
+
+**Critérios de aceite**
+
+- [ ] AOC do Mercado Pago arquivada em `docs/`
+- [ ] Campos de cartão do Brick confirmados como iframe
+- [ ] Matriz de responsabilidades registrada no checklist SAQ A
+
+### AB-179 — Trocar as contas fictícias do seed no servidor de entrega
+
+**Issue:** #179  
+**Labels:** `tipo: task`, `área: app`, `infra`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 2.2.2 (pendência P7 do checklist SAQ A, #62)
+
+**Descrição**
+
+No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD`.
+
+**Critérios de aceite**
+
+- [ ] Contas do seed com senha trocada ou desativadas no servidor de entrega
+- [ ] Procedimento registrado no checklist de lançamento (#82)
+
+### AB-180 — Certificado de CA pública ao publicar fora da rede local
+
+**Issue:** #180  
+**Labels:** `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 4 (pendência P8 do checklist SAQ A, #62)
+
+**Descrição**
+
+Usar certificado de CA pública ao publicar fora da rede local.
+
+**Critérios de aceite**
+
+- [ ] Decisão registrada sobre publicar fora da rede local
+- [ ] Se publicar, Caddy com certificado de CA pública
+
+### AB-181 — Varredura trimestral por ASV ao expor o site
+
+**Issue:** #181  
+**Labels:** `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 11.3.2 (pendência P9 do checklist SAQ A, #62)
+
+**Descrição**
+
+Contratar varredura trimestral por ASV ao expor o site na internet.
+
+**Critérios de aceite**
+
+- [ ] Decisão registrada sobre expor o site na internet
+- [ ] Se expor, varredura ASV agendada
+
+### AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
+
+**Issue:** #182  
+**Labels:** `tipo: task`, `área: pagamento`, `documentação`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RN19, PCI 12.10.1 (pendência P10 do checklist SAQ A, #62)
+
+**Descrição**
+
+Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento.
+
+**Critérios de aceite**
+
+- [ ] Política de segurança da informação versionada em `docs/`
+- [ ] Plano de resposta a incidentes de pagamento versionado em `docs/`
