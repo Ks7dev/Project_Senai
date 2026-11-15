@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ListingView } from "@/features/catalog/listing/listing-view"
 import { parseCatalogFilters } from "@/features/shared/lib/catalog/catalog-filters"
@@ -35,7 +36,32 @@ async function CategoryListing({
       title={category.name}
       filters={filters}
       page={page}
-    />
+    >
+      {(category.parent || category.children.length > 0) && (
+        <nav
+          aria-label="Subcategorias"
+          className="flex flex-wrap items-center gap-sm"
+        >
+          {category.parent && (
+            <Link
+              href={`/categoria/${category.parent.slug}`}
+              className="text-body-sm text-primary underline"
+            >
+              Voltar para {category.parent.name}
+            </Link>
+          )}
+          {category.children.map((child) => (
+            <Link
+              key={child.slug}
+              href={`/categoria/${child.slug}`}
+              className="rounded-full border border-line-subtle px-md py-1 text-label-sm text-ink hover:bg-subtle"
+            >
+              {child.name}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </ListingView>
   )
 }
 
