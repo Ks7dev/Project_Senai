@@ -29,6 +29,14 @@ const brl = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 })
 
+const scheduledDate = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: "America/Sao_Paulo",
+})
+
 const dateTime = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
   timeStyle: "short",
@@ -263,6 +271,14 @@ export function OrderManagementView({
                     {order.company && ` · ${order.company}`} ·{" "}
                     {dateTime.format(new Date(order.createdAt))}
                   </span>
+                  {order.scheduledDeliveryAt && (
+                    <span className="text-body-sm text-ink">
+                      Entrega e instalação agendadas para{" "}
+                      {scheduledDate.format(
+                        new Date(order.scheduledDeliveryAt)
+                      )}
+                    </span>
+                  )}
                   {order.payment && (
                     <span className="text-body-sm text-ink-muted">
                       {order.payment.method} · {order.payment.status}

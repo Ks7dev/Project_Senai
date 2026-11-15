@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   BarcodeIcon,
+  CalendarDaysIcon,
   CreditCardIcon,
   QrCodeIcon,
   TruckIcon,
@@ -20,6 +21,10 @@ import {
 } from "@/features/payment/checkout/action/checkout-actions"
 import type { CheckoutPaymentMethod } from "@/features/payment/checkout/schema/checkout-schema"
 import {
+  UNAVAILABLE_REASON_LABEL,
+  type ScheduleDay,
+} from "@/features/shared/lib/delivery/installation-calendar"
+import {
   deliveryTimeMessage,
   manualQuoteReasonMessage,
   manualQuoteResponseMessage,
@@ -29,6 +34,50 @@ const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 })
+
+const dayFormat = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "UTC",
+})
+
+const longDayFormat = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+})
+
+/**
+ * Formats a calendar date ("2026-11-18") for the scheduling grid.
+ *
+ * @param date - Calendar date.
+ * @param long - Whether to spell the weekday and the month.
+ * @returns The date in Portuguese.
+ */
+function formatDay(date: string, long = false): string {
+  return (long ? longDayFormat : dayFormat).format(
+    new Date(`${date}T12:00:00.000Z`)
+  )
+}
+
+/**
+ * Blocking reason of a date for the chosen shipping option: dates before
+ * the option delivers are blocked too (RN05).
+ *
+ * @param day - Calendar date.
+ * @param earliest - First date of the option, or null.
+ * @returns The reason label, or null when the date may be chosen.
+ */
+function blockedLabel(day: ScheduleDay, earliest: string | null) {
+  if (day.reason) return UNAVAILABLE_REASON_LABEL[day.reason]
+  if (earliest && day.date < earliest) {
+    return UNAVAILABLE_REASON_LABEL.too_early
+  }
+  return null
+}
 
 /**
  * Key of a shipping option in the radio group.
@@ -70,6 +119,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
   const [addressId, setAddressId] = useState("")
   const [quote, setQuote] = useState<CheckoutQuote>()
   const [selected, setSelected] = useState("")
+  const [installationDate, setInstallationDate] = useState("")
   const [method, setMethod] = useState<CheckoutPaymentMethod | "">(
     context.paymentMethods.length === 1 ? context.paymentMethods[0].method : ""
   )
@@ -87,6 +137,12 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
     quote?.status === "manual_quote"
       ? quote.total
       : (option?.total ?? cart.total)
+  const schedule = quote?.schedule ?? null
+  const earliestDate = option?.earliestInstallationDate ?? null
+  const chosenDay = schedule?.find(
+    (day) =>
+      day.date === installationDate && blockedLabel(day, earliestDate) === null
+  )
   const needsApproval =
     context.approvalLimit !== null &&
     Number(total) > Number(context.approvalLimit)
@@ -95,6 +151,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
     setError(undefined)
     setQuote(undefined)
     setSelected("")
+    setInstallationDate("")
     startTransition(async () => {
       const result = await quoteCheckoutShipping({ addressId: nextAddressId })
       if (!result.success) return setError(result.error)
@@ -110,6 +167,9 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
     if (!quote) return setError("Aguarde o cálculo do frete.")
     if (quote.status === "quoted" && !option) {
       return setError("Escolha uma opção de frete.")
+    }
+    if (context.installation.required && !chosenDay) {
+      return setError("Escolha a data de entrega e instalação.")
     }
     if (!method) return setError("Escolha a forma de pagamento.")
     setError(undefined)
@@ -127,6 +187,7 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
         expectedShippingPrice: option ? option.price : "0.00",
         expectedTotal: total,
         paymentMethod: method,
+        installationDate: chosenDay?.date ?? null,
       })
       if (!result.success) return setError(result.error)
       router.push(result.order.nextUrl)
@@ -259,6 +320,64 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
             </p>
           )}
         </div>
+
+        {context.installation.required && schedule && (
+          <fieldset
+            className="flex flex-col gap-sm"
+            aria-describedby={`${id}-schedule-help`}
+          >
+            <legend className="mb-sm text-headline-sm">
+              Data de entrega e instalação
+            </legend>
+            <p
+              id={`${id}-schedule-help`}
+              className="text-body-sm text-ink-muted"
+            >
+              {context.installation.products.join(", ")}{" "}
+              {context.installation.products.length === 1
+                ? "exige instalação"
+                : "exigem instalação"}
+              . Escolha o dia em que nossa equipe entrega e instala; o pedido só
+              é finalizado com uma data agendada. Datas riscadas não estão
+              disponíveis.
+            </p>
+            <div className="grid grid-cols-2 gap-xs lg:grid-cols-5 sm:grid-cols-4">
+              {schedule.map((day) => {
+                const blocked = blockedLabel(day, earliestDate)
+                return (
+                  <label
+                    key={day.date}
+                    className={
+                      blocked
+                        ? "flex cursor-not-allowed flex-col rounded border border-line-subtle p-xs text-label-sm text-ink-muted"
+                        : "flex cursor-pointer flex-col rounded border border-line-subtle p-xs text-label-sm text-ink has-checked:border-primary has-checked:bg-primary-tint has-focus-visible:ring-2 has-focus-visible:ring-primary"
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-installation`}
+                      value={day.date}
+                      checked={installationDate === day.date && !blocked}
+                      disabled={blocked !== null}
+                      onChange={() => setInstallationDate(day.date)}
+                      className="sr-only"
+                    />
+                    <span className={blocked ? "line-through" : "font-medium"}>
+                      {formatDay(day.date)}
+                    </span>
+                    <span>{blocked ?? "Disponível"}</span>
+                  </label>
+                )
+              })}
+            </div>
+            {chosenDay && (
+              <p className="flex items-center gap-xs text-body-sm text-ink">
+                <CalendarDaysIcon className="size-5 text-primary" aria-hidden />
+                Entrega e instalação em {formatDay(chosenDay.date, true)}.
+              </p>
+            )}
+          </fieldset>
+        )}
 
         <fieldset className="flex flex-col gap-xs">
           <legend className="mb-sm text-headline-sm">Forma de pagamento</legend>

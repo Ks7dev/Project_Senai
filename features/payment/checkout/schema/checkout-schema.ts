@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isValidDateKey } from "@/features/shared/lib/delivery/installation-calendar"
 
 /** Shipping methods a quote may return (everything but the manual quote). */
 const QUOTED_METHODS = [
@@ -29,7 +30,9 @@ export type CheckoutQuoteInput = z.input<typeof checkoutQuoteSchema>
  * Order placed by the customer: address, chosen shipping option, payment
  * method and the amounts they saw, so the order only goes on when
  * nothing changed since the review. `option` is null when the address
- * needs the manual quote of the sales team (RN20).
+ * needs the manual quote of the sales team (RN20). `installationDate` is
+ * the delivery and installation date, required when a line needs
+ * installation (RN05).
  */
 export const placeOrderSchema = checkoutQuoteSchema.extend({
   option: z
@@ -45,6 +48,10 @@ export const placeOrderSchema = checkoutQuoteSchema.extend({
     CHECKOUT_PAYMENT_METHODS,
     "Escolha a forma de pagamento."
   ),
+  installationDate: z
+    .string("Escolha a data de entrega e instalação.")
+    .refine(isValidDateKey, "Escolha a data de entrega e instalação.")
+    .nullish(),
 })
 
 /** Values of the order placement. */

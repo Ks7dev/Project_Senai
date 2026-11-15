@@ -64,6 +64,8 @@ export type AdminOrderRow = {
   total: string
   /** Order date, ISO. */
   createdAt: string
+  /** Delivery and installation date scheduled at checkout (RN05), ISO. */
+  scheduledDeliveryAt: string | null
   /** Latest payment with the Mercado Pago payment_id (RF32), if any. */
   payment: {
     /** Payment method label. */
@@ -118,6 +120,7 @@ export async function listAdminOrders(
         status: true,
         total: true,
         createdAt: true,
+        scheduledDeliveryAt: true,
         user: { select: { name: true } },
         organization: { select: { name: true } },
         payments: {
@@ -148,6 +151,7 @@ export async function listAdminOrders(
         status: row.status,
         total: row.total.toFixed(2),
         createdAt: row.createdAt.toISOString(),
+        scheduledDeliveryAt: row.scheduledDeliveryAt?.toISOString() ?? null,
         payment: row.payments[0]
           ? {
               method:
