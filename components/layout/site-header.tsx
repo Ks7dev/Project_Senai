@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { SearchIcon, ShoppingBagIcon, UserIcon } from "lucide-react"
 import { MobileMenu } from "@/components/layout/mobile-menu"
@@ -12,11 +13,15 @@ type SiteHeaderProps = {
   services: NavLink[]
   /** Number of items in the cart, shown on the cart link. */
   cartCount?: number
+  /** Cart control (e.g. the cart drawer); replaces the cart link. */
+  cart?: ReactNode
 }
 
 /**
  * Store header with logo, product search, category menu, account and
  * cart (#17). On mobile and tablet the categories move to a sheet.
+ * The cart slot receives the cart drawer (#46); without it the header
+ * links to the cart page.
  *
  * @param props - Navigation links and cart count.
  * @returns The header.
@@ -25,6 +30,7 @@ export function SiteHeader({
   categories,
   services,
   cartCount = 0,
+  cart,
 }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-line-subtle bg-canvas/95 backdrop-blur">
@@ -79,21 +85,23 @@ export function SiteHeader({
               </Link>
             </li>
             <li>
-              <Link
-                href="/carrinho"
-                aria-label={`Carrinho, ${cartCount} ${cartCount === 1 ? "item" : "itens"}`}
-                className="relative flex size-11 items-center justify-center rounded text-ink hover:bg-subtle"
-              >
-                <ShoppingBagIcon className="size-5" />
-                {cartCount > 0 && (
-                  <span
-                    aria-hidden
-                    className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-label-sm text-primary-foreground"
-                  >
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
+              {cart ?? (
+                <Link
+                  href="/carrinho"
+                  aria-label={`Carrinho, ${cartCount} ${cartCount === 1 ? "item" : "itens"}`}
+                  className="relative flex size-11 items-center justify-center rounded text-ink hover:bg-subtle"
+                >
+                  <ShoppingBagIcon className="size-5" />
+                  {cartCount > 0 && (
+                    <span
+                      aria-hidden
+                      className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-label-sm text-primary-foreground"
+                    >
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
+              )}
             </li>
           </ul>
         </nav>

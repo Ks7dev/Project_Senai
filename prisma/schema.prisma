@@ -512,6 +512,8 @@ model Cart {
   guestToken     String?       @unique @map("guest_token") @db.VarChar(64)
   createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  /// Project lists removed by the customer are soft deleted (RF07)
+  deletedAt      DateTime?     @map("deleted_at") @db.DateTime(3)
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   items          CartItem[]

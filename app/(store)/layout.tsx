@@ -1,8 +1,13 @@
 import { Suspense } from "react"
+import { unstable_rethrow } from "next/navigation"
+import { connection } from "next/server"
+import { CartDrawer } from "@/components/commerce/cart-drawer"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
 import { CompareBar } from "@/features/shared/components/compare-controls"
 import { getMenuCategoryLinks } from "@/features/app/shell/store-navigation"
+import { loadCurrentCart } from "@/features/shared/lib/cart/cart-store"
+import { logger } from "@/features/shared/lib/logger/logger"
 import {
   categoryLinks,
   institutionalLinks,
@@ -10,13 +15,50 @@ import {
 } from "@/features/shared/config/navigation"
 
 /**
- * Header with the category menu managed in the back office (#23).
+ * Cart drawer of the header with the active cart (#46): the account
+ * cart when logged in, the visitor cart otherwise. Falls back to an
+ * empty drawer if the database is unavailable.
+ *
+ * @returns The drawer.
+ */
+async function HeaderCart() {
+  // Request time only: the cart is never read during the build
+  await connection()
+  const cart = await loadCurrentCart().catch((error: unknown) => {
+    unstable_rethrow(error)
+    logger.error("header cart unavailable", { error })
+    return null
+  })
+  const lines = cart?.lines.filter((line) => line.purchasable) ?? []
+  return (
+    <CartDrawer
+      subtotal={cart?.subtotal ?? "0.00"}
+      items={lines.map((line) => ({
+        sku: line.skuCode,
+        name: line.productName,
+        variant: line.skuName,
+        quantity: line.quantity,
+        total: line.total,
+        imageKey: line.imageKey,
+      }))}
+    />
+  )
+}
+
+/**
+ * Header with the category menu managed in the back office (#23) and
+ * the cart drawer (#46).
  *
  * @returns The header.
  */
 async function StoreHeader() {
-  const categories = await getMenuCategoryLinks()
-  return <SiteHeader categories={categories} services={serviceLinks} />
+  const [categories, cart] = await Promise.all([
+    getMenuCategoryLinks(),
+    HeaderCart(),
+  ])
+  return (
+    <SiteHeader categories={categories} services={serviceLinks} cart={cart} />
+  )
 }
 
 /**

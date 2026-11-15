@@ -50,7 +50,8 @@ export async function loadAccountContext(): Promise<AccountContext | null> {
     { href: "/conta/pedidos", label: "Pedidos" },
     { href: "/conta/cotacoes", label: "Cotações" },
     { href: "/conta/enderecos", label: "Endereços" },
-    { href: "/conta/favoritos", label: "Favoritos e listas" },
+    { href: "/conta/favoritos", label: "Favoritos" },
+    { href: "/conta/listas", label: "Listas de projeto" },
     { href: "/conta/seguranca", label: "Dados e segurança" },
   ]
   if (corporate && hasCorporatePermission(roles, "member:manage")) {

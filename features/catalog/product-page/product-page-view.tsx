@@ -14,6 +14,7 @@ import { PageContainer } from "@/components/layout/page-container"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import type { ProductPageData } from "@/features/catalog/product-page/load-product"
+import { AddToCartButton } from "@/features/shared/components/add-to-cart-button"
 import { CompareButton } from "@/features/shared/components/compare-controls"
 import { FavoriteButton } from "@/features/shared/components/favorite-button"
 import { ShippingEstimate } from "@/features/shared/components/shipping-estimate"
@@ -168,13 +169,12 @@ export function ProductPageView({ product }: ProductPageViewProps) {
               : `Sob encomenda: produção em até ${product.leadTimeDays} dias úteis após a confirmação.`}
           </p>
 
-          <div className="flex flex-wrap gap-sm">
-            <Link
-              href={`/carrinho?adicionar=${encodeURIComponent(sku?.code ?? "")}`}
-              className={buttonVariants({ size: "lg" })}
-            >
-              {inStock ? "Comprar" : "Encomendar"}
-            </Link>
+          <div className="flex flex-wrap items-start gap-sm">
+            <AddToCartButton
+              key={sku?.code}
+              skuCode={sku?.code}
+              label={inStock ? "Comprar" : "Encomendar"}
+            />
             <Link
               href={`/cotacao/nova?produto=${encodeURIComponent(product.slug)}`}
               className={buttonVariants({ variant: "ghost", size: "lg" })}

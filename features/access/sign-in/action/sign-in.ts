@@ -11,6 +11,7 @@ import {
   type TwoFactorCodeInput,
 } from "@/features/shared/schema/two-factor-code-schema"
 import { getAuth } from "@/features/shared/lib/auth/auth"
+import { mergeGuestCartAfterLogin } from "@/features/shared/lib/cart/cart-store"
 import {
   AppError,
   toActionError,
@@ -21,7 +22,8 @@ const INVALID_CREDENTIALS = "E-mail ou senha incorretos."
 
 /**
  * Logs in with e-mail and password (RF39). When the account has 2FA
- * enabled, the session is only created after the code (RF40).
+ * enabled, the session is only created after the code (RF40). The
+ * visitor cart joins the account cart on login (RF07).
  *
  * @param input - Login form values, revalidated here with Zod.
  * @returns `{ success: true, twoFactor }` or `{ success: false, error }`.
@@ -42,6 +44,10 @@ export async function signIn(
 
     const twoFactor =
       "twoFactorRedirect" in result && result.twoFactorRedirect === true
+    // The visitor cart is kept after login (#46, RF07)
+    if (!twoFactor && "user" in result) {
+      await mergeGuestCartAfterLogin(result.user.id)
+    }
     return { success: true, twoFactor }
   } catch (error) {
     return toActionError(error, { action: "signIn" })
@@ -63,7 +69,7 @@ export async function verifyTwoFactor(
     if (!parsed.success) {
       throw new AppError("Código inválido.", "invalid_code")
     }
-    await getAuth()
+    const result = await getAuth()
       .api.verifyTOTP({ headers: await headers(), body: parsed.data })
       .catch((error: unknown) => {
         if (isAPIError(error)) {
@@ -74,6 +80,8 @@ export async function verifyTwoFactor(
         }
         throw error
       })
+    // The visitor cart is kept after login (#46, RF07)
+    await mergeGuestCartAfterLogin(result.user.id)
     return { success: true }
   } catch (error) {
     return toActionError(error, { action: "verifyTwoFactor" })
