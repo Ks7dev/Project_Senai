@@ -29,6 +29,9 @@ async function signIn(page: Page, redirect: string) {
   await page.getByLabel("Senha").fill(CUSTOMER_PASSWORD)
   await page.getByRole("button", { name: "Entrar" }).click()
   await page.waitForURL((url) => url.pathname === redirect)
+  // The client navigates before the server confirms the session: wait
+  // for the account greeting, which only renders for a signed-in user
+  await expect(page.getByRole("heading", { name: /^Olá,/ })).toBeVisible()
 }
 
 /**
@@ -40,16 +43,21 @@ async function signIn(page: Page, redirect: string) {
  */
 async function addAddress(page: Page, label: string) {
   await page.goto("/conta/enderecos")
-  await page.getByRole("button", { name: "Adicionar endereço" }).click()
-  await page.getByLabel("Apelido").fill(label)
-  await page.getByLabel("Quem recebe").fill(ADDRESS.recipient)
-  await page.getByLabel("CEP").fill(ADDRESS.cep)
+  await expect(page).toHaveURL(/\/conta\/enderecos$/)
+  // With no address yet the form is already open; otherwise open it
+  const add = page.getByRole("button", { name: "Adicionar endereço" })
+  const nickname = page.getByLabel("Apelido", { exact: true })
+  await expect(add.or(nickname)).toBeVisible()
+  if (await add.isVisible()) await add.click()
+  await page.getByLabel("Apelido", { exact: true }).fill(label)
+  await page.getByLabel("Quem recebe", { exact: true }).fill(ADDRESS.recipient)
+  await page.getByLabel("CEP", { exact: true }).fill(ADDRESS.cep)
   // The CEP lookup may fill the fields; the values below always win
-  await page.getByLabel("Rua").fill(ADDRESS.street)
-  await page.getByLabel("Número").fill(ADDRESS.number)
-  await page.getByLabel("Bairro").fill(ADDRESS.district)
-  await page.getByLabel("Cidade").fill(ADDRESS.city)
-  await page.getByLabel("Estado").selectOption(ADDRESS.state)
+  await page.getByLabel("Rua", { exact: true }).fill(ADDRESS.street)
+  await page.getByLabel("Número", { exact: true }).fill(ADDRESS.number)
+  await page.getByLabel("Bairro", { exact: true }).fill(ADDRESS.district)
+  await page.getByLabel("Cidade", { exact: true }).fill(ADDRESS.city)
+  await page.getByLabel("Estado", { exact: true }).selectOption(ADDRESS.state)
   await page.getByRole("button", { name: "Salvar endereço" }).click()
   await expect(page.getByText(label)).toBeVisible()
 }
