@@ -54,6 +54,41 @@ describe("local server configuration (#7, #11)", () => {
     expect(caddy).toMatch(/Strict-Transport-Security "max-age=31536000/)
   })
 
+  it("only redirects port 80 to HTTPS, for every host (RNF06)", () => {
+    const httpSite = caddy.match(/^http:\/\/ \{\n([\s\S]*?)^\}/m)
+    expect(httpSite).not.toBeNull()
+    expect(httpSite![1].trim()).toBe("redir https://{host}{uri} 308")
+    expect(caddy).not.toMatch(/^http:\/\/\S/m)
+  })
+
+  it("hides the server technology", () => {
+    expect(caddy).toContain("-Server")
+    expect(caddy).toContain("-X-Powered-By")
+  })
+
+  it("ships the root certificate export and the header check", () => {
+    for (const file of [
+      "deploy/export-root-cert.sh",
+      "deploy/export-root-cert.ps1",
+    ]) {
+      expect(readFileSync(join(process.cwd(), file), "utf8")).toContain(
+        "/data/caddy/pki/authorities/local/root.crt"
+      )
+    }
+    const check = readFileSync(
+      join(process.cwd(), "deploy/check-headers.sh"),
+      "utf8"
+    )
+    for (const header of [
+      "Strict-Transport-Security",
+      "Content-Security-Policy",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+    ]) {
+      expect(check).toContain(header)
+    }
+  })
+
   it("starts proxy, app, db and backup", () => {
     for (const service of ["proxy:", "app:", "db:", "backup:"]) {
       expect(compose).toContain(`  ${service}`)
