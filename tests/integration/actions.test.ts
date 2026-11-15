@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto"
+import { base32 } from "@better-auth/utils/base32"
+import { createOTP } from "@better-auth/utils/otp"
 import {
   afterAll,
   beforeAll,
@@ -25,10 +27,14 @@ vi.mock("next/cache", () => ({
 }))
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn, signOut } =
+const { signIn, signOut, verifyTwoFactor } =
   await import("@/features/access/sign-in/action/sign-in")
 const { signUp } = await import("@/features/access/sign-up/action/sign-up")
 const { getCurrentUser } = await import("@/features/shared/lib/auth/session")
+const { requestPasswordReset, resetPassword } =
+  await import("@/features/access/password-reset/action/password-reset")
+const { startTwoFactor, confirmTwoFactor, disableTwoFactor } =
+  await import("@/features/access/security/action/two-factor")
 const { saveAddress, listAddresses, deleteAddress } =
   await import("@/features/account/addresses/action/address-actions")
 const { setFavorite, listMyFavoriteIds } =
@@ -269,6 +275,166 @@ describe("back office and corporate permissions against MySQL", () => {
     await login("solicitante@empresa-ficticia.test")
     const result = await getTeam()
     expect(result.success).toBe(false)
+  })
+})
+
+describe("password reset against MySQL (#33, RF40)", () => {
+  const email = `recupera.${run}@atelierbureau.test`
+  const linkError = {
+    success: false,
+    error: "Este link expirou ou já foi usado. Peça um novo link.",
+  }
+
+  beforeAll(async () => {
+    created.emails.push(email)
+    const result = await signUp({
+      personType: "PF",
+      name: "Pessoa da Recuperação",
+      email,
+      cpf: randomCpf(),
+      phone: "11987654321",
+      password: "Senha-Antiga-2026",
+      confirmPassword: "Senha-Antiga-2026",
+      acceptTerms: true,
+    } as never)
+    expect(result).toEqual({ success: true })
+  })
+
+  /**
+   * Requests a reset link through the real action and reads the token
+   * Better Auth stored for the user.
+   *
+   * @returns The newest reset token.
+   */
+  async function issueToken(): Promise<string> {
+    jar.clear()
+    expect(await requestPasswordReset({ email })).toEqual({ success: true })
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email },
+      select: { id: true },
+    })
+    const verification = await prisma.verification.findFirstOrThrow({
+      where: { value: user.id, identifier: { startsWith: "reset-password:" } },
+      orderBy: { createdAt: "desc" },
+    })
+    return verification.identifier.slice("reset-password:".length)
+  }
+
+  const reset = (token: string, password: string) =>
+    resetPassword({ token, password, confirmPassword: password })
+
+  it("answers the same way for unknown e-mails", async () => {
+    expect(
+      await requestPasswordReset({ email: `ninguem.${run}@atelierbureau.test` })
+    ).toEqual({ success: true })
+  })
+
+  it("expires the token in one hour", async () => {
+    const token = await issueToken()
+    const verification = await prisma.verification.findFirstOrThrow({
+      where: { identifier: `reset-password:${token}` },
+    })
+    const lifetime =
+      verification.expiresAt.getTime() - verification.createdAt.getTime()
+    expect(Math.round(lifetime / 60_000)).toBe(60)
+
+    await prisma.verification.update({
+      where: { id: verification.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+    expect(await reset(token, "Senha-Expirada-2026")).toEqual(linkError)
+  })
+
+  it("accepts the token once and refuses it afterwards", async () => {
+    const token = await issueToken()
+    expect(await reset(token, "Senha-Nova-2026!")).toEqual({ success: true })
+    expect(await reset(token, "Senha-Outra-2026!")).toEqual(linkError)
+
+    jar.clear()
+    expect(await signIn({ email, password: "Senha-Nova-2026!" })).toEqual({
+      success: true,
+      twoFactor: false,
+    })
+  })
+})
+
+describe("optional 2FA for corporate accounts against MySQL (#33, RF40)", () => {
+  const corporateEmail = "solicitante@empresa-ficticia.test"
+
+  afterAll(async () => {
+    // Leaves the seed account as it was, even if a test failed midway
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: corporateEmail },
+      select: { id: true },
+    })
+    await prisma.twoFactor.deleteMany({ where: { userId: user.id } })
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { twoFactorEnabled: false },
+    })
+  })
+
+  it("is not offered to accounts outside a corporate account", async () => {
+    await login("cliente.pf@atelierbureau.test")
+    expect(await startTwoFactor({ password })).toEqual({
+      success: false,
+      error:
+        "A verificação em duas etapas está disponível para contas corporativas.",
+    })
+  })
+
+  it("is turned on by a corporate user and then required at login", async () => {
+    await login(corporateEmail)
+    const started = await startTwoFactor({ password })
+    expect(started.success).toBe(true)
+    if (!started.success) return
+    expect(started.backupCodes.length).toBeGreaterThan(0)
+
+    // Still off until the first code is confirmed
+    const pending = await prisma.user.findUniqueOrThrow({
+      where: { email: corporateEmail },
+      select: { twoFactorEnabled: true },
+    })
+    expect(pending.twoFactorEnabled).not.toBe(true)
+
+    expect(await confirmTwoFactor({ code: "000000" })).toEqual({
+      success: false,
+      error: "Código incorreto.",
+    })
+
+    const secret = new URL(started.totpUri).searchParams.get("secret")!
+    const code = await createOTP(base32.decode(secret)).totp()
+    expect(await confirmTwoFactor({ code })).toEqual({ success: true })
+    const enabled = await prisma.user.findUniqueOrThrow({
+      where: { email: corporateEmail },
+      select: { twoFactorEnabled: true },
+    })
+    expect(enabled.twoFactorEnabled).toBe(true)
+
+    jar.clear()
+    expect(await signIn({ email: corporateEmail, password })).toEqual({
+      success: true,
+      twoFactor: true,
+    })
+    expect(await getCurrentUser()).toBeNull()
+    expect(
+      await verifyTwoFactor({
+        code: await createOTP(base32.decode(secret)).totp(),
+      })
+    ).toEqual({ success: true })
+    expect((await getCurrentUser())?.email).toBe(corporateEmail)
+
+    expect(await disableTwoFactor({ password: "senha-errada" })).toEqual({
+      success: false,
+      error: "Senha incorreta.",
+    })
+    expect(await disableTwoFactor({ password })).toEqual({ success: true })
+
+    jar.clear()
+    expect(await signIn({ email: corporateEmail, password })).toEqual({
+      success: true,
+      twoFactor: false,
+    })
   })
 })
 
