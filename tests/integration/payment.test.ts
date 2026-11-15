@@ -39,6 +39,8 @@ const { getCheckout, placeOrder, quoteCheckoutShipping } =
   await import("@/features/payment/checkout/action/checkout-actions")
 const { getOrderPayment, payOrder } =
   await import("@/features/payment/order-payment/action/payment-actions")
+const { saveInstallmentRules } =
+  await import("@/features/payment/installments/action/installment-actions")
 const { expireUnpaidOrders } =
   await import("@/features/shared/lib/orders/order-expiration")
 
@@ -805,5 +807,94 @@ describe("Pix and boleto with expiration (#55, RF29, RN14)", () => {
       await expireUnpaidOrders(new Date(Date.now() + 31 * 60_000))
     ).toContain(order.orderId)
     expect(await fixtures.counters(sku.id)).toEqual({ onHand: 5, reserved: 0 })
+  })
+})
+
+describe("configurable installments (#56, RF14)", () => {
+  it("offers only the installments allowed for the total and refuses more", async () => {
+    // 3 units: R$ 300,00 + PAC 3 × R$ 45,90 = R$ 437,70 (PF: up to 3x)
+    const { order } = await placeCardOrder({ quantity: 3 })
+    const context = await getOrderPayment({ orderId: order.orderId })
+    expect(context).toMatchObject({
+      success: true,
+      context: { total: "437.70", maxInstallments: 3 },
+    })
+
+    const tooMany = await payOrder({
+      orderId: order.orderId,
+      method: "CARD",
+      formData: { ...brickCard, installments: 6 },
+    })
+    expect(tooMany).toEqual({
+      success: false,
+      error:
+        "Este pedido não pode ser parcelado nesse número de vezes. Escolha menos parcelas.",
+    })
+    expect(mercadoPagoRequests).toHaveLength(0)
+
+    const allowed = await payOrder({
+      orderId: order.orderId,
+      method: "CARD",
+      formData: { ...brickCard, installments: 3 },
+    })
+    expect(allowed).toMatchObject({
+      success: true,
+      attempt: { payment: { installments: 3 } },
+    })
+    expect(mercadoPagoRequests[0].body.installments).toBe(3)
+  })
+
+  it("lets only the back office with setting:manage change the ranges", async () => {
+    const key = "payment.installment_rules"
+    const original = await prisma.setting.findUniqueOrThrow({ where: { key } })
+    try {
+      await login(customer)
+      expect(
+        await saveInstallmentRules({
+          rules: [
+            { profile: "PF", minTotal: "0", maxInstallments: "12" },
+            { profile: "PJ", minTotal: "0", maxInstallments: "12" },
+          ],
+        })
+      ).toEqual({
+        success: false,
+        error: "Você não tem permissão para esta ação.",
+      })
+
+      await login("admin@atelierbureau.test")
+      const saved = await saveInstallmentRules({
+        rules: [
+          { profile: "PF", minTotal: "0", maxInstallments: "2" },
+          { profile: "PF", minTotal: "200,00", maxInstallments: "5" },
+          { profile: "PJ", minTotal: "0", maxInstallments: "1" },
+        ],
+      })
+      expect(saved).toEqual({
+        success: true,
+        rules: [
+          { profile: "PF", minTotal: "0.00", maxInstallments: 2 },
+          { profile: "PF", minTotal: "200.00", maxInstallments: 5 },
+          { profile: "PJ", minTotal: "0.00", maxInstallments: 1 },
+        ],
+      })
+      expect(
+        await prisma.auditLog.count({
+          where: { action: "setting.update", entityId: key },
+        })
+      ).toBeGreaterThan(0)
+
+      // The customer's next payment page follows the new ranges
+      const { order } = await placeCardOrder({ quantity: 2 })
+      const context = await getOrderPayment({ orderId: order.orderId })
+      expect(context).toMatchObject({
+        success: true,
+        context: { maxInstallments: 5 },
+      })
+    } finally {
+      await prisma.setting.update({
+        where: { key },
+        data: { value: original.value as never },
+      })
+    }
   })
 })
