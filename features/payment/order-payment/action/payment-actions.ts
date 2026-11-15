@@ -40,6 +40,7 @@ import {
   toMercadoPagoDate,
 } from "@/features/shared/lib/payments/payment-deadlines"
 import { loadInstallmentRules } from "@/features/shared/lib/payments/installment-rules"
+import { refreshPendingPayment } from "@/features/shared/lib/payments/payment-reconciliation"
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { maxInstallmentsFor } from "@/features/shared/schema/installment-schema"
@@ -118,6 +119,17 @@ export type PaymentAttempt = {
     creq: string
   } | null
 }
+
+/** Live payment status of an order, polled by the payment page (RF31). */
+export type PaymentStatusSnapshot = {
+  /** Order status. */
+  orderStatus: OrderStatusKey
+  /** Payment attempts, newest first. */
+  payments: PaymentView[]
+}
+
+/** Least time between two Mercado Pago reads of the same payment. */
+const LIVE_REFRESH_MS = 10_000
 
 /** Message when online payment is not configured. */
 const PAYMENT_OFF_MESSAGE =
@@ -532,5 +544,59 @@ export async function payOrder(
     }
   } catch (error) {
     return toActionError(error, { action: "payOrder" })
+  }
+}
+
+/**
+ * Live payment status of an order (RF31, #58), polled by the payment
+ * page so the customer sees the confirmation without reloading. When a
+ * payment is still pending, it is read again from Mercado Pago (at most
+ * every few seconds), so the page updates even if the webhook is late;
+ * the order is confirmed only with "approved" (RN13). Only the buyer
+ * sees it.
+ *
+ * @param input - Order id.
+ * @returns `{ success: true, snapshot }` or `{ success: false, error }`.
+ */
+export async function getPaymentStatus(input: {
+  orderId: string
+}): Promise<ActionResult<{ snapshot: PaymentStatusSnapshot }>> {
+  try {
+    const parsed = orderPaymentSchema.safeParse(input)
+    if (!parsed.success) throw new AppError("Pedido inválido.", "invalid")
+    const userId = await sessionUserId()
+    await enforceActionRateLimit("payment-status", {
+      limit: 60,
+      windowMs: 60_000,
+    })
+    const pending = await prisma.payment.findFirst({
+      where: {
+        status: "PENDING",
+        order: { id: parsed.data.orderId, userId },
+        updatedAt: { lt: new Date(Date.now() - LIVE_REFRESH_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    })
+    if (pending) {
+      try {
+        await refreshPendingPayment(pending.id)
+      } catch (error) {
+        // The stored status is still shown; the next poll tries again
+        logger.warn("live payment refresh failed", {
+          error: error instanceof Error ? error.name : "unknown",
+        })
+      }
+    }
+    const order = await loadOwnOrder(prisma, parsed.data.orderId, userId)
+    return {
+      success: true,
+      snapshot: {
+        orderStatus: order.status,
+        payments: order.payments.map(toPaymentView),
+      },
+    }
+  } catch (error) {
+    return toActionError(error, { action: "getPaymentStatus" })
   }
 }

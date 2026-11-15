@@ -16,6 +16,10 @@ import {
 } from "@/features/shared/lib/orders/cancellation"
 import { transitionOrder } from "@/features/shared/lib/orders/order-lifecycle"
 import {
+  PAYMENT_METHOD_LABEL,
+  PAYMENT_STATUS,
+} from "@/features/shared/lib/payments/payment-messages"
+import {
   MANUAL_STATUS_PERMISSION,
   manualNextStatuses,
   type OrderStatusKey,
@@ -60,6 +64,15 @@ export type AdminOrderRow = {
   total: string
   /** Order date, ISO. */
   createdAt: string
+  /** Latest payment with the Mercado Pago payment_id (RF32), if any. */
+  payment: {
+    /** Payment method label. */
+    method: string
+    /** Payment status label. */
+    status: string
+    /** Mercado Pago payment id, for the financial reconciliation. */
+    paymentId: string | null
+  } | null
   /** Statuses this user may set by hand. */
   nextStatuses: OrderStatusKey[]
   /** Status history, oldest first. */
@@ -91,6 +104,8 @@ export async function listAdminOrders(
                 { number: { contains: search } },
                 { user: { name: { contains: search } } },
                 { organization: { name: { contains: search } } },
+                // Financial reconciliation by the Mercado Pago id (RF32)
+                { payments: { some: { paymentId: search } } },
               ],
             }
           : {}),
@@ -105,6 +120,11 @@ export async function listAdminOrders(
         createdAt: true,
         user: { select: { name: true } },
         organization: { select: { name: true } },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { method: true, status: true, paymentId: true },
+        },
         statusHistory: {
           orderBy: { createdAt: "asc" },
           select: {
@@ -128,6 +148,17 @@ export async function listAdminOrders(
         status: row.status,
         total: row.total.toFixed(2),
         createdAt: row.createdAt.toISOString(),
+        payment: row.payments[0]
+          ? {
+              method:
+                PAYMENT_METHOD_LABEL[row.payments[0].method] ??
+                row.payments[0].method,
+              status:
+                PAYMENT_STATUS[row.payments[0].status]?.label ??
+                row.payments[0].status,
+              paymentId: row.payments[0].paymentId,
+            }
+          : null,
         nextStatuses: manualNextStatuses(row.status, permissions),
         history: row.statusHistory.map((entry) => ({
           id: entry.id,

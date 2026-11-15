@@ -138,6 +138,16 @@ export function AccountOrdersTable({
                 >
                   {order.number}
                 </Link>
+                {order.ownOrder && (
+                  <Link
+                    href={`/conta/pedidos/${order.id}/pagamento`}
+                    className="block text-label-sm text-ink-muted underline hover:text-ink"
+                  >
+                    {order.status === "AWAITING_PAYMENT"
+                      ? "Pagar ou ver pagamento"
+                      : "Ver pagamento"}
+                  </Link>
+                )}
                 {order.addressChangeable && (
                   <Link
                     href={`/conta/pedidos/${order.id}/endereco`}

@@ -38,8 +38,10 @@ const { resetCorreiosToken } =
   await import("@/features/shared/lib/correios/correios")
 const { getCheckout, placeOrder, quoteCheckoutShipping } =
   await import("@/features/payment/checkout/action/checkout-actions")
-const { getOrderPayment, payOrder } =
+const { getOrderPayment, getPaymentStatus, payOrder } =
   await import("@/features/payment/order-payment/action/payment-actions")
+const { listAdminOrders } =
+  await import("@/features/orders/order-management/action/order-management-actions")
 const { saveInstallmentRules } =
   await import("@/features/payment/installments/action/installment-actions")
 const { expireUnpaidOrders } =
@@ -1185,5 +1187,80 @@ describe("reconciliation by GET /v1/payments/{id} (#57)", () => {
     await reconcilePendingPayments({ now: later, expiredOnly: true })
     expect(await expireUnpaidOrders(later)).not.toContain(order.orderId)
     expect((await statusOf(order.orderId)).status).toBe("PAID")
+  })
+})
+
+describe("payment status and payment_id (#58, RF31, RF32)", () => {
+  it("updates the status for the customer without reloading", async () => {
+    vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", "")
+    const { order, paymentId } = await pendingPix()
+    settle(paymentId)
+
+    // Just issued: shown as stored, Mercado Pago is not read again yet
+    const fresh = await getPaymentStatus({ orderId: order.orderId })
+    expect(fresh).toMatchObject({
+      success: true,
+      snapshot: {
+        orderStatus: "AWAITING_PAYMENT",
+        payments: [{ status: "PENDING", paymentId }],
+      },
+    })
+
+    // A few seconds later the poll reads it again, even without webhook
+    await prisma.payment.updateMany({
+      where: { orderId: order.orderId },
+      data: { updatedAt: new Date(Date.now() - 60_000) },
+    })
+    const live = await getPaymentStatus({ orderId: order.orderId })
+    expect(live).toMatchObject({
+      success: true,
+      snapshot: {
+        orderStatus: "PAID",
+        payments: [{ status: "APPROVED", statusLabel: "Aprovado", paymentId }],
+      },
+    })
+  })
+
+  it("shows the status only to the buyer", async () => {
+    const { order } = await pendingPix()
+    await login(otherCustomer)
+    expect(await getPaymentStatus({ orderId: order.orderId })).toEqual({
+      success: false,
+      error: "Pedido não encontrado.",
+    })
+  })
+
+  it("links a unique payment_id to the order for the reconciliation", async () => {
+    const { order, paymentId } = await pendingPix()
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.orderId },
+    })
+    expect(payment.paymentId).toBe(paymentId)
+    await expect(
+      prisma.payment.create({
+        data: {
+          orderId: order.orderId,
+          method: "PIX",
+          amount: "1.00",
+          paymentId,
+        },
+      })
+    ).rejects.toMatchObject({ code: "P2002" })
+
+    await login("admin@atelierbureau.test")
+    const found = await listAdminOrders({ search: paymentId })
+    expect(found).toMatchObject({
+      success: true,
+      orders: [
+        {
+          id: order.orderId,
+          payment: {
+            method: "Pix",
+            status: "Aguardando confirmação",
+            paymentId,
+          },
+        },
+      ],
+    })
   })
 })

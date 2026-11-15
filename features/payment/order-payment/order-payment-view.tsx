@@ -7,9 +7,11 @@ import { CopyIcon, ExternalLinkIcon, LockIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  getPaymentStatus,
   payOrder,
   type OrderPaymentContext,
   type PaymentAttempt,
+  type PaymentStatusSnapshot,
   type PaymentView,
 } from "@/features/payment/order-payment/action/payment-actions"
 import {
@@ -18,7 +20,11 @@ import {
   type BrickController,
   type BrickSubmit,
 } from "@/features/shared/lib/mercadopago/bricks"
+import { ORDER_STATUS } from "@/features/shared/lib/orders/order-status"
 import { PAYMENT_STATUS } from "@/features/shared/lib/payments/payment-messages"
+
+/** Interval of the live status check while a payment is pending (RF31). */
+const POLL_MS = 5_000
 
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -241,12 +247,49 @@ export function OrderPaymentView({
   const [attempt, setAttempt] = useState<PaymentAttempt>()
   const [error, setError] = useState<string>()
   const controller = useRef<BrickController | null>(null)
+  // Live status polled from the server; a new server render wins
+  const [polled, setPolled] = useState<{
+    from: OrderPaymentContext
+    snapshot: PaymentStatusSnapshot
+  } | null>(null)
+  const snapshot: PaymentStatusSnapshot =
+    polled && polled.from === context
+      ? polled.snapshot
+      : { orderStatus: context.status, payments: context.payments }
 
   const showForm = context.canPay && !attempt
   const pendingPayment =
-    context.payments.find((payment) => payment.status === "PENDING") ??
+    snapshot.payments.find((payment) => payment.status === "PENDING") ??
     (attempt?.payment.status === "PENDING" ? attempt.payment : undefined)
+  const attemptMessage = attempt
+    ? (snapshot.payments.find((payment) => payment.id === attempt.payment.id)
+        ?.message ?? attempt.payment.message)
+    : undefined
+  const latest = snapshot.payments[0]
+  const waiting = snapshot.payments.some(
+    (payment) => payment.status === "PENDING"
+  )
   const { orderId, method, total, payerEmail, maxInstallments } = context
+
+  // Live status (RF31): while a payment is pending, ask the server every
+  // few seconds; when it settles, the page is rendered again
+  useEffect(() => {
+    if (!waiting) return
+    let stopped = false
+    const timer = setInterval(async () => {
+      if (document.visibilityState === "hidden") return
+      const result = await getPaymentStatus({ orderId })
+      if (stopped || !result.success) return
+      setPolled({ from: context, snapshot: result.snapshot })
+      if (!result.snapshot.payments.some((p) => p.status === "PENDING")) {
+        router.refresh()
+      }
+    }, POLL_MS)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+    }
+  }, [waiting, orderId, context, router])
 
   const submit = useCallback(
     async ({ formData }: BrickSubmit) => {
@@ -366,18 +409,33 @@ export function OrderPaymentView({
         </strong>
       </section>
 
+      <p
+        role="status"
+        aria-live="polite"
+        className="flex flex-wrap items-center gap-sm text-body-sm text-ink"
+      >
+        <span>
+          Pedido: <strong>{ORDER_STATUS[snapshot.orderStatus].label}</strong>
+        </span>
+        {latest && (
+          <span>
+            · Pagamento: <strong>{latest.statusLabel}</strong>
+          </span>
+        )}
+        {waiting && (
+          <span className="text-ink-muted">· atualizado automaticamente</span>
+        )}
+      </p>
+
       {context.blockedReason && !attempt && (
         <p role="note" className="rounded bg-subtle p-sm text-body-sm text-ink">
           {context.blockedReason}
         </p>
       )}
 
-      {attempt && (
-        <p
-          role="status"
-          className="rounded bg-primary-tint p-sm text-body-sm text-ink"
-        >
-          {attempt.payment.message}
+      {attemptMessage && (
+        <p className="rounded bg-primary-tint p-sm text-body-sm text-ink">
+          {attemptMessage}
         </p>
       )}
 
@@ -420,7 +478,7 @@ export function OrderPaymentView({
         </button>
       )}
 
-      <PaymentHistory payments={context.payments} />
+      <PaymentHistory payments={snapshot.payments} />
     </div>
   )
 }

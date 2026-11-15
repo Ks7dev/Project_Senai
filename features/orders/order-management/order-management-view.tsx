@@ -215,7 +215,7 @@ export function OrderManagementView({
       >
         <div className="flex min-w-60 flex-1 flex-col gap-xs">
           <label htmlFor="busca-pedido" className="text-label">
-            Buscar por número ou cliente
+            Buscar por número, cliente ou código do Mercado Pago
           </label>
           <Input id="busca-pedido" name="q" defaultValue={search} />
         </div>
@@ -263,6 +263,13 @@ export function OrderManagementView({
                     {order.company && ` · ${order.company}`} ·{" "}
                     {dateTime.format(new Date(order.createdAt))}
                   </span>
+                  {order.payment && (
+                    <span className="text-body-sm text-ink-muted">
+                      {order.payment.method} · {order.payment.status}
+                      {order.payment.paymentId &&
+                        ` · Mercado Pago ${order.payment.paymentId}`}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-md">
                   <span className="text-body">
