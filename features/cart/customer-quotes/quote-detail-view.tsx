@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { DownloadIcon, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  decideMyQuote,
   downloadMyQuoteAttachment,
   revalidateMyQuote,
   type CustomerQuote,
@@ -38,7 +40,9 @@ function money(value: string | null): string {
  * Quote page of the customer area (#48, RF05, RF06, RF08): status,
  * validity, lines with prices, totals, notes and the attached files.
  * An expired quote says its prices no longer hold and offers the
- * revalidation (#49, RN02).
+ * revalidation (#49, RN02). An answered quote shows the proposal of
+ * the sales team to approve or refuse, and a converted one links to
+ * its order (#50, RF20).
  *
  * @param props - Quote and whether it was just requested.
  * @returns The quote content.
@@ -54,6 +58,7 @@ export function QuoteDetailView({
   const [pending, startTransition] = useTransition()
   const [revalidationError, setRevalidationError] = useState<string>()
   const [revalidated, setRevalidated] = useState(false)
+  const [decisionError, setDecisionError] = useState<string>()
   const router = useRouter()
   const expired = quote.status === "EXPIRED"
 
@@ -63,6 +68,14 @@ export function QuoteDetailView({
       const result = await revalidateMyQuote({ quoteId: quote.id })
       if (!result.success) return setRevalidationError(result.error)
       setRevalidated(true)
+      router.refresh()
+    })
+
+  const decide = (decision: "accept" | "reject") =>
+    startTransition(async () => {
+      setDecisionError(undefined)
+      const result = await decideMyQuote({ quoteId: quote.id, decision })
+      if (!result.success) return setDecisionError(result.error)
       router.refresh()
     })
 
@@ -113,6 +126,72 @@ export function QuoteDetailView({
             </p>
           )}
         </section>
+      )}
+      {quote.status === "ANSWERED" && (
+        <section
+          aria-labelledby="proposta-comercial"
+          className="flex flex-col items-start gap-sm rounded-lg border border-line-subtle bg-elevated p-md"
+        >
+          <h2 id="proposta-comercial" className="text-headline-sm">
+            Proposta da equipe comercial
+          </h2>
+          {quote.answerNote && (
+            <p className="text-body-sm whitespace-pre-line">
+              {quote.answerNote}
+            </p>
+          )}
+          <p className="text-body-sm">
+            Total da proposta: <strong>{money(quote.total)}</strong>
+            {quote.validUntil &&
+              `, válida até ${dateTime.format(new Date(quote.validUntil))}`}
+            .{" "}
+            {quote.canDecide
+              ? "Ao aprovar, a equipe comercial gera o pedido com estes valores."
+              : "A aprovação cabe a quem solicita cotações na sua empresa."}
+          </p>
+          {quote.canDecide && (
+            <div className="flex flex-wrap gap-sm">
+              <Button
+                type="button"
+                disabled={pending}
+                onClick={() => decide("accept")}
+              >
+                Aprovar proposta
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => decide("reject")}
+              >
+                Recusar proposta
+              </Button>
+            </div>
+          )}
+          {decisionError && (
+            <p role="alert" className="text-body-sm text-error">
+              {decisionError}
+            </p>
+          )}
+        </section>
+      )}
+      {quote.status === "ACCEPTED" && (
+        <p role="status" className="rounded bg-primary-tint p-sm text-body-sm">
+          Proposta aprovada. A equipe comercial vai gerar o pedido com os
+          valores negociados e você acompanha por aqui e por e-mail.
+        </p>
+      )}
+      {quote.status === "CONVERTED" && quote.order && (
+        <p role="status" className="rounded bg-primary-tint p-sm text-body-sm">
+          Esta cotação virou o pedido {quote.order.number}, com os valores
+          negociados.{" "}
+          <Link
+            href={`/conta/pedidos/${quote.order.id}`}
+            className="text-primary underline"
+          >
+            Ver o pedido
+          </Link>
+        </p>
       )}
       <dl className="grid gap-md text-body-sm lg:grid-cols-4 sm:grid-cols-2">
         <div>

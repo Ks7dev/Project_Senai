@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { FormField, fieldAria } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { ORDER_STATUS } from "@/features/shared/lib/orders/order-status"
+import { QUOTED_METHODS } from "@/features/shared/lib/shipping/quoted-methods"
 import { manualQuoteReasonMessage } from "@/features/shared/lib/shipping/shipping-messages"
 import {
   answerManualShippingQuote,
@@ -16,7 +17,6 @@ import {
 } from "@/features/shipping/manual-quotes/action/manual-quote-actions"
 import {
   answerManualQuoteSchema,
-  QUOTED_METHODS,
   type AnswerManualQuoteData,
   type AnswerManualQuoteInput,
 } from "@/features/shipping/manual-quotes/schema/manual-quote-schema"
