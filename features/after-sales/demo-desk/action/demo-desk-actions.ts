@@ -25,6 +25,7 @@ import {
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
+import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** A demonstration request of the back office. */
 export type DemoDeskRow = {
@@ -100,7 +101,7 @@ export async function listDemoRequests(
         mode: row.mode,
         status: row.status,
         customer: row.user,
-        phone: row.phone,
+        phone: decryptPersonal(row.phone),
         company: row.organization?.name ?? null,
         product: row.product?.name ?? null,
         seller: row.seller?.name ?? null,

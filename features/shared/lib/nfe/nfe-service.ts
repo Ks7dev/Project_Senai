@@ -20,6 +20,7 @@ import {
 } from "@/features/shared/lib/nfe/nfe-payload"
 import { getSetting } from "@/features/shared/lib/settings/settings"
 import { saveFile } from "@/features/shared/lib/storage/storage"
+import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** Status of an NF-e in the store. */
 export type InvoiceStatusKey = "PENDING" | "PROCESSING" | "ISSUED" | "FAILED"
@@ -230,7 +231,8 @@ async function payloadFor(
   return buildNfePayload(
     {
       number: order.number,
-      document: order.organization?.cnpj ?? order.user.document,
+      document:
+        order.organization?.cnpj ?? decryptPersonal(order.user.document),
       shippingAddress: order.shippingAddress,
       shippingTotal: order.shippingTotal.toFixed(2),
       discount: order.discount.toFixed(2),

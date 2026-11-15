@@ -34,8 +34,8 @@ erDiagram
     text image
     tinyint_1 two_factor_enabled
     enum person_type
-    varchar_14 document UK
-    varchar_20 phone
+    varchar_80 document UK
+    varchar_80 phone
     datetime_3 created_at
     datetime_3 updated_at
     datetime_3 deleted_at
@@ -669,7 +669,7 @@ erDiagram
     enum mode
     datetime_3 scheduled_at
     enum status
-    varchar_20 phone
+    varchar_80 phone
     text notes
     text team_note
     datetime_3 created_at

@@ -246,9 +246,10 @@ model User {
   image            String?    @db.Text
   twoFactorEnabled Boolean?   @default(false) @map("two_factor_enabled")
   personType       PersonType @map("person_type")
-  /// CPF (PF) or CNPJ (PJ), digits only
-  document         String     @unique @db.VarChar(14)
-  phone            String?    @db.VarChar(20)
+  /// CPF (PF) or CNPJ (PJ), digits only, encrypted at rest (RNF03)
+  document         String     @unique @db.VarChar(80)
+  /// Phone, digits only, encrypted at rest (RNF03)
+  phone            String?    @db.VarChar(80)
   createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
   deletedAt        DateTime?  @map("deleted_at") @db.DateTime(3)
@@ -1399,8 +1400,8 @@ model DemoRequest {
   /// Start of the meeting (UTC)
   scheduledAt    DateTime      @map("scheduled_at") @db.DateTime(3)
   status         DemoStatus    @default(REQUESTED)
-  /// Phone for the contact, digits only (optional)
-  phone          String?       @db.VarChar(20)
+  /// Phone for the contact, digits only (optional), encrypted at rest (RNF03)
+  phone          String?       @db.VarChar(80)
   notes          String?       @db.Text
   /// Message of the sales team when confirming or canceling
   teamNote       String?       @map("team_note") @db.Text

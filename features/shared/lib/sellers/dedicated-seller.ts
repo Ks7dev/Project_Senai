@@ -6,6 +6,7 @@ import {
   pickSellerRule,
   type SellerSegment,
 } from "@/features/shared/lib/sellers/seller-routing"
+import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** The dedicated seller of a customer (RF18, RN11). */
 export type DedicatedSeller = {
@@ -78,7 +79,7 @@ export async function resolveDedicatedSeller(
           id: seller.id,
           name: seller.name,
           email: seller.email,
-          phone: seller.phone,
+          phone: decryptPersonal(seller.phone),
           source: "account",
         }
       }
@@ -113,7 +114,7 @@ export async function resolveDedicatedSeller(
     id: rule.seller.id,
     name: rule.seller.name,
     email: rule.seller.email,
-    phone: rule.seller.phone,
+    phone: decryptPersonal(rule.seller.phone),
     source: "rule",
   }
 }

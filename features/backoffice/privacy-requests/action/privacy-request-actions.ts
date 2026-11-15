@@ -22,6 +22,7 @@ import {
   CLOSED_ORDER_STATUSES,
 } from "@/features/shared/lib/privacy/personal-data"
 import type { DownloadedFile } from "@/features/shared/lib/quotes/save-download"
+import { encryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** A titular found in the search. */
 export type PrivacySubject = {
@@ -65,7 +66,7 @@ export async function findPrivacySubjects(
     const where = query.includes("@")
       ? { email: query.toLowerCase() }
       : digits.length === 11 || digits.length === 14
-        ? { document: digits }
+        ? { document: encryptPersonal(digits) }
         : null
     if (!where) {
       throw new AppError(

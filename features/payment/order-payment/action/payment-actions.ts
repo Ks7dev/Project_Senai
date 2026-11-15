@@ -44,6 +44,7 @@ import { refreshPendingPayment } from "@/features/shared/lib/payments/payment-re
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { maxInstallmentsFor } from "@/features/shared/schema/installment-schema"
+import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** Methods paid online through the Payment Brick (RF29). */
 const ONLINE_METHODS = ["CARD", "PIX", "BOLETO"] as const
@@ -357,7 +358,7 @@ function paymentBody(
   const notificationUrl = mercadoPagoNotificationUrl()
   const document = {
     type: order.user.personType === "PJ" ? "CNPJ" : "CPF",
-    number: order.user.document,
+    number: decryptPersonal(order.user.document),
   }
   const common = {
     transaction_amount: Number(order.total.toFixed(2)),

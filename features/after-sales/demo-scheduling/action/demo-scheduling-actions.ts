@@ -37,6 +37,7 @@ import {
 } from "@/features/shared/lib/errors/action-result"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
 import { resolveDedicatedSeller } from "@/features/shared/lib/sellers/dedicated-seller"
+import { encryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** Message when the picked time was taken or is out of the agenda. */
 const SLOT_TAKEN_MESSAGE =
@@ -213,7 +214,7 @@ export async function requestDemo(
           sellerId: seller?.id ?? null,
           mode: data.mode,
           scheduledAt,
-          phone: data.phone || null,
+          phone: data.phone ? encryptPersonal(data.phone) : null,
           notes: data.notes || null,
         },
         select: { id: true },
