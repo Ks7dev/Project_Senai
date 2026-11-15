@@ -102,6 +102,23 @@ export const adminModules: AdminModule[] = [
 ]
 
 /**
+ * Modules of issues not delivered yet. They stay out of the menu until
+ * their route exists, so no menu link leads to a missing page.
+ */
+export const PENDING_ADMIN_ROUTES: ReadonlySet<string> = new Set([
+  "/admin/separacao",
+  "/admin/cotacoes",
+  "/admin/clientes",
+  "/admin/financeiro",
+  "/admin/nfe",
+  "/admin/promocoes",
+  "/admin/atendimento",
+  "/admin/configuracoes",
+  "/admin/auditoria",
+  "/admin/lgpd",
+])
+
+/**
  * Whether a set of granted permissions includes the required one.
  *
  * @param granted - Permissions of the user, from their roles.
@@ -124,7 +141,10 @@ export function hasPermission(
 export function visibleAdminModules(
   granted: ReadonlySet<string>
 ): AdminModule[] {
-  return adminModules.filter((item) => granted.has(item.permission))
+  return adminModules.filter(
+    (item) =>
+      !PENDING_ADMIN_ROUTES.has(item.href) && granted.has(item.permission)
+  )
 }
 
 /**
