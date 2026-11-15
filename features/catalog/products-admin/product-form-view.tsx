@@ -101,7 +101,11 @@ export function ProductFormView({ categories, product }: ProductFormViewProps) {
       const result = await saveProduct(values as ProductFormInput)
       if (!result.success) return setError(result.error)
       if (!product) return router.push(`/admin/produtos/${result.id}`)
-      setMessage("Produto salvo.")
+      setMessage(
+        result.unpublished
+          ? `Produto salvo e despublicado (voltou para rascunho). ${result.unpublished}`
+          : "Produto salvo."
+      )
       router.refresh()
     })
   )
