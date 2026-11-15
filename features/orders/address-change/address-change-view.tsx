@@ -19,6 +19,13 @@ import {
   manualQuoteResponseMessage,
 } from "@/features/shared/lib/shipping/shipping-messages"
 
+const scheduleDate = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  day: "2-digit",
+  month: "long",
+  timeZone: "UTC",
+})
+
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -67,6 +74,7 @@ export function AddressChangeView({
   const [addressId, setAddressId] = useState("")
   const [quote, setQuote] = useState<AddressChangeQuote>()
   const [selected, setSelected] = useState("")
+  const [installationDate, setInstallationDate] = useState("")
   const [error, setError] = useState<string>()
   const [done, setDone] = useState<string>()
   const [pending, startTransition] = useTransition()
@@ -75,6 +83,7 @@ export function AddressChangeView({
     setError(undefined)
     setQuote(undefined)
     setSelected("")
+    setInstallationDate("")
     if (!nextAddressId) return setError("Escolha o novo endereço de entrega.")
     startTransition(async () => {
       const result = await quoteAddressChange({
@@ -98,6 +107,9 @@ export function AddressChangeView({
     if (quote.status === "quoted" && !option) {
       return setError("Escolha uma opção de frete.")
     }
+    if (quote.schedule && !installationDate) {
+      return setError("Escolha a nova data de entrega e instalação.")
+    }
     setError(undefined)
     startTransition(async () => {
       const result = await confirmAddressChange({
@@ -112,6 +124,7 @@ export function AddressChangeView({
             }
           : null,
         expectedShippingPrice: option ? option.price : "0.00",
+        installationDate: quote.schedule ? installationDate : null,
       })
       if (!result.success) {
         setError(result.error)
@@ -261,6 +274,37 @@ export function AddressChangeView({
                 o total do pedido fica em {brl.format(Number(quote.newTotal))},
                 sem o frete.
               </p>
+            )}
+            {quote?.schedule && (
+              <div className="flex flex-col gap-xs">
+                <label
+                  htmlFor={`${id}-installation-date`}
+                  className="text-headline-sm"
+                >
+                  Nova data de entrega e instalação
+                </label>
+                <select
+                  id={`${id}-installation-date`}
+                  value={installationDate}
+                  onChange={(event) => setInstallationDate(event.target.value)}
+                  className="h-11 rounded border border-line bg-elevated px-sm text-body-sm"
+                >
+                  <option value="">Escolha uma data</option>
+                  {quote.schedule
+                    .filter((day) => day.available)
+                    .map((day) => (
+                      <option key={day.date} value={day.date}>
+                        {scheduleDate.format(
+                          new Date(`${day.date}T12:00:00.000Z`)
+                        )}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-body-sm text-ink-muted">
+                  A entrega com instalação precisa ser agendada de novo para o
+                  novo endereço.
+                </p>
+              </div>
             )}
             {error && (
               <p role="alert" className="text-body-sm text-error">

@@ -201,6 +201,7 @@ describe("shipping re-quote when the address changes (#45, RN15)", () => {
         currentTotal: "120.00",
         newAddress:
           "Esplanada dos Ministérios, 10 · Zona Cívico-Administrativa · Brasília/DF · CEP 70040-010",
+        schedule: null,
         options: [
           {
             method: "CORREIOS_PAC",

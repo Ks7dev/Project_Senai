@@ -34,6 +34,9 @@ const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
 const { getCheckout, placeOrder, quoteCheckoutShipping } =
   await import("@/features/payment/checkout/action/checkout-actions")
 
+const { confirmAddressChange, quoteAddressChange } =
+  await import("@/features/orders/address-change/action/address-change-actions")
+
 const password = process.env.SEED_PASSWORD || "atelier-demo-2026"
 const fixtures = orderFixtures(prisma)
 const customer = "cliente.pf@atelierbureau.test"
@@ -316,5 +319,64 @@ describe("delivery and installation scheduling (#53, RF16, RN05)", () => {
     expect(
       third.schedule.find((item) => item.date === day.date)?.available
     ).toBe(true)
+  })
+
+  it("asks for a new date when the address of an installation order changes", async () => {
+    const first = await quoteFurniture()
+    const [day, otherDay] = first.schedule.filter((item) => item.available)
+    const placed = await place(first, day!.date)
+    if (!placed.success) throw new Error(placed.error)
+    const orderId = placed.order.orderId
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: customer },
+      select: { id: true },
+    })
+    const addressId = await saoPauloAddress(user.id)
+
+    const quote = await quoteAddressChange({ orderId, addressId })
+    if (!quote.success) throw new Error(quote.error)
+    // The date the order already has stays available to itself
+    expect(
+      quote.quote.schedule?.find((item) => item.date === day!.date)?.available
+    ).toBe(true)
+    const option =
+      quote.quote.status === "quoted" ? quote.quote.options[0]! : null
+    const change = {
+      orderId,
+      addressId,
+      option: option
+        ? {
+            method: option.method as "OWN_DELIVERY",
+            carrier: option.carrier,
+            service: option.service,
+          }
+        : null,
+      expectedShippingPrice: option ? option.price : "0.00",
+    }
+
+    const withoutDate = await confirmAddressChange(change)
+    expect(withoutDate.success).toBe(false)
+    const blocked = quote.quote.schedule!.find((item) => !item.available)!
+    expect(
+      (
+        await confirmAddressChange({
+          ...change,
+          installationDate: blocked.date,
+        })
+      ).success
+    ).toBe(false)
+
+    const done = await confirmAddressChange({
+      ...change,
+      installationDate: otherDay!.date,
+    })
+    expect(done.success).toBe(true)
+    const saved = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { scheduledDeliveryAt: true },
+    })
+    expect(saved.scheduledDeliveryAt?.toISOString()).toBe(
+      `${otherDay!.date}T15:00:00.000Z`
+    )
   })
 })
