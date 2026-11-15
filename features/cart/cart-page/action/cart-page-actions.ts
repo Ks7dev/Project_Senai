@@ -1,14 +1,16 @@
 "use server"
 
-import type { Prisma } from "@/generated/prisma/client"
+import { Prisma } from "@/generated/prisma/client"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import {
   activeCartWhere,
   addItemsToCart,
   findActiveCartId,
+  loadCartExtrasRules,
   loadCartView,
   resolveCartOwner,
 } from "@/features/shared/lib/cart/cart-store"
+import { isServiceEligible } from "@/features/shared/lib/cart/cart-extras"
 import type { CartView } from "@/features/shared/lib/cart/cart-types"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
 import { prisma } from "@/features/shared/lib/db/prisma"
@@ -20,9 +22,11 @@ import {
 import {
   removeCartItemSchema,
   saveProjectListSchema,
+  setCartItemExtrasSchema,
   updateCartItemSchema,
   type RemoveCartItemInput,
   type SaveProjectListInput,
+  type SetCartItemExtrasInput,
   type UpdateCartItemInput,
 } from "@/features/cart/cart-page/schema/cart-page-schema"
 
@@ -96,6 +100,84 @@ export async function removeCartItem(
     return { success: true, cart: await loadCartView(item.cartId) }
   } catch (error) {
     return toActionError(error, { action: "removeCartItem" })
+  }
+}
+
+/**
+ * Sets the laser engraving and the additional services of a cart line
+ * (RF51, RF52). Only products that accept engraving can be engraved,
+ * the text respects the configured length and only eligible services
+ * offered in the settings table are accepted. Prices and extra days
+ * come from the settings, never from the request.
+ *
+ * @param input - Item id, engraving (or null) and service keys.
+ * @returns `{ success: true, cart }` or `{ success: false, error }`.
+ */
+export async function setCartItemExtras(
+  input: SetCartItemExtrasInput
+): Promise<ActionResult<{ cart: CartView }>> {
+  try {
+    const parsed = setCartItemExtrasSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? "Revise a personalização.",
+        "invalid"
+      )
+    }
+    const { personalization, services } = parsed.data
+    const owned = await findOwnedItem(parsed.data.itemId)
+    const [item, rules] = await Promise.all([
+      prisma.cartItem.findUniqueOrThrow({
+        where: { id: owned.id },
+        select: {
+          sku: {
+            select: {
+              product: {
+                select: { personalizable: true, requiresInstallation: true },
+              },
+            },
+          },
+        },
+      }),
+      loadCartExtrasRules(),
+    ])
+    const product = item.sku.product
+
+    if (personalization) {
+      if (!product.personalizable) {
+        throw new AppError(
+          "Este produto não aceita gravação.",
+          "not_personalizable"
+        )
+      }
+      if (personalization.text.length > rules.engraving.maxLength) {
+        throw new AppError(
+          `Use até ${rules.engraving.maxLength} caracteres na gravação.`,
+          "engraving_too_long"
+        )
+      }
+    }
+    const keys = [...new Set(services)]
+    for (const key of keys) {
+      const rule = rules.services.find((service) => service.key === key)
+      if (!rule || !isServiceEligible(rule, product)) {
+        throw new AppError(
+          "Serviço indisponível para este produto.",
+          "service_unavailable"
+        )
+      }
+    }
+
+    await prisma.cartItem.update({
+      where: { id: owned.id },
+      data: {
+        personalization: personalization ?? Prisma.DbNull,
+        services: keys.length > 0 ? keys : Prisma.DbNull,
+      },
+    })
+    return { success: true, cart: await loadCartView(owned.cartId) }
+  } catch (error) {
+    return toActionError(error, { action: "setCartItemExtras" })
   }
 }
 

@@ -4,6 +4,10 @@ import { cookies } from "next/headers"
 import type { Prisma } from "@/generated/prisma/client"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import {
+  priceLineExtras,
+  type CartExtrasRules,
+} from "@/features/shared/lib/cart/cart-extras"
+import {
   centsToMoney,
   mergeQuantity,
   moneyToCents,
@@ -11,6 +15,11 @@ import {
 import type { CartLine, CartView } from "@/features/shared/lib/cart/cart-types"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import { logger } from "@/features/shared/lib/logger/logger"
+import { getSetting } from "@/features/shared/lib/settings/settings"
+import {
+  engravingRuleSchema,
+  serviceRulesSchema,
+} from "@/features/shared/schema/cart-schema"
 
 /** Cookie with the anonymous cart id of a visitor (httpOnly). */
 export const GUEST_CART_COOKIE = "ab_cart"
@@ -290,16 +299,51 @@ export type LoadedCartItem = Prisma.CartItemGetPayload<{
 }>
 
 /**
- * Builds a cart line with the current catalog price. Prices are never
- * stored in the cart: they are always read from the catalog.
+ * Reads the engraving and additional service rules from the settings
+ * table (RF51, RF52); prices and extra days are never fixed in code.
+ *
+ * @param client - Prisma client or transaction.
+ * @returns The rules.
+ */
+export async function loadCartExtrasRules(
+  client: Client = prisma
+): Promise<CartExtrasRules> {
+  const [engraving, services] = await Promise.all([
+    getSetting("personalization.engraving", client),
+    getSetting("cart.additional_services", client),
+  ])
+  return {
+    engraving: engravingRuleSchema.parse(engraving),
+    services: serviceRulesSchema.parse(services),
+  }
+}
+
+/**
+ * Builds a cart line with the current catalog price and the priced
+ * extras. Prices are never stored in the cart: they are always read
+ * from the catalog and the settings table.
  *
  * @param item - Loaded cart item.
+ * @param rules - Engraving and service rules.
  * @returns The line.
  */
-export function toCartLine(item: LoadedCartItem): CartLine {
+export function toCartLine(
+  item: LoadedCartItem,
+  rules: CartExtrasRules
+): CartLine {
   const { sku } = item
   const { product } = sku
   const unitCents = moneyToCents((sku.price ?? product.basePrice).toFixed(2))
+  const extras = priceLineExtras(
+    {
+      quantity: item.quantity,
+      personalizable: product.personalizable,
+      requiresInstallation: product.requiresInstallation,
+      personalization: item.personalization,
+      services: item.services,
+    },
+    rules
+  )
   return {
     id: item.id,
     skuCode: sku.code,
@@ -315,23 +359,39 @@ export function toCartLine(item: LoadedCartItem): CartLine {
       product.status === "ACTIVE" &&
       product.deletedAt === null &&
       product.category.active,
+    personalizable: product.personalizable,
+    requiresInstallation: product.requiresInstallation,
+    ...extras,
   }
 }
 
 /**
- * Sums the purchasable lines. Lines that left the catalog stay visible
- * but do not count.
+ * Sums the purchasable lines with their extras (RF51, RF52). Lines that
+ * left the catalog stay visible but do not count.
  *
  * @param lines - Cart lines.
  * @returns The cart view.
  */
 export function summarizeLines(lines: CartLine[]): CartView {
   const purchasable = lines.filter((line) => line.purchasable)
+  const subtotal = purchasable.reduce(
+    (sum, line) => sum + moneyToCents(line.total),
+    0
+  )
+  const services = purchasable.reduce(
+    (sum, line) => sum + moneyToCents(line.extrasTotal),
+    0
+  )
   return {
     lines,
     count: purchasable.reduce((sum, line) => sum + line.quantity, 0),
-    subtotal: centsToMoney(
-      purchasable.reduce((sum, line) => sum + moneyToCents(line.total), 0)
+    subtotal: centsToMoney(subtotal),
+    servicesTotal: centsToMoney(services),
+    total: centsToMoney(subtotal + services),
+    // Lines are produced in parallel: the order waits for the longest
+    extraBusinessDays: Math.max(
+      0,
+      ...purchasable.map((line) => line.extraBusinessDays)
     ),
   }
 }
@@ -347,16 +407,26 @@ export async function loadCartView(
   cartId: string,
   client: Client = prisma
 ): Promise<CartView> {
-  const items = await client.cartItem.findMany({
-    where: { cartId },
-    include: cartItemInclude,
-    orderBy: { createdAt: "asc" },
-  })
-  return summarizeLines(items.map(toCartLine))
+  const [items, rules] = await Promise.all([
+    client.cartItem.findMany({
+      where: { cartId },
+      include: cartItemInclude,
+      orderBy: { createdAt: "asc" },
+    }),
+    loadCartExtrasRules(client),
+  ])
+  return summarizeLines(items.map((item) => toCartLine(item, rules)))
 }
 
 /** An empty cart. */
-export const EMPTY_CART: CartView = { lines: [], count: 0, subtotal: "0.00" }
+export const EMPTY_CART: CartView = {
+  lines: [],
+  count: 0,
+  subtotal: "0.00",
+  servicesTotal: "0.00",
+  total: "0.00",
+  extraBusinessDays: 0,
+}
 
 /**
  * Loads the active cart of whoever is browsing: the account cart when
