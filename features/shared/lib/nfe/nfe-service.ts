@@ -1,6 +1,6 @@
 import "server-only"
 import type { Prisma } from "@/generated/prisma/client"
-import { nfeFailureAlertEmail } from "@/emails/templates"
+import { invoiceIssuedEmail, nfeFailureAlertEmail } from "@/emails/templates"
 import { writeAudit } from "@/features/shared/lib/db/audit"
 import { prisma } from "@/features/shared/lib/db/prisma"
 import { enqueueEmail } from "@/features/shared/lib/email/mailer"
@@ -190,6 +190,39 @@ async function failInvoice(input: {
     status: "FAILED",
     message: `A NF-e não foi emitida: ${input.message}`,
   }
+}
+
+/**
+ * Queues the "nota fiscal emitida" e-mail to the customer in the
+ * transaction that stores the authorized NF-e (RF53: NF-e), with the
+ * access key, so it goes out only if the NF-e is saved.
+ *
+ * @param tx - Prisma transaction of the issuance.
+ * @param input - Order and access key of the NF-e.
+ */
+async function enqueueInvoiceIssuedEmail(
+  tx: Prisma.TransactionClient,
+  input: { orderId: string; accessKey: string }
+): Promise<void> {
+  const order = await tx.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      number: true,
+      total: true,
+      user: { select: { name: true, email: true } },
+    },
+  })
+  if (!order) return
+  await enqueueEmail(tx, {
+    to: order.user.email,
+    ...invoiceIssuedEmail({
+      name: order.user.name,
+      number: order.number,
+      total: order.total.toFixed(2),
+      url: `${siteUrl()}/conta/pedidos`,
+      accessKey: input.accessKey,
+    }),
+  })
 }
 
 /**
@@ -425,6 +458,10 @@ export async function processInvoice(
           number: result.number,
           series: result.series,
         },
+      })
+      await enqueueInvoiceIssuedEmail(tx, {
+        orderId: invoice.orderId,
+        accessKey: result.accessKey,
       })
     })
     return {

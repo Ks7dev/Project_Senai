@@ -2,7 +2,6 @@ import "server-only"
 import type { Prisma } from "@/generated/prisma/client"
 import {
   approvalPendingEmail,
-  invoiceIssuedEmail,
   orderCanceledEmail,
   orderDeliveredEmail,
   orderShippedEmail,
@@ -18,11 +17,14 @@ import { enqueueEmail } from "@/features/shared/lib/email/mailer"
 import { siteUrl } from "@/features/shared/lib/email/site-url"
 import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
 
-/** Statuses that send an e-mail (RF53). */
+/**
+ * Statuses that send an e-mail (RF53). The NF-e e-mail goes out when the
+ * NF-e is authorized (`processInvoice`), with the access key, and not
+ * when the order is marked as invoiced.
+ */
 export const NOTIFIED_STATUSES: readonly OrderStatusKey[] = [
   "AWAITING_APPROVAL",
   "PAID",
-  "INVOICED",
   "SHIPPED",
   "DELIVERED",
   "CANCELED",
@@ -36,7 +38,8 @@ const CANCELED_DEFAULT =
  * Queues the e-mails of an order status change in the same transaction
  * (RF53): approval pending goes to the company approvers other than the
  * requester (RN01) or, in a single-user account, to its holder (RN08);
- * paid, NF-e, shipped, delivered and canceled go to the customer.
+ * paid, shipped, delivered and canceled go to the customer. The NF-e
+ * e-mail is queued by the NF-e issuance.
  * Statuses of the manual shipping quote have their own e-mails (#44).
  *
  * @param tx - Prisma transaction of the status change.
@@ -101,9 +104,6 @@ export async function enqueueOrderStatusEmails(
   const customer = order.user.email
   if (input.to === "PAID") {
     emails.push({ to: customer, email: paymentConfirmedEmail(base) })
-  }
-  if (input.to === "INVOICED") {
-    emails.push({ to: customer, email: invoiceIssuedEmail(base) })
   }
   if (input.to === "SHIPPED") {
     emails.push({
