@@ -228,7 +228,8 @@ Modelar no `prisma/schema.prisma` (MySQL 8, InnoDB, `utf8mb4`) as entidades prin
 
 Checklist “Critérios de aceite”:
 
-- [ ] Diagrama ER no repositório
+- [ ] Escopo, DER, MER, dicionário de dados e script SQL em `docs/banco-de-dados/`, regenerados por `npm run db:docs`
+- [ ] Gatilhos de integridade (auditoria, histórico de status e razão de estoque imutáveis; estoque, valores, NF-e emitida e descontos protegidos), com teste de integração
 - [ ] Migrations criam todas as tabelas
 - [ ] Seeds de desenvolvimento com produtos e contas de teste
 - [ ] Valores das regras de negócio confirmados na #5 carregados como seed de configuração

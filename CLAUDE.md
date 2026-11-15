@@ -8,6 +8,7 @@ E-commerce high ticket de papelaria nobre e mobiliário executivo, híbrido B2B 
 |---|---|
 | Requisitos (RF, RN, RNF, personas, matriz RN x RF) | `docs/AtelierBureau_Levantamento_Requisitos_v2.docx` |
 | Stack, organização de código, banco, servidor local, Git e release | `ARCHITECTURE.md` |
+| Modelo de dados: escopo, DER, MER, dicionário, gatilhos e script SQL | `docs/banco-de-dados/` |
 | Backlog: as 82 issues com labels, milestone, prioridade e critérios | `docs/AtelierBureau_Issues.md` |
 | Quadro do Trello: listas, prazos e cards | `docs/AtelierBureau_Trello_Etapas.md` |
 | Acompanhamento (status, prioridade, esforço e etapa) | GitHub Project "Atelier Bureau" (`github.com/users/Ks7dev/projects/1`) |
@@ -81,7 +82,8 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 - Exclusão feita pelo usuário é soft delete (`deleted_at`).
 - Valores configuráveis das regras de negócio (RN01, RN06, RN14, RN16, RN20) ficam na tabela de configuração e no `prisma/seed.ts`, **nunca fixos no código**.
 - Nenhum dado de cartão chega ao backend nem ao banco (RN19). Senha só como hash.
-- Depois de mudar o schema: `npx prisma validate`, `npx prisma migrate dev` e testes.
+- Depois de mudar o schema: `npx prisma validate`, `npx prisma migrate dev`, `npm run db:docs` (com descrição de toda coluna nova em `scripts/db-docs/descriptions.ts`) e testes.
+- Gatilhos só por migration. Eles recusam operações inválidas e nunca gravam dados; a regra continua na Server Action.
 
 ## 8. Servidor local (Docker, acessível pela rede)
 
