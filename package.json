@@ -12,6 +12,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run --passWithNoTests",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "perf:budget": "tsx scripts/performance-budget.ts",
+    "perf:api": "tsx scripts/api-latency.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

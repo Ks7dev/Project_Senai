@@ -43,3 +43,7 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # First-load JS/CSS of the storefront routes (RNF10, #78)
+      - name: Performance budget
+        run: npm run perf:budget

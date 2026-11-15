@@ -1,0 +1,28 @@
+{
+  "targets": {
+    "lcpSeconds": 2.5,
+    "apiP95Ms": 500
+  },
+  "routes": [
+    { "route": "/(store)/page", "maxJsKb": 235, "maxCssKb": 15 },
+    {
+      "route": "/(store)/categoria/[slug]/page",
+      "maxJsKb": 235,
+      "maxCssKb": 15
+    },
+    {
+      "route": "/(store)/produto/[slug]/page",
+      "maxJsKb": 270,
+      "maxCssKb": 15
+    },
+    { "route": "/(store)/busca/page", "maxJsKb": 235, "maxCssKb": 15 }
+  ],
+  "apiPaths": [
+    "/api/health",
+    "/",
+    "/categoria/escrita-fina",
+    "/produto/caneta-tinteiro-heritage",
+    "/busca?q=caneta",
+    "/sitemap.xml"
+  ]
+}
