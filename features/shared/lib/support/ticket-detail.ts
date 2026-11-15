@@ -5,6 +5,10 @@ import {
   warrantyCoverage,
 } from "@/features/shared/lib/support/ticket-format"
 import type {
+  ReturnOutcomeKey,
+  ReturnReasonKey,
+} from "@/features/shared/lib/support/return-policy"
+import type {
   TicketKindKey,
   TicketStatusKey,
 } from "@/features/shared/lib/support/ticket-status"
@@ -60,6 +64,14 @@ export type TicketDetail = {
   description: string
   /** Outcome of the evaluation, once it ends. */
   resolution: string | null
+  /** Exchanges and returns: reason given by the customer (RN12). */
+  returnReason: ReturnReasonKey | null
+  /** Exchanges, returns and withdrawals: decided outcome. */
+  returnOutcome: ReturnOutcomeKey | null
+  /** The item was personalized or made to measure (RF51). */
+  personalized: boolean
+  /** PF withdrawal of a personalized item: legal opinion pending (RN22). */
+  legalReview: boolean
   /** Opening date, ISO string. */
   createdAt: string
   /** End date, ISO string. */
@@ -89,6 +101,10 @@ export const ticketDetailSelect = {
   subject: true,
   description: true,
   resolution: true,
+  returnReason: true,
+  returnOutcome: true,
+  personalized: true,
+  legalReview: true,
   createdAt: true,
   closedAt: true,
   user: { select: { name: true, email: true } },
@@ -172,6 +188,10 @@ export function toTicketDetail(
     subject: row.subject,
     description: row.description,
     resolution: row.resolution,
+    returnReason: row.returnReason,
+    returnOutcome: row.returnOutcome,
+    personalized: row.personalized,
+    legalReview: row.legalReview,
     createdAt: row.createdAt.toISOString(),
     closedAt: row.closedAt?.toISOString() ?? null,
     customer: { name: row.user.name, email: row.user.email },

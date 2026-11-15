@@ -3,6 +3,7 @@ import {
   TICKET_MESSAGE_MAX,
   TICKET_RESOLUTION_MIN,
 } from "@/features/shared/lib/support/ticket-format"
+import { RETURN_OUTCOMES } from "@/features/shared/lib/support/return-policy"
 import {
   requiresResolution,
   TICKET_STATUSES,
@@ -67,6 +68,11 @@ export const supportTicketUpdateSchema = z
         TICKET_MESSAGE_MAX,
         `Use no máximo ${TICKET_MESSAGE_MAX} caracteres.`
       ),
+    /**
+     * Exchanges, returns and withdrawals resolved: what the evaluation
+     * decided (RN12, RN22). The action checks it against the kind.
+     */
+    returnOutcome: z.enum(RETURN_OUTCOMES).or(z.literal("")).default(""),
   })
   .superRefine((value, context) => {
     if (!value.status && !value.message) {
