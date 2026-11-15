@@ -5,6 +5,7 @@ import {
   cancelOpenInstallments,
   createInvoicedInstallments,
 } from "@/features/shared/lib/invoiced/invoiced-billing"
+import { queueInvoiceIssuance } from "@/features/shared/lib/nfe/nfe-service"
 import { enqueueOrderStatusEmails } from "@/features/shared/lib/orders/order-notifications"
 import {
   canTransition,
@@ -70,7 +71,8 @@ export function invalidTransitionMessage(
  * 3. applies the stock effect: write-off when the order is paid or
  *    approved, release when it is canceled (RF43, RN14); an invoiced
  *    order gets its installments when confirmed and loses the open ones
- *    when canceled or refunded (RF33);
+ *    when canceled or refunded (RF33); a confirmed order has its NF-e
+ *    queued for issuance (RF13);
  * 4. stamps the shipment dates when it ships or is delivered;
  * 5. writes the status history with the date and who did it (null for
  *    the system: payment webhook, expiration job);
@@ -127,6 +129,8 @@ export async function transitionOrder(
     })
     // Invoiced orders get their own boletos on confirmation (RF33)
     await createInvoicedInstallments(tx, { orderId: input.orderId, now })
+    // The NF-e is issued by the job right after the confirmation (RF13)
+    await queueInvoiceIssuance(tx, { orderId: input.orderId, now })
   }
   if (input.to === "CANCELED") {
     await releaseOrderStock(tx, {

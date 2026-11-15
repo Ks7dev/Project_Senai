@@ -26,6 +26,11 @@ describe("seed configuration (#5, #8)", () => {
     expect(setting("payment.invoiced_due_days")).toEqual([28, 56])
     expect(setting("refund.withdrawal_days")).toBe(7)
     expect(setting("refund.max_days_after_payment")).toBe(180)
+    expect(setting("invoice.issuer")).toMatchObject({ state: "SP" })
+    expect(setting("invoice.nfe_defaults")).toMatchObject({
+      cfopSameState: "5102",
+      cfopOtherState: "6102",
+    })
   })
 
   it("has unique setting keys", () => {

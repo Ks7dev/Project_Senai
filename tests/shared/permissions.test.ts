@@ -92,6 +92,16 @@ describe("admin modules by profile (RF55)", () => {
     ).not.toContain("/admin/cotacoes")
   })
 
+  it("shows the NF-e module to finance and hides it from sales (#63)", () => {
+    expect(PENDING_ADMIN_ROUTES.has("/admin/nfe")).toBe(false)
+    expect(
+      visibleAdminModules(rolePermissions("finance")).map((m) => m.href)
+    ).toContain("/admin/nfe")
+    expect(
+      visibleAdminModules(rolePermissions("sales")).map((m) => m.href)
+    ).not.toContain("/admin/nfe")
+  })
+
   it("shows the finance module to finance and hides it from sales (#61)", () => {
     expect(PENDING_ADMIN_ROUTES.has("/admin/financeiro")).toBe(false)
     const finance = rolePermissions("finance")

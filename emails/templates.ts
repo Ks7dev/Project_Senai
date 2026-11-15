@@ -387,6 +387,41 @@ export function refundCompletedEmail(
 }
 
 /**
+ * Internal alert: the NF-e of an order failed (RF13, #63).
+ *
+ * @param input - Team member name, order number, failure and link.
+ * @returns The e-mail.
+ */
+export function nfeFailureAlertEmail(input: {
+  name: string
+  number: string
+  error: string
+  automaticRetry: boolean
+  url: string
+}): RenderedEmail {
+  return render(
+    "internal.nfe_failure",
+    `Falha na emissão da NF-e do pedido ${input.number}`,
+    {
+      preheader: "A NF-e de um pedido não foi emitida.",
+      heading: "Falha na emissão da NF-e",
+      paragraphs: [
+        `Olá, ${input.name}.`,
+        `A NF-e do pedido ${input.number} não foi emitida.`,
+        input.automaticRetry
+          ? "O sistema tentará de novo automaticamente. Se a falha continuar, confira os dados e reprocesse no back office."
+          : "Corrija os dados indicados e reprocesse a NF-e no back office.",
+      ],
+      details: [
+        { label: "Pedido", value: input.number },
+        { label: "Motivo", value: input.error },
+      ],
+      action: { label: "Abrir NF-e no back office", url: input.url },
+    }
+  )
+}
+
+/**
  * Support ticket opened or updated (RF53: chamados, RF18).
  *
  * @param input - Name, ticket number, status text and link.
