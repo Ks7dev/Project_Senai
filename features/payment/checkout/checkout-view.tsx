@@ -25,6 +25,7 @@ import {
   type ScheduleDay,
 } from "@/features/shared/lib/delivery/installation-calendar"
 import {
+  coverageMessage,
   deliveryTimeMessage,
   manualQuoteReasonMessage,
   manualQuoteResponseMessage,
@@ -282,6 +283,11 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
         <div aria-live="polite" className="flex flex-col gap-sm">
           {pending && addressId && !quote && (
             <p className="text-body-sm text-ink-muted">Calculando o frete…</p>
+          )}
+          {quote && (
+            <p className="rounded bg-subtle p-sm text-body-sm text-ink">
+              {coverageMessage(quote.coverage)}
+            </p>
           )}
           {quote?.status === "quoted" && (
             <fieldset className="flex flex-col gap-xs">
