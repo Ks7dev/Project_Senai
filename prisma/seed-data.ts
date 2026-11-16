@@ -1,0 +1,716 @@
+/**
+ * Seed data for development and the academic demo (#8). Every company,
+ * person and document here is fictitious.
+ */
+
+/** A business rule value stored in the `settings` table. */
+export type SettingSeed = {
+  /** Stable key read by the code. */
+  key: string
+  /** JSON value. */
+  value: unknown
+  /** Description shown in the back office, in Portuguese. */
+  description: string
+}
+
+/**
+ * Business rule values confirmed in issue #5. They live in the
+ * database and are editable in the back office, never hardcoded.
+ */
+export const settings: SettingSeed[] = [
+  {
+    key: "order.approval_limit",
+    value: "10000.00",
+    description: "Pedidos acima deste valor exigem aprovação (RN01)",
+  },
+  {
+    key: "product.extended_warranty_threshold",
+    value: "5000.00",
+    description:
+      "Produtos acima deste valor já incluem garantia estendida (RN06)",
+  },
+  {
+    key: "payment.pix_expiration_minutes",
+    value: 30,
+    description: "Prazo de expiração do Pix, em minutos (RN14)",
+  },
+  {
+    key: "payment.boleto_expiration_business_days",
+    value: 3,
+    description: "Prazo de expiração do boleto, em dias úteis (RN14)",
+  },
+  {
+    key: "quote.validity_days",
+    value: 15,
+    description:
+      "Validade da cotação em dias corridos, contada da solicitação, da resposta do comercial e da revalidação (RN02)",
+  },
+  {
+    key: "shipping.correios_max_weight_kg",
+    value: 30,
+    description: "Peso máximo por volume para os Correios (RN20)",
+  },
+  {
+    key: "shipping.correios_max_side_cm",
+    value: 100,
+    description: "Maior lado máximo por volume para os Correios (RN20)",
+  },
+  {
+    key: "shipping.correios_max_dimensions_sum_cm",
+    value: 200,
+    description: "Soma máxima das dimensões para os Correios (RN20)",
+  },
+  {
+    key: "shipping.cubage_factor",
+    value: 6000,
+    description: "Fator de cubagem: peso cubado = C × L × A (cm) ÷ fator (#40)",
+  },
+  {
+    key: "shipping.origin_cep",
+    value: "04538133",
+    description:
+      "CEP de origem dos envios, usado nas cotações dos Correios e da transportadora (fictício, RF25)",
+  },
+  {
+    key: "shipping.manual_quote_response_business_days",
+    value: 2,
+    description:
+      "Prazo de retorno da cotação manual de frete, em dias úteis (RN20)",
+  },
+  {
+    key: "payment.installment_rules",
+    value: [
+      { profile: "PF", minTotal: "0.00", maxInstallments: 1 },
+      { profile: "PF", minTotal: "300.00", maxInstallments: 3 },
+      { profile: "PF", minTotal: "1000.00", maxInstallments: 6 },
+      { profile: "PF", minTotal: "3000.00", maxInstallments: 10 },
+      { profile: "PJ", minTotal: "0.00", maxInstallments: 1 },
+      { profile: "PJ", minTotal: "1000.00", maxInstallments: 3 },
+      { profile: "PJ", minTotal: "5000.00", maxInstallments: 6 },
+      { profile: "PJ", minTotal: "10000.00", maxInstallments: 10 },
+    ],
+    description:
+      "Máximo de parcelas no cartão por faixa de valor do pedido e por perfil de cliente (RF14)",
+  },
+  {
+    key: "payment.invoiced_due_days",
+    value: [28, 56],
+    description: "Vencimentos do pagamento faturado, em dias (RN03)",
+  },
+  {
+    key: "refund.withdrawal_days",
+    value: 7,
+    description:
+      "Prazo do direito de arrependimento de PF, em dias corridos do recebimento, com reembolso integral; nunca abaixo dos 7 dias do CDC (RN22)",
+  },
+  {
+    key: "refund.max_days_after_payment",
+    value: 180,
+    description:
+      "Prazo máximo para estornar pelo Mercado Pago, em dias após a aprovação do pagamento, salvo arrependimento (RN18)",
+  },
+  {
+    key: "invoice.issuer",
+    value: {
+      cnpj: "12345678000195",
+      name: "Atelier Bureau Papelaria e Mobiliário Ltda (fictícia)",
+      state: "SP",
+    },
+    description:
+      "Emitente da NF-e em homologação: CNPJ cadastrado no emissor, razão social e UF de origem (fictícios, RF13)",
+  },
+  {
+    key: "invoice.nfe_defaults",
+    value: {
+      operationNature: "Venda de mercadoria",
+      ncm: "48201000",
+      cfopSameState: "5102",
+      cfopOtherState: "6102",
+      icmsSituation: "102",
+      pisCofinsSituation: "07",
+    },
+    description:
+      "Padrões fiscais da NF-e: natureza da operação, NCM, CFOP dentro e fora do estado e situações tributárias (Simples Nacional, a validar com a contabilidade, RF13)",
+  },
+  {
+    key: "personalization.engraving",
+    value: { price: "90.00", extraBusinessDays: 3, maxLength: 30 },
+    description:
+      "Gravação a laser por unidade: preço, dias úteis a mais no prazo e limite de caracteres (RF51)",
+  },
+  {
+    key: "cart.additional_services",
+    value: [
+      {
+        key: "institutional_packaging",
+        label: "Embalagem institucional",
+        description: "Caixa rígida com a identidade da empresa e cartão.",
+        price: "35.00",
+        courtesy: false,
+        extraBusinessDays: 1,
+        eligibility: "all",
+      },
+      {
+        key: "assembly",
+        label: "Montagem",
+        description: "Montagem no local por equipe própria ou parceira.",
+        price: "250.00",
+        courtesy: false,
+        extraBusinessDays: 0,
+        eligibility: "installation",
+      },
+    ],
+    description:
+      "Serviços adicionais do carrinho por unidade: preço ou cortesia, dias úteis a mais e produtos elegíveis (RF52)",
+  },
+  {
+    key: "installation.min_business_days",
+    value: 2,
+    description:
+      "Antecedência mínima do agendamento de entrega e instalação, em dias úteis, somada ao prazo do frete e dos serviços (RN05)",
+  },
+  {
+    key: "installation.window_days",
+    value: 45,
+    description:
+      "Quantos dias corridos a agenda de entrega e instalação oferece a partir da primeira data (RN05)",
+  },
+  {
+    key: "installation.daily_capacity",
+    value: 3,
+    description:
+      "Entregas com instalação que a equipe atende por dia; com a agenda cheia, a data fica bloqueada (RN05)",
+  },
+  {
+    key: "installation.weekdays",
+    value: [1, 2, 3, 4, 5],
+    description:
+      "Dias da semana com equipe de instalação (0 = domingo … 6 = sábado) (RN05)",
+  },
+  {
+    key: "installation.blocked_dates",
+    value: [
+      "2026-11-20",
+      "2026-12-24",
+      "2026-12-25",
+      "2026-12-31",
+      "2027-01-01",
+      "2027-02-08",
+      "2027-02-09",
+      "2027-03-26",
+      "2027-04-21",
+      "2027-05-01",
+      "2027-05-27",
+      "2027-09-07",
+      "2027-10-12",
+      "2027-11-02",
+      "2027-11-15",
+      "2027-11-20",
+      "2027-12-24",
+      "2027-12-25",
+      "2027-12-31",
+    ],
+    description:
+      "Datas sem entrega e instalação, como feriados e recesso, no formato AAAA-MM-DD (RN05)",
+  },
+]
+
+/**
+ * Agenda of the demonstrations of complex items (#70, RF19). Kept in a
+ * separate list so the merge with the other settings stays additive.
+ */
+export const demoSettings: SettingSeed[] = [
+  {
+    key: "demo.min_business_days",
+    value: 1,
+    description:
+      "Antecedência mínima para agendar uma demonstração, em dias úteis (RF19)",
+  },
+  {
+    key: "demo.window_days",
+    value: 30,
+    description:
+      "Quantos dias corridos a agenda de demonstrações oferece a partir da primeira data (RF19)",
+  },
+  {
+    key: "demo.weekdays",
+    value: [1, 2, 3, 4, 5],
+    description:
+      "Dias da semana com demonstração (0 = domingo … 6 = sábado) (RF19)",
+  },
+  {
+    key: "demo.time_slots",
+    value: ["09:30", "11:00", "14:00", "15:30", "17:00"],
+    description:
+      "Horários de início das demonstrações, no horário de Brasília (RF19)",
+  },
+  {
+    key: "demo.slot_capacity",
+    value: 1,
+    description:
+      "Demonstrações que a equipe comercial atende no mesmo horário (RF19)",
+  },
+  {
+    key: "demo.blocked_dates",
+    value: [
+      "2026-11-20",
+      "2026-12-24",
+      "2026-12-25",
+      "2026-12-31",
+      "2027-01-01",
+    ],
+    description:
+      "Datas sem demonstração, como feriados e recesso, no formato AAAA-MM-DD (RF19)",
+  },
+]
+
+/** A CEP range of the delivery coverage. */
+export type ShippingRegionSeed = {
+  /** Region name, in Portuguese. */
+  name: string
+  /** First CEP of the range, digits only. */
+  cepStart: string
+  /** Last CEP of the range, digits only. */
+  cepEnd: string
+  /** Whether the store delivers and assembles with its own team. */
+  ownDelivery: boolean
+  /** Own delivery prices by maximum weight. */
+  ownDeliveryRates?: Array<{ maxKg: number; price: string }>
+  /** Order total that ships for free to the region (RN23), if any. */
+  freeShippingMinimum?: string
+}
+
+/**
+ * Own delivery coverage: São Paulo Metropolitan Region (RN16), with a
+ * provisional free shipping minimum (RN23, #73) editable in /admin/frete.
+ */
+export const shippingRegions: ShippingRegionSeed[] = [
+  {
+    name: "Região Metropolitana de São Paulo",
+    cepStart: "01000000",
+    cepEnd: "09999999",
+    ownDelivery: true,
+    ownDeliveryRates: [
+      { maxKg: 30, price: "120.00" },
+      { maxKg: 100, price: "240.00" },
+      { maxKg: 300, price: "480.00" },
+    ],
+    freeShippingMinimum: "5000.00",
+  },
+]
+
+/** Internal role with its permissions (RF55). */
+export type RoleSeed = {
+  /** Stable key in English. */
+  key: string
+  /** Display name, in Portuguese. */
+  name: string
+  /** Permissions as "resource:action". */
+  permissions: string[]
+}
+
+/** Every internal permission, as "resource:action". */
+export const permissions: string[] = [
+  "product:read",
+  "product:create",
+  "product:update",
+  "product:delete",
+  "category:manage",
+  "stock:read",
+  "stock:update",
+  "order:read",
+  "order:status:update",
+  "order:cancel",
+  "shipment:manage",
+  "quote:read",
+  "quote:answer",
+  "customer:read",
+  "customer:update",
+  "credit:approve",
+  "payment:refund",
+  "invoice:manage",
+  "promotion:manage",
+  "content:manage",
+  "support:manage",
+  "user:manage",
+  "setting:manage",
+  "audit:read",
+  "privacy:manage",
+]
+
+/** Internal roles: administrator, sales, finance and stock (RF55). */
+export const roles: RoleSeed[] = [
+  { key: "admin", name: "Administrador", permissions },
+  {
+    key: "sales",
+    name: "Comercial",
+    permissions: [
+      "product:read",
+      "order:read",
+      "quote:read",
+      "quote:answer",
+      "customer:read",
+      "customer:update",
+      "support:manage",
+    ],
+  },
+  {
+    key: "finance",
+    name: "Financeiro",
+    permissions: [
+      "order:read",
+      "order:cancel",
+      "customer:read",
+      "credit:approve",
+      "payment:refund",
+      "invoice:manage",
+      "audit:read",
+    ],
+  },
+  {
+    key: "stock",
+    name: "Estoque e logística",
+    permissions: [
+      "product:read",
+      "stock:read",
+      "stock:update",
+      "order:read",
+      "order:status:update",
+      "shipment:manage",
+    ],
+  },
+]
+
+/** A catalog category. */
+export type CategorySeed = {
+  /** URL slug. */
+  slug: string
+  /** Display name. */
+  name: string
+}
+
+/** Main catalog categories (RF01). */
+export const categories: CategorySeed[] = [
+  { slug: "papelaria-nobre", name: "Papelaria nobre" },
+  { slug: "escrita-fina", name: "Escrita fina" },
+  { slug: "organizacao-de-mesa", name: "Organização de mesa" },
+  { slug: "iluminacao", name: "Iluminação" },
+  { slug: "mobiliario-ergonomico", name: "Mobiliário ergonômico" },
+  { slug: "projetos-b2b", name: "Projetos B2B" },
+]
+
+/** A product with one or more SKUs and initial stock. */
+export type ProductSeed = {
+  /** URL slug. */
+  slug: string
+  /** Category slug. */
+  category: string
+  /** Display name. */
+  name: string
+  /** Description. */
+  description: string
+  /** Brand. */
+  brand: string
+  /** Base price, as a decimal string. */
+  price: string
+  /** Weight in kg. */
+  weightKg: string
+  /** Dimensions in cm: length, width and height. */
+  dimensionsCm: [string, string, string]
+  /** Contractual warranty in months. */
+  warrantyMonths: number
+  /** Whether checkout requires an installation date (RN05). */
+  requiresInstallation?: boolean
+  /** Whether laser engraving is offered (RF51). */
+  personalizable?: boolean
+  /** Technical specifications. */
+  specs: Record<string, string>
+  /** SKUs with code, name, attributes and stock on hand. */
+  skus: Array<{
+    code: string
+    name: string
+    attributes?: Record<string, string>
+    stock: number
+  }>
+}
+
+/** Fictitious catalog for development and the demo. */
+export const products: ProductSeed[] = [
+  {
+    slug: "caderno-couro-toscano-a5",
+    category: "papelaria-nobre",
+    name: "Caderno em couro toscano A5",
+    description:
+      "Caderno com capa em couro legítimo de curtimento vegetal, costura aparente e papel pólen 90 g/m².",
+    brand: "Atelier Bureau",
+    price: "389.00",
+    weightKg: "0.450",
+    dimensionsCm: ["23", "17", "3"],
+    warrantyMonths: 6,
+    personalizable: true,
+    specs: { Formato: "A5", Papel: "Pólen 90 g/m²", Folhas: "192" },
+    skus: [
+      {
+        code: "PAP-CAD-A5-CAR",
+        name: "Caramelo",
+        attributes: { cor: "Caramelo" },
+        stock: 40,
+      },
+      {
+        code: "PAP-CAD-A5-GRA",
+        name: "Grafite",
+        attributes: { cor: "Grafite" },
+        stock: 25,
+      },
+    ],
+  },
+  {
+    slug: "caneta-tinteiro-heritage",
+    category: "escrita-fina",
+    name: "Caneta tinteiro Heritage",
+    description:
+      "Caneta tinteiro com corpo em resina e acabamentos em latão, pena de aço banhada a ouro.",
+    brand: "Atelier Bureau",
+    price: "1290.00",
+    weightKg: "0.200",
+    dimensionsCm: ["18", "6", "4"],
+    warrantyMonths: 12,
+    personalizable: true,
+    specs: { Pena: "M, aço banhado a ouro", Carga: "Cartucho e conversor" },
+    skus: [{ code: "ESC-TIN-HER-M", name: "Pena média", stock: 12 }],
+  },
+  {
+    slug: "organizador-modular-nogueira",
+    category: "organizacao-de-mesa",
+    name: "Organizador modular em nogueira",
+    description:
+      "Organizador de mesa em nogueira maciça com detalhes em latão escovado.",
+    brand: "Atelier Bureau",
+    price: "2480.00",
+    weightKg: "2.800",
+    dimensionsCm: ["40", "25", "12"],
+    warrantyMonths: 12,
+    specs: { Madeira: "Nogueira maciça", Acabamento: "Óleo natural" },
+    skus: [
+      {
+        code: "ORG-MOD-NOG",
+        name: "Nogueira",
+        attributes: { acabamento: "Nogueira" },
+        stock: 8,
+      },
+      {
+        code: "ORG-MOD-CAR",
+        name: "Carvalho",
+        attributes: { acabamento: "Carvalho" },
+        stock: 5,
+      },
+    ],
+  },
+  {
+    slug: "luminaria-articulada-latao",
+    category: "iluminacao",
+    name: "Luminária articulada em latão",
+    description:
+      "Luminária de mesa com braço articulado, LED de 3000 K e dimmer.",
+    brand: "Atelier Bureau",
+    price: "1890.00",
+    weightKg: "3.200",
+    dimensionsCm: ["55", "20", "20"],
+    warrantyMonths: 12,
+    specs: { LED: "3000 K, 8 W", Tensão: "Bivolt" },
+    skus: [{ code: "ILU-ART-LAT", name: "Latão escovado", stock: 10 }],
+  },
+  {
+    slug: "poltrona-executiva-walnut",
+    category: "mobiliario-ergonomico",
+    name: "Poltrona executiva em couro",
+    description:
+      "Poltrona executiva com estrutura em nogueira, couro natural e mecanismo de reclinação sincronizado.",
+    brand: "Atelier Bureau",
+    price: "7400.00",
+    weightKg: "28.000",
+    dimensionsCm: ["75", "70", "120"],
+    warrantyMonths: 24,
+    requiresInstallation: true,
+    specs: { Estofado: "Couro natural", "Peso máximo": "130 kg" },
+    skus: [{ code: "MOB-POL-EXE-NOG", name: "Nogueira e couro", stock: 4 }],
+  },
+  {
+    slug: "mesa-regulavel-carvalho",
+    category: "mobiliario-ergonomico",
+    name: "Mesa com regulagem elétrica em carvalho",
+    description:
+      "Mesa com regulagem elétrica de altura, tampo em carvalho e memória de quatro posições.",
+    brand: "Atelier Bureau",
+    price: "9800.00",
+    weightKg: "62.000",
+    dimensionsCm: ["160", "80", "12"],
+    warrantyMonths: 36,
+    requiresInstallation: true,
+    specs: { Altura: "65 a 130 cm", Motor: "Duplo, 120 kg" },
+    skus: [{ code: "MOB-MES-REG-CAR", name: "Carvalho 160 × 80", stock: 3 }],
+  },
+]
+
+/** A customer price table (RF21). */
+export type PriceTableSeed = {
+  /** Table name, shown to the customer. */
+  name: string
+  /** Description for the back office. */
+  description: string
+  /** Default discount over the catalog price, in percent. */
+  discountPercent: string
+  /** Discounts per product slug, replacing the default. */
+  items: Array<{ product: string; discountPercent: string }>
+  /** Corporate account slugs that buy with the table. */
+  organizations: string[]
+}
+
+/**
+ * Demo price table (RF21). The percentages are fictitious examples for
+ * the academic demo, edited in the back office (/admin/precos). No
+ * account is assigned by the seed, so the catalog prices the other
+ * flows rely on do not change; the demo assigns it in the back office.
+ */
+export const priceTables: PriceTableSeed[] = [
+  {
+    name: "Corporativo",
+    description: "Exemplo fictício para a demonstração: contas corporativas.",
+    discountPercent: "5.00",
+    items: [{ product: "mesa-regulavel-carvalho", discountPercent: "8.00" }],
+    organizations: [],
+  },
+]
+
+/** An automatic volume discount of a category (RN04). */
+export type VolumeDiscountSeed = {
+  /** Category slug. */
+  category: string
+  /** Minimum units of the category, or null. */
+  minQuantity: number | null
+  /** Minimum amount of the category, or null. */
+  minAmount: string | null
+  /** Discount in percent. */
+  discountPercent: string
+}
+
+/**
+ * Demo volume discounts (RN04). Fictitious thresholds for the academic
+ * demo, edited in the back office (/admin/precos).
+ */
+export const volumeDiscounts: VolumeDiscountSeed[] = [
+  {
+    category: "papelaria-nobre",
+    minQuantity: 10,
+    minAmount: null,
+    discountPercent: "5.00",
+  },
+  {
+    category: "papelaria-nobre",
+    minQuantity: 50,
+    minAmount: null,
+    discountPercent: "10.00",
+  },
+  {
+    category: "mobiliario-ergonomico",
+    minQuantity: 4,
+    minAmount: "25000.00",
+    discountPercent: "6.00",
+  },
+]
+
+/** A fictitious account for development and the demo. */
+export type AccountSeed = {
+  /** Login e-mail (fictitious domain). */
+  email: string
+  /** Display name. */
+  name: string
+  /** PF or PJ. */
+  personType: "PF" | "PJ"
+  /** Fictitious CPF or CNPJ, digits only. */
+  document: string
+  /** Internal role keys (back office users only). */
+  roles?: string[]
+}
+
+/** Test accounts. Passwords come from SEED_PASSWORD (see README). */
+export const accounts: AccountSeed[] = [
+  {
+    email: "admin@atelierbureau.test",
+    name: "Administração Atelier Bureau",
+    personType: "PF",
+    document: "00000000191",
+    roles: ["admin"],
+  },
+  {
+    email: "comercial@atelierbureau.test",
+    name: "Equipe Comercial",
+    personType: "PF",
+    document: "00000000272",
+    roles: ["sales"],
+  },
+  {
+    email: "financeiro@atelierbureau.test",
+    name: "Equipe Financeira",
+    personType: "PF",
+    document: "00000001910",
+    roles: ["finance"],
+  },
+  {
+    email: "cliente.pf@atelierbureau.test",
+    name: "Cliente Pessoa Física",
+    personType: "PF",
+    document: "00000000353",
+  },
+  {
+    email: "solicitante@empresa-ficticia.test",
+    name: "Solicitante Empresa Fictícia",
+    personType: "PJ",
+    document: "00000000434",
+  },
+  {
+    email: "aprovador@empresa-ficticia.test",
+    name: "Aprovador Empresa Fictícia",
+    personType: "PJ",
+    document: "00000000515",
+  },
+]
+
+/** A seller rule by region and segment (RN11). */
+export type SellerRuleSeed = {
+  /** E-mail of a seeded account with the sales role. */
+  sellerEmail: string
+  /** WhatsApp of the seller, digits with area code (fictitious). */
+  sellerPhone: string
+  /** Segment; null means any. */
+  personType: "PF" | "PJ" | null
+  /** State (UF); null means any. */
+  state: string | null
+}
+
+/**
+ * Dedicated seller rules (#69, RF18, RN11). The general rule sends
+ * every customer to the fictitious sales account until the back office
+ * defines the regions, segments and the real WhatsApp numbers.
+ */
+export const sellerRules: SellerRuleSeed[] = [
+  {
+    sellerEmail: "comercial@atelierbureau.test",
+    sellerPhone: "11900000000",
+    personType: null,
+    state: null,
+  },
+]
+
+/** Fictitious corporate account with a requester and an approver. */
+export const corporateAccount = {
+  name: "Empresa Fictícia Ltda.",
+  slug: "empresa-ficticia",
+  cnpj: "98765432000198",
+  legalName: "Empresa Fictícia Ltda. (dados fictícios)",
+  creditLimit: "50000.00",
+  members: [
+    { email: "solicitante@empresa-ficticia.test", role: "requester" },
+    { email: "aprovador@empresa-ficticia.test", role: "approver,admin" },
+  ],
+}

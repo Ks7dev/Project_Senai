@@ -1,0 +1,122 @@
+import { Suspense } from "react"
+import type { Metadata } from "next"
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import { ListingView } from "@/features/catalog/listing/listing-view"
+import { parseCatalogFilters } from "@/features/shared/lib/catalog/catalog-filters"
+import {
+  getCategoryWithSubtree,
+  queryCatalog,
+} from "@/features/shared/lib/catalog/catalog-query"
+import { siteUrl } from "@/features/shared/lib/email/site-url"
+import { STORE_NAME } from "@/features/shared/lib/seo/product-json-ld"
+import { priceCardsForCurrentCustomer } from "@/features/shared/lib/pricing/customer-pricing"
+
+type Params = { slug: string }
+type Search = Record<string, string | string[] | undefined>
+
+/**
+ * Title, description and canonical URL of the category listing
+ * (RNF14, #31). Filters and pages share the canonical of the category.
+ *
+ * @param props - Page props.
+ * @returns The page metadata.
+ */
+export async function generateMetadata(
+  props: PageProps<"/categoria/[slug]">
+): Promise<Metadata> {
+  const { slug } = await props.params
+  const category = await getCategoryWithSubtree(slug)
+  if (!category) return { title: `Categoria não encontrada — ${STORE_NAME}` }
+  const description = `${category.name} na ${STORE_NAME}: papelaria nobre e mobiliário executivo com garantia, entrega para todo o Brasil e condições para empresas.`
+  const url = `${siteUrl()}/categoria/${category.slug}`
+  return {
+    title: `${category.name} — ${STORE_NAME}`,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      title: category.name,
+      description,
+      url,
+      siteName: STORE_NAME,
+      locale: "pt_BR",
+    },
+  }
+}
+
+/**
+ * Loads the category and its filtered products.
+ *
+ * @param props - Route params and search params promises.
+ * @returns The listing.
+ */
+async function CategoryListing({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>
+  searchParams: Promise<Search>
+}) {
+  const [{ slug }, search] = await Promise.all([params, searchParams])
+  const category = await getCategoryWithSubtree(slug)
+  if (!category) notFound()
+  const filters = parseCatalogFilters(search)
+  const catalog = await queryCatalog(filters, category.ids)
+  // Price of the logged-in customer table, applied after the shared cache
+  const page = {
+    ...catalog,
+    products: await priceCardsForCurrentCustomer(catalog.products),
+  }
+  return (
+    <ListingView
+      basePath={`/categoria/${category.slug}`}
+      eyebrow="Categoria"
+      title={category.name}
+      filters={filters}
+      page={page}
+    >
+      {(category.parent || category.children.length > 0) && (
+        <nav
+          aria-label="Subcategorias"
+          className="flex flex-wrap items-center gap-sm"
+        >
+          {category.parent && (
+            <Link
+              href={`/categoria/${category.parent.slug}`}
+              className="text-body-sm text-primary underline"
+            >
+              Voltar para {category.parent.name}
+            </Link>
+          )}
+          {category.children.map((child) => (
+            <Link
+              key={child.slug}
+              href={`/categoria/${child.slug}`}
+              className="rounded-full border border-line-subtle px-md py-1 text-label-sm text-ink hover:bg-subtle"
+            >
+              {child.name}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </ListingView>
+  )
+}
+
+/**
+ * Category listing route (#24, RF02).
+ *
+ * @param props - Page props.
+ * @returns The page.
+ */
+export default function CategoryPage(props: PageProps<"/categoria/[slug]">) {
+  return (
+    <Suspense fallback={<p className="p-xl text-body">Carregando produtos…</p>}>
+      <CategoryListing
+        params={props.params}
+        searchParams={props.searchParams as Promise<Search>}
+      />
+    </Suspense>
+  )
+}

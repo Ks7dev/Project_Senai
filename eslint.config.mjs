@@ -38,6 +38,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "prisma/migrations/**",
     "components/ui/**",
+    "generated/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ])
 

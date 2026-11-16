@@ -228,7 +228,8 @@ Modelar no `prisma/schema.prisma` (MySQL 8, InnoDB, `utf8mb4`) as entidades prin
 
 Checklist “Critérios de aceite”:
 
-- [ ] Diagrama ER no repositório
+- [ ] Escopo, DER, MER, dicionário de dados e script SQL em `docs/banco-de-dados/`, regenerados por `npm run db:docs`
+- [ ] Gatilhos de integridade (auditoria, histórico de status e razão de estoque imutáveis; estoque, valores, NF-e emitida e descontos protegidos), com teste de integração
 - [ ] Migrations criam todas as tabelas
 - [ ] Seeds de desenvolvimento com produtos e contas de teste
 - [ ] Valores das regras de negócio confirmados na #5 carregados como seed de configuração
@@ -1160,6 +1161,16 @@ AB-079 — Teste de carga
 AB-080 — Monitoramento de disponibilidade e alertas
 AB-081 — Backup e teste de restauração
 AB-082 — Deploy e checklist de lançamento
+AB-173 — Trocar unsafe-inline da CSP por nonce nas páginas de pagamento
+AB-174 — Restringir os curingas de domínio da CSP do Mercado Pago
+AB-175 — Rate limit nas Server Actions de pagamento e estorno
+AB-176 — Rodar npm audit no CI
+AB-177 — 2FA obrigatório para perfis internos com acesso financeiro
+AB-178 — Arquivar a AOC do Mercado Pago e a matriz de responsabilidades
+AB-179 — Trocar as contas fictícias do seed no servidor de entrega
+AB-180 — Certificado de CA pública ao publicar fora da rede local
+AB-181 — Varredura trimestral por ASV ao expor o site
+AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
 ```
 
 ### Detalhamento dos cards
@@ -1199,8 +1210,8 @@ Verificar os requisitos mínimos do SAQ A para o checkout transparente.
 
 Checklist “Critérios de aceite”:
 
-- [ ] Checklist preenchido e versionado
-- [ ] Pendências viram issues
+- [x] Checklist preenchido e versionado
+- [x] Pendências viram issues (#173 a #182)
 
 #### AB-077 — Testes automatizados e cobertura mínima
 
@@ -1279,3 +1290,126 @@ Checklist “Critérios de aceite”:
 - [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
 - [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
 - [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada
+
+#### AB-173 — Trocar unsafe-inline da CSP por nonce nas páginas de pagamento
+
+**Etiquetas:** P1 — Importante, Backend  
+**Issue:** #173 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 6.4.3, 11.6.1, E6
+
+Trocar `'unsafe-inline'` de `script-src` por nonce ou hash nas páginas de pagamento, aprovar o inventário de scripts e monitorar mudanças de scripts e cabeçalhos na página de pagamento. Pendência P1 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] `script-src` das páginas de pagamento sem `'unsafe-inline'`, com nonce ou hash
+- [ ] Inventário de scripts da página de pagamento aprovado e versionado
+- [ ] Mudança de script ou cabeçalho na página de pagamento detectada e alertada
+
+#### AB-174 — Restringir os curingas de domínio da CSP do Mercado Pago
+
+**Etiquetas:** P2 — Desejável, Backend  
+**Issue:** #174 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 6.4.3, E6
+
+Restringir os curingas de domínio da CSP (`*.mercadopago.com`, `*.mlstatic.com`, `*.mercadolibre.com`, `*.mercadolivre.com`) aos hosts que o Brick usa de fato. Pendência P2 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] CSP lista só os hosts usados pelo Brick
+- [ ] Pagamento em sandbox funciona com a CSP restrita
+
+#### AB-175 — Rate limit nas Server Actions de pagamento e estorno
+
+**Etiquetas:** P1 — Importante, Backend  
+**Issue:** #175 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 8, RNF05
+
+Aplicar rate limit às Server Actions de pagamento e estorno: tentativas de cartão por pedido e por IP. Pendência P3 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Tentativas de pagamento limitadas por pedido e por IP
+- [ ] Solicitações de estorno limitadas por usuário
+- [ ] Recusa por limite mostra mensagem genérica e grava log
+
+#### AB-176 — Rodar npm audit no CI
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade, Backend  
+**Issue:** #176 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 6.3
+
+Rodar `npm audit` (ou equivalente) no CI e tratar as vulnerabilidades altas e críticas. Pendência P4 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] CI falha com vulnerabilidade alta ou crítica
+- [ ] Vulnerabilidades atuais tratadas ou justificadas
+
+#### AB-177 — 2FA obrigatório para perfis internos com acesso financeiro
+
+**Etiquetas:** P1 — Importante, Backend  
+**Issue:** #177 · **Área:** acesso · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 8
+
+Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos. Pendência P5 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Perfil interno com acesso a pedidos, pagamentos ou estornos não entra sem 2FA
+- [ ] Primeiro acesso leva à ativação do 2FA
+
+#### AB-178 — Arquivar a AOC do Mercado Pago e a matriz de responsabilidades
+
+**Etiquetas:** P1 — Importante, Decisão  
+**Issue:** #178 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19, PCI E2, E3, 12.8
+
+Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades. Pendência P6 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] AOC do Mercado Pago arquivada em `docs/`
+- [ ] Campos de cartão do Brick confirmados como iframe
+- [ ] Matriz de responsabilidades registrada no checklist SAQ A
+
+#### AB-179 — Trocar as contas fictícias do seed no servidor de entrega
+
+**Etiquetas:** P1 — Importante, Infra/Qualidade, Backend  
+**Issue:** #179 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 2.2.2
+
+No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD`. Pendência P7 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Contas do seed com senha trocada ou desativadas no servidor de entrega
+- [ ] Procedimento registrado no checklist de lançamento (#82)
+
+#### AB-180 — Certificado de CA pública ao publicar fora da rede local
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade, Backend, Decisão  
+**Issue:** #180 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 4
+
+Usar certificado de CA pública ao publicar fora da rede local. Pendência P8 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Decisão registrada sobre publicar fora da rede local
+- [ ] Se publicar, Caddy com certificado de CA pública
+
+#### AB-181 — Varredura trimestral por ASV ao expor o site
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade, Backend, Decisão  
+**Issue:** #181 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 11.3.2
+
+Contratar varredura trimestral por ASV ao expor o site na internet. Pendência P9 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Decisão registrada sobre expor o site na internet
+- [ ] Se expor, varredura ASV agendada
+
+#### AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
+
+**Etiquetas:** P2 — Desejável, Decisão  
+**Issue:** #182 · **Área:** pagamento · **Milestone:** v1.0.0 · **Referências:** RN19, PCI 12.10.1
+
+Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento. Pendência P10 do checklist SAQ A (#62).
+
+Checklist “Critérios de aceite”:
+
+- [ ] Política de segurança da informação versionada em `docs/`
+- [ ] Plano de resposta a incidentes de pagamento versionado em `docs/`

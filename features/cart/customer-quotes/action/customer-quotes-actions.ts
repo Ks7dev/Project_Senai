@@ -1,0 +1,398 @@
+"use server"
+
+import {
+  customerQuoteSchema,
+  decideQuoteSchema,
+  quoteAttachmentSchema,
+  revalidateQuoteSchema,
+  type CustomerQuoteInput,
+  type DecideQuoteInput,
+  type QuoteAttachmentInput,
+  type RevalidateQuoteInput,
+} from "@/features/cart/customer-quotes/schema/customer-quotes-schema"
+import { writeAudit } from "@/features/shared/lib/db/audit"
+import { FORBIDDEN_MESSAGE } from "@/features/shared/lib/db/permissions"
+import { prisma } from "@/features/shared/lib/db/prisma"
+import {
+  AppError,
+  toActionError,
+  type ActionResult,
+} from "@/features/shared/lib/errors/action-result"
+import {
+  customerQuoteScope,
+  loadQuoteCustomer,
+  QUOTE_NOT_FOUND_MESSAGE,
+  readQuoteAttachment,
+  type AttachmentDownload,
+} from "@/features/shared/lib/quotes/quote-access"
+import {
+  assertQuotePricesValid,
+  lockQuote,
+  revalidateExpiredQuote,
+} from "@/features/shared/lib/quotes/quote-revalidation"
+import type { QuoteStatusKey } from "@/features/shared/lib/quotes/quote-status"
+import { effectiveQuoteStatus } from "@/features/shared/lib/quotes/quote-validity"
+import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+
+/** A quote row of the customer area. */
+export type CustomerQuoteRow = {
+  /** Quote id. */
+  id: string
+  /** Readable number (RF06). */
+  number: string
+  /**
+   * Status shown: a quote past its validity reads as expired even
+   * before the background job updates it (RN02).
+   */
+  status: QuoteStatusKey
+  /** Request date, ISO string. */
+  createdAt: string
+  /** End of the validity, ISO string, when set (RN02). */
+  validUntil: string | null
+  /** Total, decimal string. */
+  total: string
+  /** Who asked for the quote. */
+  requester: string
+}
+
+/** A line of a quote. */
+export type CustomerQuoteLine = {
+  /** Line id. */
+  id: string
+  /** Product and variation. */
+  description: string
+  /** Units. */
+  quantity: number
+  /** Unit price, decimal string, or null when not priced yet. */
+  unitPrice: string | null
+  /** Quantity × unit price, decimal string, or null. */
+  total: string | null
+}
+
+/** An attachment of a quote. */
+export type CustomerQuoteAttachment = {
+  /** Attachment id. */
+  id: string
+  /** Original file name. */
+  name: string
+  /** Media type. */
+  mimeType: string
+  /** Size in bytes. */
+  sizeBytes: number
+}
+
+/** What the quote page of the customer area shows (RF05, RF06, RF08). */
+export type CustomerQuote = CustomerQuoteRow & {
+  /** Customer notes. */
+  notes: string | null
+  /** Message of the sales team sent with the answer (RF20). */
+  answerNote: string | null
+  /** Order generated from the quote, if any (RF20). */
+  order: { id: string; number: string } | null
+  /** Lines. */
+  lines: CustomerQuoteLine[]
+  /** Attached files. */
+  attachments: CustomerQuoteAttachment[]
+  /** Sum of the lines, decimal string. */
+  subtotal: string
+  /** Discount, decimal string. */
+  discount: string
+  /** Shipping, decimal string. */
+  shippingTotal: string
+  /**
+   * Whether the quote is expired and this customer may ask for the
+   * revalidation of its prices (RN02).
+   */
+  canRevalidate: boolean
+  /**
+   * Whether the quote was answered, is still valid and this customer
+   * may approve or refuse the proposal (RF20).
+   */
+  canDecide: boolean
+}
+
+/** Fields of the quote list and page. */
+const rowSelect = {
+  id: true,
+  number: true,
+  status: true,
+  createdAt: true,
+  validUntil: true,
+  total: true,
+  user: { select: { name: true } },
+} as const
+
+/**
+ * Maps a loaded quote to a row.
+ *
+ * @param row - Quote with its requester.
+ * @param now - Reference time of the validity (RN02).
+ * @returns The row.
+ */
+function toRow(
+  row: {
+    id: string
+    number: string
+    status: QuoteStatusKey
+    createdAt: Date
+    validUntil: Date | null
+    total: { toFixed: (digits: number) => string }
+    user: { name: string }
+  },
+  now: Date
+): CustomerQuoteRow {
+  return {
+    id: row.id,
+    number: row.number,
+    status: effectiveQuoteStatus(row, now),
+    createdAt: row.createdAt.toISOString(),
+    validUntil: row.validUntil?.toISOString() ?? null,
+    total: row.total.toFixed(2),
+    requester: row.user.name,
+  }
+}
+
+/**
+ * Lists the quotes the customer follows, newest first: their own, or
+ * the whole company for approvers, finance and account administrators.
+ * The user comes from the session.
+ *
+ * @returns `{ success: true, quotes, companyWide }` or `{ success: false, error }`.
+ */
+export async function listMyQuotes(): Promise<
+  ActionResult<{ quotes: CustomerQuoteRow[]; companyWide: boolean }>
+> {
+  try {
+    const customer = await loadQuoteCustomer()
+    const rows = await prisma.quote.findMany({
+      where: customerQuoteScope(customer),
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: rowSelect,
+    })
+    const now = new Date()
+    return {
+      success: true,
+      quotes: rows.map((row) => toRow(row, now)),
+      companyWide: customer.seesCompanyQuotes,
+    }
+  } catch (error) {
+    return toActionError(error, { action: "listMyQuotes" })
+  }
+}
+
+/**
+ * Loads one quote the customer follows, with lines, totals and
+ * attachments (RF05, RF08).
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true, quote }` or `{ success: false, error }`.
+ */
+export async function getMyQuote(
+  input: CustomerQuoteInput
+): Promise<ActionResult<{ quote: CustomerQuote }>> {
+  try {
+    const parsed = customerQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    const customer = await loadQuoteCustomer()
+    const quote = await prisma.quote.findFirst({
+      where: { id: parsed.data.quoteId, ...customerQuoteScope(customer) },
+      select: {
+        ...rowSelect,
+        notes: true,
+        answerNote: true,
+        orders: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, number: true },
+        },
+        subtotal: true,
+        discount: true,
+        shippingTotal: true,
+        items: {
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            unitPrice: true,
+          },
+        },
+        attachments: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, mimeType: true, sizeBytes: true },
+        },
+      },
+    })
+    if (!quote) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const row = toRow(quote, new Date())
+    return {
+      success: true,
+      quote: {
+        ...row,
+        canRevalidate: row.status === "EXPIRED" && customer.canRequest,
+        canDecide: row.status === "ANSWERED" && customer.canRequest,
+        notes: quote.notes,
+        answerNote: quote.answerNote,
+        order: quote.orders[0] ?? null,
+        subtotal: quote.subtotal.toFixed(2),
+        discount: quote.discount.toFixed(2),
+        shippingTotal: quote.shippingTotal.toFixed(2),
+        lines: quote.items.map((item) => ({
+          id: item.id,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice?.toFixed(2) ?? null,
+          total: item.unitPrice
+            ? item.unitPrice.mul(item.quantity).toFixed(2)
+            : null,
+        })),
+        attachments: quote.attachments,
+      },
+    }
+  } catch (error) {
+    return toActionError(error, { action: "getMyQuote" })
+  }
+}
+
+/**
+ * Asks for the revalidation of the prices of an expired quote (RN02).
+ * In one transaction the lines get the current catalog prices, the
+ * discount and shipping negotiated before are dropped, the validity
+ * restarts and the quote returns to the sales queue; the audit log
+ * keeps the old and the new values (RNF12). Only who may request
+ * quotes revalidates, and only quotes they follow.
+ *
+ * @param input - Quote id.
+ * @returns `{ success: true, validUntil, total }` or `{ success: false, error }`.
+ */
+export async function revalidateMyQuote(
+  input: RevalidateQuoteInput
+): Promise<ActionResult<{ validUntil: string; total: string }>> {
+  try {
+    const parsed = revalidateQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "invalid")
+    }
+    const customer = await loadQuoteCustomer()
+    if (!customer.canRequest) {
+      throw new AppError(FORBIDDEN_MESSAGE, "forbidden")
+    }
+    await enforceActionRateLimit("quote-revalidate", {
+      limit: 10,
+      windowMs: 60_000,
+    })
+    const owned = await prisma.quote.findFirst({
+      where: { id: parsed.data.quoteId, ...customerQuoteScope(customer) },
+      select: { id: true },
+    })
+    if (!owned) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const result = await prisma.$transaction((tx) =>
+      revalidateExpiredQuote(tx, {
+        quoteId: owned.id,
+        userId: customer.user.id,
+        now: new Date(),
+      })
+    )
+    return {
+      success: true,
+      validUntil: result.validUntil.toISOString(),
+      total: result.total,
+    }
+  } catch (error) {
+    return toActionError(error, { action: "revalidateMyQuote" })
+  }
+}
+
+/**
+ * Approves or refuses the proposal of an answered quote (RF20). Only
+ * who may request quotes decides, only quotes they follow and only
+ * while the prices are valid (RN02). An approved quote waits for the
+ * sales team to turn it into an order with the negotiated values. The
+ * decision is audited (RNF12).
+ *
+ * @param input - Quote id and decision.
+ * @returns `{ success: true, status }` or `{ success: false, error }`.
+ */
+export async function decideMyQuote(
+  input: DecideQuoteInput
+): Promise<ActionResult<{ status: QuoteStatusKey }>> {
+  try {
+    const parsed = decideQuoteSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message ?? QUOTE_NOT_FOUND_MESSAGE,
+        "invalid"
+      )
+    }
+    const customer = await loadQuoteCustomer()
+    if (!customer.canRequest) {
+      throw new AppError(FORBIDDEN_MESSAGE, "forbidden")
+    }
+    const owned = await prisma.quote.findFirst({
+      where: { id: parsed.data.quoteId, ...customerQuoteScope(customer) },
+      select: { id: true },
+    })
+    if (!owned) throw new AppError(QUOTE_NOT_FOUND_MESSAGE, "not_found")
+    const status: QuoteStatusKey =
+      parsed.data.decision === "accept" ? "ACCEPTED" : "REJECTED"
+    await prisma.$transaction(async (tx) => {
+      await lockQuote(tx, owned.id)
+      const quote = await tx.quote.findUniqueOrThrow({
+        where: { id: owned.id },
+        select: { status: true, validUntil: true, total: true },
+      })
+      assertQuotePricesValid(quote, new Date())
+      if (quote.status !== "ANSWERED") {
+        throw new AppError(
+          "Esta cotação não está aguardando a sua aprovação.",
+          "invalid_status"
+        )
+      }
+      await tx.quote.update({ where: { id: owned.id }, data: { status } })
+      await writeAudit(tx, {
+        userId: customer.user.id,
+        action: status === "ACCEPTED" ? "quote.accept" : "quote.reject",
+        entity: "quote",
+        entityId: owned.id,
+        before: { status: quote.status },
+        after: { status, total: quote.total },
+      })
+    })
+    return { success: true, status }
+  } catch (error) {
+    return toActionError(error, { action: "decideMyQuote" })
+  }
+}
+
+/**
+ * Downloads an attachment of a quote the customer follows (RF08). Files
+ * live in the private storage and only leave through this check.
+ *
+ * @param input - Attachment id.
+ * @returns `{ success: true, file }` or `{ success: false, error }`.
+ */
+export async function downloadMyQuoteAttachment(
+  input: QuoteAttachmentInput
+): Promise<ActionResult<{ file: AttachmentDownload }>> {
+  try {
+    const parsed = quoteAttachmentSchema.safeParse(input)
+    if (!parsed.success) throw new AppError("Anexo inválido.", "invalid")
+    const customer = await loadQuoteCustomer()
+    const attachment = await prisma.quoteAttachment.findFirst({
+      where: {
+        id: parsed.data.attachmentId,
+        quote: customerQuoteScope(customer),
+      },
+      select: { name: true, mimeType: true, storageKey: true },
+    })
+    if (!attachment) {
+      throw new AppError("Anexo não encontrado.", "not_found")
+    }
+    return { success: true, file: await readQuoteAttachment(attachment) }
+  } catch (error) {
+    return toActionError(error, { action: "downloadMyQuoteAttachment" })
+  }
+}

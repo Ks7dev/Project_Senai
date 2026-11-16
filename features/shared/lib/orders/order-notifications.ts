@@ -1,0 +1,135 @@
+import "server-only"
+import type { Prisma } from "@/generated/prisma/client"
+import {
+  approvalPendingEmail,
+  orderCanceledEmail,
+  orderDeliveredEmail,
+  orderShippedEmail,
+  paymentConfirmedEmail,
+  type OrderEmailData,
+  type RenderedEmail,
+} from "@/emails/templates"
+import {
+  canDecideOrderApproval,
+  parseRoles,
+} from "@/features/shared/lib/auth/corporate-roles"
+import { enqueueEmail } from "@/features/shared/lib/email/mailer"
+import { siteUrl } from "@/features/shared/lib/email/site-url"
+import type { OrderStatusKey } from "@/features/shared/lib/orders/order-status"
+
+/**
+ * Statuses that send an e-mail (RF53). The NF-e e-mail goes out when the
+ * NF-e is authorized (`processInvoice`), with the access key, and not
+ * when the order is marked as invoiced.
+ */
+export const NOTIFIED_STATUSES: readonly OrderStatusKey[] = [
+  "AWAITING_APPROVAL",
+  "PAID",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELED",
+]
+
+/** Default text of the cancellation e-mail. */
+const CANCELED_DEFAULT =
+  "Seu pedido foi cancelado e os itens reservados voltaram ao estoque. Se houve pagamento, o estorno segue a política comercial."
+
+/**
+ * Queues the e-mails of an order status change in the same transaction
+ * (RF53): approval pending goes to the company approvers other than the
+ * requester (RN01) or, in a single-user account, to its holder (RN08);
+ * paid, shipped, delivered and canceled go to the customer. The NF-e
+ * e-mail is queued by the NF-e issuance.
+ * Statuses of the manual shipping quote have their own e-mails (#44).
+ *
+ * @param tx - Prisma transaction of the status change.
+ * @param input - Order, new status and, for a cancellation, the reason
+ * shown to the customer instead of the default text.
+ * @returns How many e-mails were queued.
+ */
+export async function enqueueOrderStatusEmails(
+  tx: Prisma.TransactionClient,
+  input: { orderId: string; to: OrderStatusKey; cancelReason?: string | null }
+): Promise<number> {
+  if (!NOTIFIED_STATUSES.includes(input.to)) return 0
+  const order = await tx.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      number: true,
+      total: true,
+      userId: true,
+      organizationId: true,
+      user: { select: { name: true, email: true } },
+      shipment: { select: { carrier: true, trackingCode: true } },
+    },
+  })
+  if (!order) return 0
+  const url = `${siteUrl()}/conta/pedidos`
+  const base: OrderEmailData = {
+    name: order.user.name,
+    number: order.number,
+    total: order.total.toFixed(2),
+    url,
+  }
+
+  const emails: Array<{ to: string; email: RenderedEmail }> = []
+  if (input.to === "AWAITING_APPROVAL" && order.organizationId) {
+    const members = await tx.member.findMany({
+      where: { organizationId: order.organizationId },
+      select: {
+        userId: true,
+        role: true,
+        user: { select: { name: true, email: true } },
+      },
+    })
+    const approvers = members.filter((member) =>
+      canDecideOrderApproval({
+        roles: parseRoles(member.role),
+        isRequester: member.userId === order.userId,
+        memberCount: members.length,
+      })
+    )
+    for (const member of approvers) {
+      emails.push({
+        to: member.user.email,
+        email: approvalPendingEmail({
+          ...base,
+          url: `${siteUrl()}/conta/aprovacoes`,
+          name: member.user.name,
+          requester: order.user.name,
+        }),
+      })
+    }
+  }
+  const customer = order.user.email
+  if (input.to === "PAID") {
+    emails.push({ to: customer, email: paymentConfirmedEmail(base) })
+  }
+  if (input.to === "SHIPPED") {
+    emails.push({
+      to: customer,
+      email: orderShippedEmail({
+        ...base,
+        carrier: order.shipment?.carrier,
+        trackingCode: order.shipment?.trackingCode,
+      }),
+    })
+  }
+  if (input.to === "DELIVERED") {
+    emails.push({ to: customer, email: orderDeliveredEmail(base) })
+  }
+  if (input.to === "CANCELED") {
+    emails.push({
+      to: customer,
+      email: orderCanceledEmail({
+        ...base,
+        reason: input.cancelReason?.trim() || CANCELED_DEFAULT,
+      }),
+    })
+  }
+
+  for (const { to, email } of emails) {
+    await enqueueEmail(tx, { to, ...email })
+  }
+  return emails.length
+}

@@ -26,6 +26,54 @@ O site abre em `http://localhost:3000`.
 | `npm run typecheck` | Checagem de tipos (`tsc --noEmit`) |
 | `npm run format` / `npm run format:check` | Prettier |
 | `npm test` | Testes (Vitest) |
+| `npm run test:coverage` | Testes com a cobertura mínima de `vitest.config.ts` (verificada no CI) |
+| `npm run test:integration` | Testes de integração das actions contra o MySQL (precisa do banco com migrations e seed) |
+| `npm run test:e2e` | Fluxo de compra de ponta a ponta (Playwright). Precisa do app com build, MySQL, migrations e seed; roda no workflow `E2E` do CI |
+| `npm run db:migrate` | Cria e aplica migrations em desenvolvimento |
+| `npm run db:deploy` | Aplica as migrations pendentes (servidor) |
+| `npm run db:seed` | Carrega configurações, catálogo e contas fictícias |
+
+## Servidor local (Docker)
+
+A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam por `https://<ip-da-máquina>` (detalhes em `ARCHITECTURE.md`, seção 5.1).
+
+1. Instale o Docker Desktop e reserve um IP fixo para a máquina no roteador.
+2. Copie `.env.example` para `.env` e preencha `SITE_HOST`, as senhas do MySQL, o `BETTER_AUTH_SECRET` e a `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`). Guarde uma cópia da `DATA_ENCRYPTION_KEY` fora do servidor: sem ela, os CPFs e telefones gravados não podem ser lidos.
+3. Suba tudo:
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Carregue os dados fictícios (só na primeira vez). O seed roda nesta máquina, fora do container, e usa o `MIGRATION_DATABASE_URL` do `.env` (`localhost:3306`):
+
+   ```bash
+   npm ci
+   ```
+
+   ```bash
+   npm run db:seed
+   ```
+
+   A imagem do app não leva o seed: ela só aplica as migrations ao iniciar.
+
+5. Exporte o certificado raiz do HTTPS local e instale em cada dispositivo:
+
+   ```bash
+   sh deploy/export-root-cert.sh
+   ```
+
+   No Windows, use `powershell -ExecutionPolicy Bypass -File deploy\export-root-cert.ps1`. Depois, confira o HTTPS e os headers de segurança a partir de outro dispositivo da rede:
+
+   ```bash
+   sh deploy/check-headers.sh <ip-do-servidor>
+   ```
+
+6. No Firewall do Windows, libere as portas 80 e 443 só no perfil de rede **Privada**. O MySQL (3306) fica só nesta máquina; para abri-lo à rede, defina `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env` e libere a 3306 também no perfil Privado.
+
+Serviços: `proxy` (Caddy, portas 80 e 443), `app` (Next.js, só na rede interna), `db` (MySQL 8.4, porta 3306 em `127.0.0.1`) e `backup` (`mysqldump` diário em `./backups`, 30 dias de retenção).
+
+As contas de teste estão em `prisma/seed-data.ts`, e a senha delas é a do `SEED_PASSWORD`.
 
 ## Versão
 

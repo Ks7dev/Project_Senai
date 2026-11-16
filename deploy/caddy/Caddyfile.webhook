@@ -1,0 +1,37 @@
+# Atelier Bureau — webhook gate of the cloudflared tunnel (#57, RF30)
+# Runs only with `docker compose --profile tunnel up -d`. The tunnel
+# container sits alone on the `tunnel` network with this gate, so it can
+# reach nothing but this listener, and this listener forwards nothing but
+# the Mercado Pago webhook. Every other method or path answers 404.
+# In the Cloudflare panel, the public hostname of the tunnel points to
+# http://webhook-gate:8080 (ARCHITECTURE.md 5.1).
+
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	@webhook {
+		method POST
+		path /api/webhooks/mercadopago
+	}
+
+	handle @webhook {
+		request_body {
+			max_size 16KB
+		}
+		reverse_proxy app:3000 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	handle {
+		respond 404
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}
