@@ -302,6 +302,8 @@ model Session {
   userAgent            String?  @map("user_agent") @db.Text
   userId               String   @map("user_id") @db.VarChar(36)
   activeOrganizationId String?  @map("active_organization_id") @db.VarChar(36)
+  /// Whether the session was opened with the 2FA code (#177)
+  twoFactorVerified    Boolean  @default(false) @map("two_factor_verified")
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

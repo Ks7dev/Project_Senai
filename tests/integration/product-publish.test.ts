@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { jar } from "./next-headers-stub"
+import {
+  resetInternalTwoFactor,
+  signInInternalWithTwoFactor,
+} from "./internal-sign-in"
 
 try {
   process.loadEnvFile()
@@ -17,7 +20,6 @@ vi.mock("next/cache", () => ({
 }))
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { saveProduct, setProductStatus } =
   await import("@/features/catalog/products-admin/action/product-actions")
 
@@ -67,15 +69,13 @@ beforeEach(() => {
 afterAll(async () => {
   // audit_logs is append-only (database trigger), so its rows stay
   await prisma.product.deleteMany({ where: { id: { in: productIds } } })
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 
 describe("certification rule on product edits (#21, RN09)", () => {
   it("unpublishes a published product that starts to require a missing certification", async () => {
-    jar.clear()
-    expect(
-      await signIn({ email: "admin@atelierbureau.test", password })
-    ).toEqual({ success: true, twoFactor: false })
+    await signInInternalWithTwoFactor("admin@atelierbureau.test", password)
     const product = await createPublishedProduct()
     const form = {
       id: product.id,

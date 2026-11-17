@@ -35,3 +35,10 @@
 		-Server
 	}
 }
+
+# Healthcheck of the container (#80). Bound to the loopback, so the
+# tunnel cannot reach it.
+:8081 {
+	bind 127.0.0.1
+	respond "ok" 200
+}

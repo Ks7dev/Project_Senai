@@ -1,4 +1,4 @@
-# Atelier Bureau — Checklist PCI-DSS SAQ A #173 | #174 | #175 | #176 | #177 | #178 | #179 | #180 | #181 | #182 |
+# Atelier Bureau — Checklist PCI-DSS SAQ A
 
 Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente com o Payment Brick do Mercado Pago (RN19, issue #62). O documento revisa o código real do checkout e lista as pendências encontradas.
 
@@ -9,7 +9,10 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | Versão | Data | Autor | Alteração |
 |---|---|---|---|
 | 1.0 | 14/11/2026 | Equipe Atelier Bureau | Primeira versão: elegibilidade, checklist por requisito e pendências, com base no código do checkout das issues #54 a #59 |
-| 1.1 | 17/11/2026 | Equipe Atelier Bureau | Bloqueio de tentativas passa a atender: rate limit nas Server Actions de pagamento e estorno (pendência P3, #175) |
+| 1.1 | 17/11/2026 | Equipe Atelier Bureau | `npm audit` no CI e tratamento das vulnerabilidades das dependências (pendência P4, #176, seção 6.1) |
+| 1.2 | 17/11/2026 | Equipe Atelier Bureau | Requisito 12: links para a política de segurança e o plano de resposta a incidentes de pagamento (#182), com aprovação pendente |
+| 1.3 | 17/11/2026 | Equipe Atelier Bureau | Seção 2.2 (campos seguros do Brick confirmados no código e na documentação, E3 passa a Atende), seção 8 (matriz de responsabilidades) e `docs/pci/README.md` para a AOC do Mercado Pago (#178) |
+| 1.4 | 17/11/2026 | Equipe Atelier Bureau | Bloqueio de tentativas passa a atender: rate limit nas Server Actions de pagamento e estorno (pendência P3, #175) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -33,6 +36,31 @@ Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeç
 5. O servidor monta o corpo do `POST /v1/payments` com o valor do pedido (nunca o do navegador) e o token, usando o **access token** só no servidor (`features/shared/lib/mercadopago/mercadopago.ts`), e grava o `payment_id` e o status.
 6. A confirmação chega pelo webhook com assinatura HMAC validada e idempotência (`app/api/webhooks/mercadopago/route.ts`) e pela reconciliação por `GET /v1/payments/{id}`.
 
+### 2.2 Campos de cartão do Brick: campos seguros do Mercado Pago (E3, #178)
+
+Conferência feita em 17/11/2026 no código da `develop` e na documentação pública do Mercado Pago.
+
+**No código:**
+
+| Evidência | Arquivo e linhas | O que mostra |
+|---|---|---|
+| Origem do SDK | `features/shared/lib/mercadopago/bricks.ts`, linha 2 | `MERCADO_PAGO_SDK_URL = "https://sdk.mercadopago.com/js/v2"`: o único script externo é o SDK JS v2 do Mercado Pago |
+| Carga do SDK | `features/payment/order-payment/order-payment-view.tsx`, linhas 396 a 400 | `<Script src={MERCADO_PAGO_SDK_URL}>` só na página de pagamento |
+| Montagem do Brick | `features/shared/lib/mercadopago/bricks.ts`, linhas 54 a 57; `order-payment-view.tsx`, linhas 313 a 332 | `new window.MercadoPago(publicKey).bricks().create("payment", paymentContainer, ...)`: o SDK monta o Brick com a chave pública |
+| Contêiner vazio | `order-payment-view.tsx`, linha 455 | `<div id={paymentContainer} />`: o site entrega só um `div` vazio; os campos de cartão são inseridos pelo SDK |
+| Nenhum campo de cartão do site | `features/payment/**` | Não há `<input>` de número, validade, CVV ou titular. Os únicos `<input>` são rádios de endereço, frete, instalação e meio de pagamento (`checkout/checkout-view.tsx`, linhas 274, 316, 394 e 427) e a linha digitável do boleto, somente leitura (`order-payment-view.tsx`, linha 199) |
+| Retorno do Brick só com token | `bricks.ts`, linhas 10 a 16; `order-payment-view.tsx`, linhas 294 a 301 | `onSubmit` recebe `formData` e o repassa à action `payOrder` |
+| Servidor aceita só o token | `features/payment/order-payment/schema/payment-schema.ts`, linhas 9 a 10, 44 a 69 e 146 a 149 | `cardFormSchema` lê só `token`, `payment_method_id`, `issuer_id`, `installments` e `payer`; `payOrderSchema` recusa antes qualquer chave de cartão (`containsCardData`) |
+| Frames só do Mercado Pago | `features/shared/lib/security/headers.ts`, linhas 2 a 7 e 32 | `frame-src` aceita só `'self'` e os domínios do Mercado Pago, então o navegador só exibe iframes dessa origem |
+
+**Na documentação do Mercado Pago:**
+
+- [Card Payment Brick — introdução](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/card-payment-brick/introduction): os campos de cartão do Brick (número, validade e código de segurança) já atendem às normas de segurança do PCI, e o callback de envio recebe o **token** do cartão. O Payment Brick usa o mesmo formulário de cartão.
+- [Bricks — PCI DSS](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/additional-content/security/pci.md): os campos de entrada do cartão vêm direto dos servidores do Mercado Pago, numa área segura, o ambiente de dados do cartão fica hospedado pelo Mercado Pago, e o Checkout Transparente se enquadra no SAQ A. A página também afirma que o Mercado Pago é certificado PCI DSS.
+- [Secure Fields](https://mercadopago.cl/developers/en/news/2022/09/30/Secure-Fields-protects-card-details-at-checkout): no SDK JS v2, os campos seguros são iframes servidos pelo Mercado Pago, que enviam o cartão direto aos servidores dele.
+
+**Conclusão:** o site não renderiza nenhum campo de cartão; o SDK JS v2 do Mercado Pago insere o formulário do Brick num contêiner vazio, e a CSP só permite frames das origens do Mercado Pago. O critério E3 passa a **Atende**. Conferência manual recomendada a cada mudança no checkout: nas ferramentas do desenvolvedor do navegador, os campos de número, validade e CVV aparecem dentro de `<iframe>` com origem do Mercado Pago, e nenhuma requisição ao próprio site leva esses dados.
+
 ## 3. Critérios de elegibilidade ao SAQ A
 
 Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal), **Não atende**, **N/A**.
@@ -40,13 +68,13 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | # | Critério | Situação | Evidência no projeto |
 |---|---|---|---|
 | E1 | Só transações sem cartão presente (e-commerce) | Atende | Não há loja física nem maquininha no escopo |
-| E2 | Todo o processamento do cartão é terceirizado a um provedor certificado PCI DSS | Parcial | Mercado Pago processa e tokeniza. **Falta arquivar a AOC do Mercado Pago** (pendência P6) |
-| E3 | Os elementos da página de pagamento que capturam o cartão vêm do provedor (iframe ou campos seguros) | Parcial | Os campos são do Payment Brick. **Falta confirmar na documentação e na AOC do Mercado Pago que os campos de cartão do Brick são campos seguros em iframe** (pendência P6) |
+| E2 | Todo o processamento do cartão é terceirizado a um provedor certificado PCI DSS | Parcial | Mercado Pago processa e tokeniza e declara a certificação PCI DSS na documentação (seção 2.2). **Falta arquivar a AOC do Mercado Pago** em `docs/pci/` (como obter em [`docs/pci/README.md`](pci/README.md), pendência P6) |
+| E3 | Os elementos da página de pagamento que capturam o cartão vêm do provedor (iframe ou campos seguros) | Atende | O site não tem campo de cartão; o SDK JS v2 do Mercado Pago insere os campos seguros do Brick num contêiner vazio, e a CSP só aceita frames do Mercado Pago. Evidências no código e na documentação na seção 2.2 (#178) |
 | E4 | O comerciante não armazena, processa nem transmite dados de cartão nos seus sistemas | Atende | Só o token passa pelo servidor; `containsCardData` recusa payloads com dados de cartão; o banco não tem colunas de cartão |
 | E5 | Cópias em papel ou eletrônicas de dados de cartão, se houver, não são eletrônicas | N/A | Não há coleta de cartão por telefone, e-mail ou papel |
 | E6 | O site não está suscetível a ataques de scripts que afetem a página de pagamento (critério da revisão de 2025 do SAQ A; conferir no formulário oficial) | Parcial | CSP limita scripts externos ao Mercado Pago, mas mantém `'unsafe-inline'` e curingas de domínio (pendências P1 e P2) |
 
-**Conclusão de elegibilidade:** o desenho do checkout é compatível com o SAQ A. A elegibilidade formal depende das pendências P1, P2 e P6.
+**Conclusão de elegibilidade:** o desenho do checkout é compatível com o SAQ A. A elegibilidade formal depende das pendências P1, P2 e da AOC do Mercado Pago (P6).
 
 ## 4. Checklist por requisito
 
@@ -81,7 +109,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Proteções contra clickjacking | Atende | `X-Frame-Options: DENY` e `frame-ancestors 'none'` |
 | CSP restringindo origens | Parcial | Scripts, frames e conexões externas limitados ao Mercado Pago, mas com `'unsafe-inline'` em `script-src` e curingas como `https://*.mlstatic.com` (pendências P1 e P2) |
 | Valor e dados do pagamento definidos no servidor | Atende | `payOrder` usa o total do pedido gravado, nunca o valor enviado pelo navegador (RF36) |
-| Dependências atualizadas e revisadas | Parcial | `npm audit` não roda no CI. **Incluir verificação de vulnerabilidades das dependências** (pendência P4) |
+| Dependências atualizadas e revisadas | Atende | O CI roda `npm audit --audit-level=high` logo após o `npm ci` e falha com vulnerabilidade alta ou crítica. Situação e justificativas na seção 6.1 (pendência P4, #176) |
 
 ### Requisito 8 — Identificação e autenticação
 
@@ -109,9 +137,9 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Item | Situação | Evidência ou observação |
 |---|---|---|
-| 12.8 Lista de provedores e responsabilidades | Parcial | Mercado Pago é o único provedor que toca dados de cartão. **Falta registrar a matriz de responsabilidades e a AOC anual do provedor** (pendência P6) |
-| 12.10.1 Plano de resposta a incidentes | Não atende | Não há plano escrito de resposta a incidentes de pagamento (pendência P10) |
-| Política de segurança da informação | Parcial | Regras no `CLAUDE.md` e no `ARCHITECTURE.md` (segredos só no `.env`, logs sem dados pessoais). **Falta uma política formal** (pendência P10) |
+| 12.8 Lista de provedores e responsabilidades | Parcial | Mercado Pago é o único provedor que toca dados de cartão. Matriz de responsabilidades registrada na seção 8 (#178). **Falta arquivar a AOC anual do provedor** ([`docs/pci/README.md`](pci/README.md), pendência P6) |
+| 12.10.1 Plano de resposta a incidentes | Parcial | [Plano de resposta a incidentes de pagamento](AtelierBureau_Resposta_Incidentes_Pagamento.md) escrito (#182): detecção, classificação, contenção, comunicação ao Mercado Pago, às bandeiras, à ANPD e aos titulares, evidências, recuperação, lições aprendidas e teste anual. **Falta a aprovação do responsável e o preenchimento dos contatos** |
+| Política de segurança da informação | Parcial | [Política de segurança da informação](AtelierBureau_Politica_Seguranca.md) escrita (#182): papéis, acesso e 2FA, senhas, segredos, backup, logs e auditoria, dependências, terceiros e revisão anual. **Falta a aprovação do responsável** |
 
 ## 5. Inventário de scripts da página de pagamento (6.4.3)
 
@@ -137,6 +165,22 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 | P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #181 |
 | P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` | #182 |
 
+### 6.1 Auditoria de dependências (P4, #176)
+
+- **Onde roda:** passo "Audit dependencies" do `.github/workflows/ci.yml`, em todo PR e push para `develop` e `master`, com `npm audit --audit-level=high`. Vulnerabilidade alta ou crítica reprova o CI.
+- **Árvore auditada:** a completa, sem `--omit=dev`. As ferramentas de desenvolvimento (ESLint, Prisma CLI, Vitest, tsx) rodam no próprio CI e no build da imagem Docker, então uma dependência de desenvolvimento comprometida também atinge o artefato entregue.
+- **Moderadas e baixas:** não reprovam o CI, para não travar entregas por avisos sem correção publicada. São revisadas a cada release e corrigidas quando houver versão compatível.
+
+Situação em 17/11/2026 (`npm audit` sobre 919 pacotes):
+
+| Vulnerabilidade | Severidade | Origem | Tratamento |
+|---|---|---|---|
+| `minimatch` 7.0.0 a 11.0.0, negação de serviço por amplificação de padrões ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) | Moderada (10 avisos na cadeia) | `minimatch@10` usado por `@typescript-eslint/typescript-estree` (ESLint) e por `@ts-morph/common` (CLI do `shadcn`) | Corrigida com `overrides` no `package.json`, que fixa `minimatch@^11.0.1` só nesses dois pacotes. O `npm audit fix --force` sugerido trocaria o `shadcn` pela versão 1.0.0, uma regressão |
+
+Depois da correção, `npm audit` não aponta nenhuma vulnerabilidade (0 baixas, 0 moderadas, 0 altas e 0 críticas). Não há vulnerabilidade alta ou crítica pendente de justificativa. Quando surgir uma sem correção, ela é registrada nesta tabela com o motivo, e a exceção é temporária, revista a cada release.
+
+Remover os `overrides` quando o `typescript-eslint` e o `ts-morph` passarem a depender de um `minimatch` corrigido.
+
 ## 7. Pontos que já atendem (resumo)
 
 - Tokenização no navegador pelo Payment Brick; o servidor recebe só o token (RF35).
@@ -147,3 +191,24 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 - Webhook com assinatura HMAC, idempotência e túnel restrito à rota do webhook (RF30).
 - HTTPS com HSTS, CSP, `X-Frame-Options: DENY` e `frame-ancestors 'none'`.
 - Estornos pela API com auditoria (RF34, RNF12).
+
+## 8. Matriz de responsabilidades (12.8.5)
+
+Divisão dos requisitos do PCI DSS entre a Atelier Bureau e o Mercado Pago, o único provedor que toca dados de cartão (#178). A divisão do lado do Mercado Pago deve ser conferida com a AOC e a matriz que ele fornecer junto com ela ([`docs/pci/README.md`](pci/README.md)); havendo divergência, vale o documento do Mercado Pago e esta tabela é corrigida.
+
+| Requisito PCI | Atelier Bureau | Mercado Pago | Compartilhado |
+|---|---|---|---|
+| Captura do cartão na página (E3) | Carregar só o SDK oficial e montar o Brick num contêiner vazio, sem campo de cartão próprio | Servir os campos seguros do Brick e o SDK JS v2 | — |
+| Tokenização, autorização e processamento (E2) | Enviar ao `POST /v1/payments` só o token e o valor do pedido gravado no servidor | Tokenizar, autorizar, processar e liquidar a transação | — |
+| 3 — Armazenamento de dados de cartão | Não armazenar cartão em banco, logs ou backups (RN19, `containsCardData`, logger com máscara) | Armazenar e proteger o cartão e os cartões salvos do comprador | — |
+| 4 — Transmissão em redes públicas | HTTPS com HSTS no site e TLS nas chamadas à API | TLS no SDK, nos campos seguros e na API | — |
+| 2.2.2 — Contas e configurações padrão | Servidor, MySQL, Caddy e contas do seed (pendência P7) | Infraestrutura própria | — |
+| 6.3 — Vulnerabilidades e atualizações | Dependências do site e imagens Docker (pendência P4) | SDK JS v2 e ambiente de dados do cartão | — |
+| 6.4.3 e 11.6.1 — Scripts e alterações na página de pagamento | Inventário, autorização e monitoramento dos scripts e cabeçalhos da página (seção 5, pendência P1) | Integridade do SDK e do conteúdo dos iframes servidos por ele | Conferir, a cada versão do SDK, os domínios que o Brick usa (pendência P2) |
+| 8 — Identificação e autenticação | Contas nominais e 2FA no back office (pendência P5) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
+| 9 — Acesso físico | Máquina servidora e backups (sem dados de cartão) | Data centers do ambiente de cartão | — |
+| 11.3.2 — Varredura ASV | Site público, quando houver (pendência P9) | Ambiente próprio | — |
+| 12.8 — Gestão do provedor | Manter a lista de provedores, obter e conferir a AOC todo ano e acompanhar a validade | Fornecer a AOC e manter a certificação PCI DSS | Esta matriz, revisada todo ano |
+| 12.10 — Resposta a incidentes | Plano de resposta e comunicação ao Mercado Pago (issue #182) | Resposta no ambiente de cartão e comunicação às bandeiras | Investigação conjunta de incidente na página de pagamento ou de fraude |
+| Notificações e confirmação de pagamento | Validar a assinatura do webhook, idempotência, reconciliação e confirmar só com `approved` (RN13) | Enviar as notificações assinadas e expor `GET /v1/payments/{id}` | — |
+| Antifraude e chargeback | Dados do pedido e do pagador corretos; atender às contestações | Análise antifraude, 3DS e gestão das contestações com as bandeiras | — |

@@ -1,8 +1,6 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
 import { visibleAdminModules } from "@/features/shared/lib/auth/permissions"
-import { getCurrentUser } from "@/features/shared/lib/auth/session"
-import { loadUserPermissions } from "@/features/shared/lib/db/permissions"
+import { requireBackOfficePage } from "@/features/shared/lib/db/page-guard"
 
 /**
  * Back office home: greets the user and lists the modules allowed for
@@ -11,9 +9,9 @@ import { loadUserPermissions } from "@/features/shared/lib/db/permissions"
  * @returns The home content.
  */
 export async function AdminHomeView() {
-  const user = await getCurrentUser()
-  if (!user) redirect("/entrar?redirect=%2Fadmin")
-  const modules = visibleAdminModules(await loadUserPermissions(user.id))
+  // Login and mandatory 2FA (#177) are checked on the server
+  const { user, permissions } = await requireBackOfficePage("/admin")
+  const modules = visibleAdminModules(permissions)
 
   return (
     <div className="flex flex-col gap-lg">
