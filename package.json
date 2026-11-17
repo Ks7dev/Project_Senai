@@ -22,7 +22,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:validate": "prisma validate",
-    "db:docs": "tsx scripts/db-docs/generate-db-docs.mts"
+    "db:docs": "tsx scripts/db-docs/generate-db-docs.mts",
+    "accounts:rotate-seed": "tsx scripts/rotate-seed-accounts.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

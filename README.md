@@ -32,6 +32,7 @@ O site abre em `http://localhost:3000`.
 | `npm run db:migrate` | Cria e aplica migrations em desenvolvimento |
 | `npm run db:deploy` | Aplica as migrations pendentes (servidor) |
 | `npm run db:seed` | Carrega configurações, catálogo e contas fictícias |
+| `npm run accounts:rotate-seed` | Troca (ou desativa, com `--disable`) a senha das contas fictícias do seed no servidor de entrega; `--dry-run` só mostra o que mudaria (#179) |
 
 ## Servidor local (Docker)
 
@@ -73,7 +74,7 @@ A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam
 
 Serviços: `proxy` (Caddy, portas 80 e 443), `app` (Next.js, só na rede interna), `db` (MySQL 8.4, porta 3306 em `127.0.0.1`) e `backup` (`mysqldump` diário em `./backups`, 30 dias de retenção).
 
-As contas de teste estão em `prisma/seed-data.ts`, e a senha delas é a do `SEED_PASSWORD`.
+As contas de teste estão em `prisma/seed-data.ts`, e a senha delas é a do `SEED_PASSWORD`. No servidor de entrega, troque ou desative essas contas antes da apresentação, conforme o [checklist de lançamento](docs/AtelierBureau_Checklist_Lancamento.md).
 
 ## Versão
 
