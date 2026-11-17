@@ -272,3 +272,92 @@ describe("CSP violation reports (#173)", () => {
     expect(write.mock.calls.flat().join(" ")).toContain("csp violation")
   })
 })
+
+describe("security helpers edge cases (#173)", () => {
+  it("reads the nonce the proxy set, if any", async () => {
+    vi.resetModules()
+    let value: string | null = "n1"
+    vi.doMock("next/headers", () => ({
+      headers: async () => new Headers(value ? { [NONCE_HEADER]: value } : {}),
+    }))
+    const { getRequestNonce } =
+      await import("@/features/shared/lib/security/nonce")
+    expect(await getRequestNonce()).toBe("n1")
+    value = null
+    expect(await getRequestNonce()).toBeUndefined()
+    vi.doUnmock("next/headers")
+  })
+
+  it("parses CSPs with empty parts and flags extra directives", () => {
+    expect([...parseCsp(" ; script-src 'self';;").keys()]).toEqual([
+      "script-src",
+    ])
+    expect(
+      diffCsp("script-src 'self'", "script-src 'self'; worker-src 'none'")
+    ).toEqual(["diretiva worker-src não aprovada"])
+    expect(
+      checkPaymentPage(
+        { ...approved, contentSecurityPolicy: "default-src 'self'" },
+        "default-src 'self'",
+        null
+      )
+    ).toEqual(["script-src sem nonce"])
+  })
+
+  it("reads single-quoted and unquoted attributes", () => {
+    expect(
+      extractScripts(
+        "<script src='/_next/static/a.js' nonce=n1></script><script type=module></script>"
+      )
+    ).toEqual([
+      { src: "/_next/static/a.js", nonce: "n1" },
+      { src: null, nonce: null },
+    ])
+    expect(checkScripts([{ src: null, nonce: null }], [], null)).toEqual([
+      "script inline nº 1 sem o nonce da CSP",
+    ])
+  })
+
+  it("falls back to safe values on odd reports", () => {
+    expect(
+      parseCspReport(
+        JSON.stringify({
+          "csp-report": {
+            "document-uri": "not a url",
+            "blocked-uri": "Not A Keyword!",
+            "violated-directive": 42,
+          },
+        })
+      )
+    ).toEqual([
+      {
+        directive: "",
+        blocked: "unknown",
+        page: "unknown",
+        disposition: "enforce",
+      },
+    ])
+    expect(parseCspReport("")).toEqual([])
+    expect(parseCspReport("null")).toEqual([])
+    expect(parseCspReport('{"other":1}')).toEqual([])
+    expect(parseCspReport('{"csp-report":"x"}')).toEqual([])
+    expect(
+      parseCspReport(
+        JSON.stringify([null, 1, { type: "csp-violation" }, { type: "x" }])
+      )
+    ).toEqual([])
+  })
+
+  it("ignores report bodies over the size limit", async () => {
+    const write = vi.spyOn(console, "error").mockImplementation(() => {})
+    const response = await cspReport(
+      new Request("https://loja.test/api/csp-report", {
+        method: "POST",
+        headers: { "content-length": "999999" },
+        body: "{}",
+      })
+    )
+    expect(response.status).toBe(204)
+    expect(write).not.toHaveBeenCalled()
+  })
+})

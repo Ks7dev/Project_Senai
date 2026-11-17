@@ -110,7 +110,7 @@ function attribute(attributes: string, name: string): string | null {
     )
   )
   if (!match) return null
-  return match[1] ?? match[2] ?? match[3] ?? ""
+  return match[1] ?? match[2] ?? match[3]
 }
 
 /** Script types the browser executes; any other type is inert data. */
@@ -131,7 +131,7 @@ const EXECUTABLE_TYPES = [
 export function extractScripts(html: string): FoundScript[] {
   const scripts: FoundScript[] = []
   for (const match of html.matchAll(/<script\b([^>]*)>/gi)) {
-    const attributes = match[1] ?? ""
+    const attributes = match[1]
     const type = (attribute(attributes, "type") ?? "").trim().toLowerCase()
     if (!EXECUTABLE_TYPES.includes(type)) continue
     scripts.push({
