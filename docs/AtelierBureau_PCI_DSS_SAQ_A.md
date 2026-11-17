@@ -21,7 +21,7 @@ Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeç
 
 | Item | Situação no projeto |
 |---|---|
-| Canal | E-commerce (site Next.js servido pelo Caddy em HTTPS, numa VPS pública com domínio próprio, #206) |
+| Canal | E-commerce (site Next.js servido pelo Caddy em HTTPS; publicação na VPS pública com domínio próprio em preparação, #206) |
 | Meios com cartão | Cartão de crédito pelo Payment Brick do Mercado Pago (RF28, RF35, RF36) |
 | Meios sem cartão | Pix e boleto pelo Mercado Pago (RF29); faturado 28/56 dias com boleto próprio (RF12, RF33), fora do escopo do PCI |
 | Provedor de pagamento | Mercado Pago (Checkout Transparente, ambiente de teste) |
@@ -84,7 +84,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | 2.2.2 Contas e senhas padrão de fornecedores alteradas ou desativadas | Parcial | MySQL sem `root` remoto e app com usuário sem DDL (`deploy/mysql/init/01-users.sh`). As contas fictícias do seed usam `SEED_PASSWORD` do `.env`: **no servidor de entrega, trocar ou desativar as contas do seed** (pendência P7) |
-| Serviços desnecessários desligados | Atende | Na VPS, só 22 (SSH com chave), 80 (redireciona para 443) e 443 ficam abertas; MySQL e painel de monitoramento só no loopback. No servidor local, o túnel do webhook aceita só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`) |
+| Serviços desnecessários desligados | Parcial | O override da VPS publica só 80 e 443; MySQL e painel de monitoramento ficam no loopback. Falta verificar as portas e o SSH na VPS. No servidor local, o túnel do webhook aceita só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`) |
 
 ### Requisito 3 — Proteção dos dados armazenados
 
@@ -98,8 +98,8 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Item | Situação | Evidência ou observação |
 |---|---|---|
-| HTTPS em todas as páginas, sem retorno ao HTTP | Atende | `deploy/caddy/Caddyfile`: redirecionamento 308 e HSTS; `upgrade-insecure-requests` na CSP (`features/shared/lib/security/headers.ts`) |
-| Certificado confiável | Atende | Na VPS de entrega, certificado Let's Encrypt (CA pública) para o domínio, renovado pelo Caddy (`deploy/caddy/Caddyfile.vps`, #180, #206). O `tls internal` (CA local) fica só no servidor local de desenvolvimento |
+| HTTPS em todas as páginas, sem retorno ao HTTP | Parcial | O Caddy configura redirecionamento 308 e HSTS; a CSP inclui `upgrade-insecure-requests` (`features/shared/lib/security/headers.ts`). Falta conferir todas as rotas pelo domínio público na VPS |
+| Certificado confiável | Parcial | `deploy/caddy/Caddyfile.vps` configura Let's Encrypt para o domínio (#180, #206). Falta subir a VPS e conferir o certificado emitido e sua renovação. O `tls internal` (CA local) fica só no servidor local de desenvolvimento |
 | Chamadas ao Mercado Pago em TLS | Atende | Base `https://api.mercadopago.com`; o SDK é carregado por HTTPS |
 
 ### Requisito 6 — Sistemas e software seguros
@@ -118,7 +118,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 |---|---|---|
 | Usuários únicos no back office, sem contas compartilhadas | Atende | Usuários internos nominais com perfis (RF55, `/admin/usuarios`) |
 | Senhas com hash | Atende | Better Auth (hash, cookie `httpOnly`) |
-| MFA para acesso administrativo | Parcial | 2FA disponível (Better Auth `twoFactor`), mas **não obrigatório para perfis internos** (pendência P5) |
+| MFA para acesso administrativo | Parcial | O código exige 2FA para perfis internos com acesso a pedidos, pagamentos ou estornos (#177). Falta ativá-lo nas contas usadas na entrega e validar o bloqueio e o primeiro acesso na VPS (pendência P5) |
 | Bloqueio de tentativas | Atende | Rate limit nas rotas de login e cadastro (`features/shared/lib/rate-limit/rate-limit.ts`). As Server Actions de pagamento e estorno têm limite próprio, gravado no banco (`rate_limit_buckets`) e configurável na tabela `settings`: tentativas de pagamento por pedido e por IP, e solicitações de estorno por usuário. A recusa mostra mensagem genérica e grava log de auditoria (`features/shared/lib/rate-limit/persistent-limit.ts`, pendência P3 resolvida na #175) |
 
 ### Requisito 9 — Acesso físico
@@ -131,7 +131,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Item | Situação | Evidência ou observação |
 |---|---|---|
-| 11.3.2 Varredura externa de vulnerabilidades por ASV, trimestral | Não atende | O site da entrega fica exposto na internet (VPS, #206), mas o Mercado Pago roda em sandbox e não há transação real com cartão. **Contratar varredura ASV antes de aceitar pagamentos reais** (pendência P9, decisão a registrar na #181) |
+| 11.3.2 Varredura externa de vulnerabilidades por ASV, trimestral | Não atende | A publicação na VPS exporá o site na internet (#206), mas o Mercado Pago continuará em sandbox e não haverá transação real com cartão. **Contratar varredura ASV antes de aceitar pagamentos reais** (pendência P9, decisão a registrar na #181) |
 | 11.6.1 Detecção de alteração não autorizada na página de pagamento | Atende | Quatro camadas (seção 5.2): o teste `tests/shared/payment-page-csp.test.ts` falha no CI se a CSP mudar sem atualizar o baseline; `npm run security:payment-page -- <url>` compara a página publicada com o baseline e sai com erro em divergência; as violações da CSP chegam a `/api/csp-report`, que grava `csp violation` no log; e `deploy/check-headers.sh` confere o nonce (#173) |
 
 ### Requisito 12 — Políticas
@@ -184,7 +184,7 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 | P5 | Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos | 8 | P1 | `tipo: task`, `área: acesso`, `segurança` | #177 |
 | P6 | Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades | E2, E3, 12.8 | P1 | `tipo: task`, `área: pagamento`, `documentação` | #178 |
 | P7 | No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD` | 2.2.2 | P1 | `tipo: task`, `área: app`, `infra`, `segurança` | #179 |
-| P8 | Usar certificado de CA pública ao publicar fora da rede local (atendida pela VPS com Let's Encrypt, #206) | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
+| P8 | Usar certificado de CA pública ao publicar fora da rede local (configurado no Caddy da VPS; emissão e renovação ainda não verificadas, #206) | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
 | P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #181 |
 | P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` | #182 |
 
@@ -228,7 +228,7 @@ Divisão dos requisitos do PCI DSS entre a Atelier Bureau e o Mercado Pago, o ú
 | 2.2.2 — Contas e configurações padrão | Servidor, MySQL, Caddy e contas do seed (pendência P7) | Infraestrutura própria | — |
 | 6.3 — Vulnerabilidades e atualizações | Dependências do site e imagens Docker (pendência P4) | SDK JS v2 e ambiente de dados do cartão | — |
 | 6.4.3 e 11.6.1 — Scripts e alterações na página de pagamento | Inventário, autorização e monitoramento dos scripts e cabeçalhos da página (seção 5, pendência P1) | Integridade do SDK e do conteúdo dos iframes servidos por ele | Conferir, a cada versão do SDK, os domínios que o Brick usa (pendência P2) |
-| 8 — Identificação e autenticação | Contas nominais e 2FA no back office (pendência P5) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
+| 8 — Identificação e autenticação | Contas nominais e regra de 2FA no back office; ativação e teste na VPS pendentes (P5) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
 | 9 — Acesso físico | VPS (data center da Hostinger), máquina local de desenvolvimento e backups (sem dados de cartão) | Data centers do ambiente de cartão | — |
 | 11.3.2 — Varredura ASV | Site público, quando houver (pendência P9) | Ambiente próprio | — |
 | 12.8 — Gestão do provedor | Manter a lista de provedores, obter e conferir a AOC todo ano e acompanhar a validade | Fornecer a AOC e manter a certificação PCI DSS | Esta matriz, revisada todo ano |

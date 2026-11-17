@@ -112,7 +112,7 @@ O override usa `!override`, que exige **Docker Compose 2.24 ou mais novo**.
 ## 5. Código e `.env`
 
 ```bash
-git clone https://github.com/Ks7dev/<repositorio>.git ~/atelier-bureau
+git clone https://github.com/Ks7dev/Project_Senai.git ~/atelier-bureau
 cd ~/atelier-bureau
 git checkout master
 cp .env.example .env
@@ -182,11 +182,13 @@ Seed, uma vez, com o banco novo:
 sh deploy/vps/node-task.sh npm run db:seed
 ```
 
-Antes da apresentação, troque ou desative as contas fictícias (#179), conforme a seção 7 do [checklist de lançamento](AtelierBureau_Checklist_Lancamento.md). O mesmo script roda a troca:
+Logo depois do seed, troque ou desative as contas fictícias (#179), conforme a seção 7 do [checklist de lançamento](AtelierBureau_Checklist_Lancamento.md). Não deixe a senha inicial ativa enquanto o site estiver acessível pela internet. O mesmo script roda a troca:
 
 ```bash
 sh deploy/vps/node-task.sh npm run accounts:rotate-seed -- --dry-run
 ```
+
+A conta administrativa do seed é `admin@atelierbureau.test`. Depois da rotação, guarde a nova senha no gerenciador de senhas da equipe, entre em `https://<domínio>/entrar` e ative o 2FA antes de usar `/admin`. A senha inicial do `.env` deixa de valer após a rotação.
 
 ## 8. Painel de monitoramento (Uptime Kuma)
 
