@@ -51,6 +51,7 @@ erDiagram
     text user_agent
     varchar_36 user_id FK
     varchar_36 active_organization_id
+    tinyint_1 two_factor_verified
   }
   accounts {
     varchar_36 id PK

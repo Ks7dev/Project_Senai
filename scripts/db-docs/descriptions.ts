@@ -381,6 +381,8 @@ export const columns: Record<string, string> = {
   "sessions.id": "Identificador da sessão",
   "sessions.user_id": "Usuário da sessão",
   "sessions.active_organization_id": "Conta corporativa ativa na sessão",
+  "sessions.two_factor_verified":
+    "Indica se a sessão foi aberta com o código do 2FA; exigido no back office para perfis com acesso a pedidos, pagamentos ou estornos (#177)",
   "accounts.id": "Identificador da credencial",
   "accounts.account_id": "Identificador da conta no provedor",
   "accounts.provider_id": "Provedor de login (credential = e-mail e senha)",
