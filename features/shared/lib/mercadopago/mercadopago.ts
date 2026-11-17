@@ -84,16 +84,53 @@ export class MercadoPagoError extends Error {
 const DEFAULT_BASE_URL = "https://api.mercadopago.com"
 const DEFAULT_TIMEOUT_MS = 10_000
 
+/** Prefix of the sandbox credentials (access token and public key). */
+const TEST_CREDENTIAL_PREFIX = "TEST-"
+
+/**
+ * Whether production (non-sandbox) Mercado Pago credentials may be used.
+ * Off unless `MERCADOPAGO_ALLOW_PRODUCTION=true` is set explicitly on a
+ * production server (#7): the store runs in sandbox only.
+ *
+ * @returns True only with the explicit opt-in.
+ */
+export function mercadoPagoProductionAllowed(): boolean {
+  return (
+    process.env.MERCADOPAGO_ALLOW_PRODUCTION?.trim().toLowerCase() === "true"
+  )
+}
+
+/**
+ * Accepts a sandbox credential (`TEST-...`) always and any other one
+ * only with `MERCADOPAGO_ALLOW_PRODUCTION=true`. A refused credential
+ * is logged by variable name only, never by value.
+ *
+ * @param credential - The access token or public key.
+ * @param variable - Name of the environment variable, for the log.
+ * @returns Whether the credential may be used.
+ */
+function credentialAllowed(credential: string, variable: string): boolean {
+  if (credential.startsWith(TEST_CREDENTIAL_PREFIX)) return true
+  if (mercadoPagoProductionAllowed()) return true
+  logger.error("mercadopago production credential refused", {
+    variable,
+    hint: "use the sandbox credentials (TEST-) or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
+  })
+  return false
+}
+
 /**
  * Mercado Pago settings from the environment. The access token is
  * server-only (no `NEXT_PUBLIC_`); without it online payment is off and
- * the customer sees a friendly message.
+ * the customer sees a friendly message. A production token is refused
+ * (online payment stays off) unless production is explicitly allowed.
  *
- * @returns The settings, or null when the token is missing.
+ * @returns The settings, or null when the token is missing or refused.
  */
 export function mercadoPagoConfig(): MercadoPagoConfig | null {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
   if (!accessToken) return null
+  if (!credentialAllowed(accessToken, "MERCADOPAGO_ACCESS_TOKEN")) return null
   const timeout = Number(process.env.MERCADOPAGO_TIMEOUT_MS)
   return {
     baseUrl: (process.env.MERCADOPAGO_BASE_URL || DEFAULT_BASE_URL).replace(
@@ -108,12 +145,17 @@ export function mercadoPagoConfig(): MercadoPagoConfig | null {
 
 /**
  * Public key used by the Bricks in the browser (RF28, RF35). It is
- * public by design, read on the server and passed to the page.
+ * public by design, read on the server and passed to the page. Like the
+ * access token, a production key needs the explicit opt-in.
  *
- * @returns The key, or null when missing.
+ * @returns The key, or null when missing or refused.
  */
 export function mercadoPagoPublicKey(): string | null {
-  return process.env.MERCADOPAGO_PUBLIC_KEY?.trim() || null
+  const publicKey = process.env.MERCADOPAGO_PUBLIC_KEY?.trim() ?? ""
+  if (!publicKey) return null
+  return credentialAllowed(publicKey, "MERCADOPAGO_PUBLIC_KEY")
+    ? publicKey
+    : null
 }
 
 /**

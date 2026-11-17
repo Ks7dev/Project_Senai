@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest"
 import { createHmac, randomUUID } from "node:crypto"
-import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 import { deleteOrders, orderFixtures } from "./order-fixtures"
 
 try {
@@ -30,9 +30,15 @@ vi.mock("next/cache", () => ({
 vi.mock("@/features/shared/lib/rate-limit/action-limit", () => ({
   enforceActionRateLimit: vi.fn(async () => undefined),
 }))
+vi.mock(
+  "@/features/shared/lib/rate-limit/persistent-limit",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    enforcePersistentRateLimits: vi.fn(async () => undefined),
+  })
+)
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
 const { loadCurrentCart } =
   await import("@/features/shared/lib/cart/cart-store")
@@ -84,14 +90,14 @@ let nextProviderId = 7_000_000_000
 const issued = new Map<string, Record<string, unknown>>()
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  const result = await signIn({ email, password })
-  expect(result).toEqual({ success: true, twoFactor: false })
+  await signInSeedAccount(email, password)
 }
 
 /**
@@ -342,6 +348,7 @@ afterAll(async () => {
   await prisma.address.deleteMany({ where: { id: { in: addresses } } })
   await emptyCart(customer)
   await fixtures.cleanup()
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 

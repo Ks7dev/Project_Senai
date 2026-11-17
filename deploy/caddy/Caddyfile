@@ -36,3 +36,22 @@ https://{$SITE_HOST}, https://localhost {
 		header_up X-Forwarded-Proto https
 	}
 }
+
+# Uptime panel (Uptime Kuma, #80). Same local CA; only private (LAN)
+# addresses get through, every other client is refused. The panel has
+# its own login, created on the first access.
+https://{$SITE_HOST}:3001, https://localhost:3001 {
+	tls internal
+
+	@outside not remote_ip private_ranges
+	abort @outside
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy uptime-kuma:3001
+}

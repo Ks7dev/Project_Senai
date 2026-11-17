@@ -2,6 +2,10 @@
  * Seed data for development and the academic demo (#8). Every company,
  * person and document here is fictitious.
  */
+import {
+  DEFAULT_RATE_LIMITS,
+  RATE_LIMIT_SETTING_KEYS,
+} from "../features/shared/schema/rate-limit-schema"
 
 /** A business rule value stored in the `settings` table. */
 export type SettingSeed = {
@@ -108,6 +112,24 @@ export const settings: SettingSeed[] = [
     value: 180,
     description:
       "Prazo máximo para estornar pelo Mercado Pago, em dias após a aprovação do pagamento, salvo arrependimento (RN18)",
+  },
+  {
+    key: RATE_LIMIT_SETTING_KEYS["payment.order"],
+    value: DEFAULT_RATE_LIMITS["payment.order"],
+    description:
+      "Tentativas de pagamento por pedido: máximo de tentativas na janela, em minutos (PCI 8, RNF05)",
+  },
+  {
+    key: RATE_LIMIT_SETTING_KEYS["payment.ip"],
+    value: DEFAULT_RATE_LIMITS["payment.ip"],
+    description:
+      "Tentativas de pagamento por IP: máximo de tentativas na janela, em minutos (PCI 8, RNF05)",
+  },
+  {
+    key: RATE_LIMIT_SETTING_KEYS["refund.user"],
+    value: DEFAULT_RATE_LIMITS["refund.user"],
+    description:
+      "Solicitações de estorno por usuário: máximo de solicitações na janela, em minutos (PCI 8, RNF05)",
   },
   {
     key: "invoice.issuer",

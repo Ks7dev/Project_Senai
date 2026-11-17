@@ -98,7 +98,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Migrations:** `npx prisma migrate dev` em dev, `npx prisma migrate deploy` no deploy, e uma por mudança coesa, versionada no PR. Nunca se altera o banco à mão em homologação ou produção. Seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
 - **Seed** (`prisma/seed.ts`): valores das regras de negócio confirmados na #5 (tabela de configuração), perfis e permissões, e dados fictícios de desenvolvimento (#8).
 - **Segurança (RNF03):** o MySQL exige TLS (`require_secure_transport=ON`) em conexões vindas da rede. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar, com AES-256-GCM e a chave `DATA_ENCRYPTION_KEY` (`features/shared/lib/crypto/personal-data-cipher.ts`). Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
-- **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`, e a restauração é testada e documentada (#81).
+- **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`. A restauração usa `deploy/backup/restore.sh` (ou `restore.ps1` no Windows), que confere o dump, pede confirmação, faz um dump de segurança e recria o banco. Passo a passo, RTO de 4 h e roteiro de teste em [`docs/AtelierBureau_Backup_Restauracao.md`](docs/AtelierBureau_Backup_Restauracao.md) (#81).
 - **Configuração:** `DATABASE_URL` e as demais chaves vêm do `.env` (não versionado), e o `.env.example` traz o modelo.
 
 ### 5.1 Servidor local (Docker) e acesso pela rede
@@ -107,13 +107,14 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
 
 | Serviço | Imagem | Porta publicada na rede | Papel |
 |---|---|---|---|
-| `proxy` | `caddy:2` | **80 e 443** | HTTPS na frente do app. O 80 só redireciona para o 443 (RNF06) |
+| `proxy` | `caddy:2` | **80, 443 e 3001** | HTTPS na frente do app (o 80 só redireciona para o 443, RNF06) e do painel de disponibilidade na 3001 |
 | `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
 | `db` | `mysql:8.4` | **3306**, só em `127.0.0.1` por padrão | MySQL com volume persistente `mysql-data` |
 | `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
+| `uptime-kuma` | `louislam/uptime-kuma:1` | nenhuma (só pelo `proxy`, na 3001) | Painel de disponibilidade e alertas por e-mail (#80) |
 
 - **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
-- **Firewall do Windows:** libere 80 e 443 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.
+- **Firewall do Windows:** libere 80, 443 e 3001 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.
 - **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/certs/root.crt` por `deploy/export-root-cert.sh` ou, no Windows, `deploy/export-root-cert.ps1`) em cada dispositivo para o navegador não mostrar aviso.
 - **Sem fallback para HTTP (RNF06):** a porta 80 só responde com redirecionamento `308` para o HTTPS, qualquer que seja o host. Um host sem certificado é recusado no handshake TLS da 443. O HSTS e os demais headers de segurança saem do Caddy, e a CSP sai do próprio app (`features/shared/lib/security/headers.ts`): estática no `next.config.ts` para as páginas comuns e com nonce por requisição, gerada no `proxy.ts`, na página de pagamento (#173). O baseline aprovado dessa página fica em `deploy/payment-page-baseline.json` e é conferido por `npm run security:payment-page -- https://<ip-do-servidor>`. Para conferir de outro dispositivo: `sh deploy/check-headers.sh <ip-do-servidor>`, que sai com erro se faltar algum header crítico.
 - **Acesso ao MySQL por outros dispositivos:**
@@ -122,14 +123,15 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
   - O app usa um usuário próprio sem DDL. As migrations rodam com o usuário de migração.
   - A porta 3306 é publicada só em `127.0.0.1` por padrão. No Docker Desktop, toda conexão que entra pela porta publicada chega ao MySQL com o IP do gateway do Docker, então o MySQL não consegue separar quem vem da LAN. Por isso, abrir o banco à rede é uma decisão explícita: `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env`, com o firewall no perfil Privado e senhas fortes em todos os usuários.
   - As configurações do servidor (charset, fuso UTC, TLS e conexões) vão como flags do `mysqld` no `docker-compose.yml`. Um `.cnf` montado do Windows chega com permissão de escrita para todos, e o MySQL o ignora.
-  - O MySQL 8 autentica com `caching_sha2_password`. Sem TLS, o driver do app busca a chave pública RSA do servidor (`allowPublicKeyRetrieval`, em `features/shared/lib/db/connection-config.ts`).
+  - A conexão do app com o MySQL é criptografada por padrão (`DATABASE_TLS=required`, em `features/shared/lib/db/connection-config.ts`). O certificado do container é autoassinado, então o padrão não confere a cadeia; `DATABASE_TLS=verify` com `DATABASE_TLS_CA` apontando para o `ca.pem` do volume confere. Só com `DATABASE_TLS=disabled` (MySQL local sem TLS) o driver busca a chave pública RSA do servidor (`allowPublicKeyRetrieval`), exigida pelo `caching_sha2_password`.
 - **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, perfil opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago` (#57):
   - `docker compose --profile tunnel up -d` sobe o `tunnel` e o `webhook-gate`. O túnel fica sozinho com o gate na rede `tunnel` e não alcança o app, o proxy nem o banco.
   - O gate (`deploy/caddy/Caddyfile.webhook`, porta 8080 não publicada) repassa ao app só `POST /api/webhooks/mercadopago`. Qualquer outro método ou caminho recebe 404.
   - No painel da Cloudflare, o hostname público do túnel aponta para `http://webhook-gate:8080`. A URL pública completa vai em `MERCADOPAGO_NOTIFICATION_URL` (ou no painel de webhooks do Mercado Pago), e a chave secreta do webhook vai em `MERCADOPAGO_WEBHOOK_SECRET`.
+  - **Trava de sandbox (#7):** credenciais do Mercado Pago que não começam com `TEST-` são recusadas (o pagamento online fica indisponível e o log diz o motivo, sem o valor), a menos que `MERCADOPAGO_ALLOW_PRODUCTION=true`. Em dev, homologação e no servidor de entrega, fica `false`.
   - A rota valida a assinatura `x-signature`, é idempotente pelo `x-request-id` (tabela `payment_notifications`), relê o pagamento em `GET /v1/payments/{id}` e só confirma o pedido com `approved` (RN13).
   - Se o webhook não chegar, a reconciliação (job a cada 5 minutos e antes de expirar Pix e boleto) consulta `GET /v1/payments/{id}`, ou busca pelo `external_reference` quando a criação ficou sem resposta.
-- **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O app depende de a máquina servidora estar ligada e na rede, e o monitoramento fica na #80.
+- **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O `GET /api/health` roda `SELECT 1` no MySQL e responde 503 sem detalhe se o banco cair. O Uptime Kuma (`https://<ip>:3001`, só para endereços da rede local) guarda o histórico de disponibilidade e manda e-mail em queda. Monitores, alerta e roteiro de teste em [`docs/AtelierBureau_Monitoramento.md`](docs/AtelierBureau_Monitoramento.md) (#80).
 - **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
 
 ## 6. Convenções de código

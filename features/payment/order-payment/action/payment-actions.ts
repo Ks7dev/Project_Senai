@@ -43,6 +43,8 @@ import { loadInstallmentRules } from "@/features/shared/lib/payments/installment
 import { refreshPendingPayment } from "@/features/shared/lib/payments/payment-reconciliation"
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+import { enforcePersistentRateLimits } from "@/features/shared/lib/rate-limit/persistent-limit"
+import { getClientIp } from "@/features/shared/lib/request/client-ip"
 import { maxInstallmentsFor } from "@/features/shared/schema/installment-schema"
 import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
@@ -408,10 +410,36 @@ function paymentBody(
 }
 
 /**
+ * Counts a payment attempt and refuses it over the limits (#175, PCI
+ * 8): per order and per client IP (set by the Caddy proxy, never read
+ * from the body), from the settings table. Only the buyer's own order
+ * is counted, so nobody exhausts the attempts of someone else's order.
+ *
+ * @param orderId - Order id.
+ * @param userId - Session user id.
+ * @throws AppError("not_found") or AppError("rate_limited").
+ */
+async function enforcePaymentRateLimits(
+  orderId: string,
+  userId: string
+): Promise<void> {
+  const owned = await prisma.order.count({ where: { id: orderId, userId } })
+  if (owned === 0) throw new AppError("Pedido não encontrado.", "not_found")
+  await enforcePersistentRateLimits(
+    [
+      { scope: "payment.order", subject: orderId },
+      { scope: "payment.ip", subject: (await getClientIp()) ?? "unknown" },
+    ],
+    { userId, action: "payOrder", entityId: orderId }
+  )
+}
+
+/**
  * Pays an order with the Payment Brick by card, Pix or boleto (RF28,
  * RF29, RF35, RF36, RF37):
  * 1. checks the payload has no card data and validates it (RN19);
- * 2. takes the buyer from the session;
+ * 2. takes the buyer from the session and counts the attempt against
+ *    the limits per order and per IP (#175);
  * 3. locks the order, checks it waits for this payment and opens a
  *    payment row with the order total and, for Pix and boleto, the
  *    configured expiration (RN14);
@@ -438,7 +466,7 @@ export async function payOrder(
     }
     const data = parsed.data
     const userId = await sessionUserId()
-    await enforceActionRateLimit("payment", { limit: 10, windowMs: 60_000 })
+    await enforcePaymentRateLimits(data.orderId, userId)
     if (!mercadoPagoConfig()) {
       throw new AppError(PAYMENT_OFF_MESSAGE, "payment_off")
     }
