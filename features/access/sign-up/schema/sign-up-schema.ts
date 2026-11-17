@@ -4,18 +4,10 @@ import {
   isValidCpf,
   onlyDigits,
 } from "@/features/shared/lib/validation/documents"
-
-const password = z
-  .string()
-  .min(10, "Use pelo menos 10 caracteres.")
-  .max(128, "Use no máximo 128 caracteres.")
+import { newPasswordSchema as password } from "@/features/shared/schema/password-schema"
+import { phoneSchema as phone } from "@/features/shared/schema/phone-schema"
 
 const cpf = z.string().transform(onlyDigits).refine(isValidCpf, "CPF inválido.")
-
-const phone = z
-  .string()
-  .transform(onlyDigits)
-  .refine((v) => v.length === 10 || v.length === 11, "Telefone inválido.")
 
 const common = {
   name: z.string().trim().min(3, "Informe o nome completo.").max(160),

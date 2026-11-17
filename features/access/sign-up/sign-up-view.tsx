@@ -21,6 +21,13 @@ import {
   type SignUpData,
   type SignUpInput,
 } from "@/features/access/sign-up/schema/sign-up-schema"
+import {
+  maskCnpj,
+  maskCpf,
+  maskPhone,
+} from "@/features/shared/lib/validation/documents"
+import { withMask } from "@/features/shared/lib/validation/input-mask"
+import { PASSWORD_HINT } from "@/features/shared/schema/password-schema"
 
 /**
  * Sign-up page with distinct PF (CPF) and PJ (CNPJ) flows (RF39).
@@ -135,11 +142,15 @@ export function SignUpView() {
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="00.000.000/0000-00"
+                maxLength={18}
                 {...fieldAria("cnpj", error("cnpj"))}
-                {...form.register("cnpj" as never, {
-                  onBlur: (event: React.FocusEvent<HTMLInputElement>) =>
-                    checkCnpj(event.target.value),
-                })}
+                {...withMask(
+                  form.register("cnpj" as never, {
+                    onBlur: (event: React.FocusEvent<HTMLInputElement>) =>
+                      checkCnpj(event.target.value),
+                  }),
+                  maskCnpj
+                )}
               />
             </FormField>
             {cnpjNotice && (
@@ -194,8 +205,9 @@ export function SignUpView() {
               inputMode="numeric"
               autoComplete="off"
               placeholder="000.000.000-00"
+              maxLength={14}
               {...fieldAria("cpf", error("cpf"))}
-              {...form.register("cpf")}
+              {...withMask(form.register("cpf"), maskCpf)}
             />
           </FormField>
           <FormField id="email" label="E-mail" error={error("email")}>
@@ -216,15 +228,17 @@ export function SignUpView() {
               id="phone"
               type="tel"
               inputMode="tel"
-              autoComplete="tel"
+              autoComplete="tel-national"
+              placeholder="(00) 00000-0000"
+              maxLength={15}
               {...fieldAria("phone", error("phone"))}
-              {...form.register("phone")}
+              {...withMask(form.register("phone"), maskPhone)}
             />
           </FormField>
           <FormField
             id="password"
             label="Senha"
-            hint="Pelo menos 10 caracteres."
+            hint={PASSWORD_HINT}
             error={error("password")}
           >
             <Input

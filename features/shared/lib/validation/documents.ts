@@ -77,6 +77,89 @@ export function formatCnpj(value: string): string {
   )
 }
 
+/** Brazilian area codes (DDD) assigned by Anatel. */
+const AREA_CODES = new Set([
+  11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24, 27, 28, 31, 32, 33, 34, 35,
+  37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 53, 54, 55, 61, 62, 63, 64,
+  65, 66, 67, 68, 69, 71, 73, 74, 75, 77, 79, 81, 82, 83, 84, 85, 86, 87, 88,
+  89, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+])
+
+/**
+ * Validates a Brazilian phone with area code: a mobile has 11 digits
+ * and starts with 9 after the DDD; a landline has 10 digits and starts
+ * with 2 to 5. Rejects unknown DDDs and repeated digits.
+ *
+ * @param value - Phone with or without punctuation.
+ * @returns True when the phone is valid.
+ */
+export function isValidPhone(value: string): boolean {
+  const phone = onlyDigits(value)
+  if (/^(\d)\1+$/.test(phone)) return false
+  if (!AREA_CODES.has(Number(phone.slice(0, 2)))) return false
+  if (phone.length === 11) return phone[2] === "9"
+  if (phone.length === 10) return /[2-5]/.test(phone[2])
+  return false
+}
+
+/**
+ * Applies a digit pattern progressively while the user types; each `0`
+ * in the pattern takes one digit and extra digits are dropped.
+ *
+ * @param value - Raw input.
+ * @param pattern - Pattern such as "000.000.000-00".
+ * @returns The partially formatted value.
+ */
+function applyMask(value: string, pattern: string): string {
+  const digits = onlyDigits(value)
+  let result = ""
+  let index = 0
+  for (const char of pattern) {
+    if (index >= digits.length) break
+    if (char === "0") {
+      result += digits[index]
+      index++
+    } else {
+      result += char
+    }
+  }
+  return result
+}
+
+/**
+ * Masks a CPF while typing (000.000.000-00), keeping at most 11 digits.
+ *
+ * @param value - Raw input.
+ * @returns The masked CPF.
+ */
+export function maskCpf(value: string): string {
+  return applyMask(value, "000.000.000-00")
+}
+
+/**
+ * Masks a CNPJ while typing (00.000.000/0000-00), keeping at most 14
+ * digits.
+ *
+ * @param value - Raw input.
+ * @returns The masked CNPJ.
+ */
+export function maskCnpj(value: string): string {
+  return applyMask(value, "00.000.000/0000-00")
+}
+
+/**
+ * Masks a phone while typing: (00) 0000-0000 for landlines and
+ * (00) 00000-0000 for mobiles, keeping at most 11 digits.
+ *
+ * @param value - Raw input.
+ * @returns The masked phone.
+ */
+export function maskPhone(value: string): string {
+  return onlyDigits(value).length > 10
+    ? applyMask(value, "(00) 00000-0000")
+    : applyMask(value, "(00) 0000-0000")
+}
+
 /**
  * Accepts only internal paths as a post-login destination, so the
  * `redirect` query cannot send the user to another site.
