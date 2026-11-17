@@ -123,4 +123,4 @@ O teste usa um banco separado, `atelier_bureau_restore_test`, para não parar a 
 
 | Data | Responsável | Dump usado | Banco de destino | Tempo medido | Dentro do RTO (4 h)? | Observações |
 |---|---|---|---|---|---|---|
-| | | | | | | |
+| 17/11/2026 | Equipe de desenvolvimento (#81) | `atelier_bureau-20261117-232936.sql.gz` (25 KB) | `atelier_bureau_restore_test`, com `restore.ps1 latest -Target ... -Yes` | 12 s | Sim | Esquema idêntico (53 tabelas, 20 gatilhos). As contagens batem com as linhas gravadas até o dump. O banco temporário foi apagado depois do teste. No Git Bash, `docker compose exec backup sh /usr/local/bin/backup.sh` precisa de `MSYS_NO_PATHCONV=1`. |
