@@ -1251,6 +1251,26 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// Fixed window counter of a rate limited Server Action (#175, PCI 8):
+/// payment attempts per order and per IP, refund requests per user. It
+/// lives in the database so the limit survives a restart of the app
+model RateLimitBucket {
+  /// SHA-256 of "<scope>:<subject>", so no IP or id is stored in clear
+  keyHash     String   @map("key_hash") @db.Char(64)
+  /// Start of the fixed window (UTC)
+  windowStart DateTime @map("window_start") @db.DateTime(3)
+  /// What is limited, e.g. "payment.order", "payment.ip", "refund.user"
+  scope       String   @db.VarChar(32)
+  /// Calls counted in the window, refused ones included
+  hits        Int      @default(0)
+  /// End of the window; expired rows are deleted by a background job
+  expiresAt   DateTime @map("expires_at") @db.DateTime(3)
+
+  @@id([keyHash, windowStart])
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
+}
+
 model Favorite {
   userId    String   @map("user_id") @db.VarChar(36)
   productId String   @map("product_id") @db.Char(36)

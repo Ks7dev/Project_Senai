@@ -54,6 +54,7 @@ import {
   type RefundSettings,
   type RefundStatusKey,
 } from "@/features/shared/lib/refunds/refund-rules"
+import { enforcePersistentRateLimits } from "@/features/shared/lib/rate-limit/persistent-limit"
 import { getNumberSetting } from "@/features/shared/lib/settings/settings"
 import { toCents } from "@/features/shared/lib/shipping/strategies"
 import { WITHDRAWAL_DAYS_SETTING } from "@/features/shared/lib/support/return-policy"
@@ -723,7 +724,8 @@ async function processRefund(
 
 /**
  * Asks for a full or partial refund (RF34). Requires `payment:refund`,
- * with the user from the session. In one transaction it locks the
+ * with the user from the session, and counts the request against the
+ * per-user limit (#175). In one transaction it locks the
  * order, applies the rules (RN07, RN18, RN22: amount, deadline,
  * withdrawal, one refund at a time), records the request and writes
  * the audit log (RNF12). A corporate invoiced order waits for the
@@ -746,6 +748,10 @@ export async function requestRefund(
     }
     const data = parsed.data
     const { user } = await requirePermission("payment:refund")
+    await enforcePersistentRateLimits(
+      [{ scope: "refund.user", subject: user.id }],
+      { userId: user.id, action: "requestRefund", entityId: data.orderId }
+    )
     const now = new Date()
 
     const created = await prisma.$transaction(async (tx) => {
@@ -960,7 +966,8 @@ export async function rejectRefund(
 /**
  * Sends again a refund still processing (Mercado Pago did not answer or
  * was still processing it). The same idempotency key makes the retry
- * safe: Mercado Pago never refunds twice. Requires `payment:refund`.
+ * safe: Mercado Pago never refunds twice. Requires `payment:refund`;
+ * counted against the same per-user limit as the request (#175).
  *
  * @param input - Refund id.
  * @returns `{ success: true, refundId, status, message }` or
@@ -973,6 +980,14 @@ export async function retryRefund(
     const parsed = retryRefundSchema.safeParse(input)
     if (!parsed.success) throw new AppError("Estorno inválido.", "invalid")
     const { user } = await requirePermission("payment:refund")
+    await enforcePersistentRateLimits(
+      [{ scope: "refund.user", subject: user.id }],
+      {
+        userId: user.id,
+        action: "retryRefund",
+        entityId: parsed.data.refundId,
+      }
+    )
     return {
       success: true,
       ...(await processRefund(parsed.data.refundId, user.id)),

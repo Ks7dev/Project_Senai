@@ -30,6 +30,13 @@ vi.mock("next/cache", () => ({
 vi.mock("@/features/shared/lib/rate-limit/action-limit", () => ({
   enforceActionRateLimit: vi.fn(async () => undefined),
 }))
+vi.mock(
+  "@/features/shared/lib/rate-limit/persistent-limit",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    enforcePersistentRateLimits: vi.fn(async () => undefined),
+  })
+)
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")

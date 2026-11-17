@@ -12,6 +12,7 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | 1.1 | 17/11/2026 | Equipe Atelier Bureau | `npm audit` no CI e tratamento das vulnerabilidades das dependências (pendência P4, #176, seção 6.1) |
 | 1.2 | 17/11/2026 | Equipe Atelier Bureau | Requisito 12: links para a política de segurança e o plano de resposta a incidentes de pagamento (#182), com aprovação pendente |
 | 1.3 | 17/11/2026 | Equipe Atelier Bureau | Seção 2.2 (campos seguros do Brick confirmados no código e na documentação, E3 passa a Atende), seção 8 (matriz de responsabilidades) e `docs/pci/README.md` para a AOC do Mercado Pago (#178) |
+| 1.4 | 17/11/2026 | Equipe Atelier Bureau | Bloqueio de tentativas passa a atender: rate limit nas Server Actions de pagamento e estorno (pendência P3, #175) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -117,7 +118,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Usuários únicos no back office, sem contas compartilhadas | Atende | Usuários internos nominais com perfis (RF55, `/admin/usuarios`) |
 | Senhas com hash | Atende | Better Auth (hash, cookie `httpOnly`) |
 | MFA para acesso administrativo | Parcial | 2FA disponível (Better Auth `twoFactor`), mas **não obrigatório para perfis internos** (pendência P5) |
-| Bloqueio de tentativas | Parcial | Rate limit nas rotas de login e cadastro (`features/shared/lib/rate-limit/rate-limit.ts`). **A Server Action de pagamento não tem rate limit próprio** (pendência P3) |
+| Bloqueio de tentativas | Atende | Rate limit nas rotas de login e cadastro (`features/shared/lib/rate-limit/rate-limit.ts`). As Server Actions de pagamento e estorno têm limite próprio, gravado no banco (`rate_limit_buckets`) e configurável na tabela `settings`: tentativas de pagamento por pedido e por IP, e solicitações de estorno por usuário. A recusa mostra mensagem genérica e grava log de auditoria (`features/shared/lib/rate-limit/persistent-limit.ts`, pendência P3 resolvida na #175) |
 
 ### Requisito 9 — Acesso físico
 
