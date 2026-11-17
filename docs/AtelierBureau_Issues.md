@@ -90,7 +90,7 @@ Total: 93 issues: `AB-001` = #1 … `AB-082` = #82, as 10 pendências do checkli
 | #11 AB-011 | HTTPS obrigatório e headers de segurança | task | app | v0.1.0 | E1 | P0 | Backlog |
 | #12 AB-012 | Padrão de documentação de código | task | app | v0.1.0 | E1 | P1 | Backlog |
 | #13 AB-013 | Criar os tokens do design system Warm Editorial Atelier | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #14 AB-014 | Redesenhar o logo e criar o kit de marca | task | app | v0.1.0 | E1 | P1 | Backlog |
+| #14 AB-014 | Redesenhar o logo e criar o kit de marca | task | app | v0.1.0 | E1 | P1 | Concluído |
 | #15 AB-015 | Componentes base da biblioteca de UI | feature | app | v0.1.0 | E1 | P0 | Backlog |
 | #16 AB-016 | Componentes de commerce | feature | app | v0.2.0 | E2 | P1 | Backlog |
 | #17 AB-017 | Layout base: header, footer e grid responsivo | feature | app | v0.1.0 | E1 | P0 | Backlog |
@@ -426,13 +426,16 @@ Arquivo único de tokens com a paleta aprovada (terracota ajustada para #7A5C4C,
 
 **Descrição**
 
-Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
+Novo símbolo sem leitura de botão “+” ou de farmácia e versões de uso. Logo escolhida: monograma AB com pena (ver `docs/AtelierBureau_Identidade_Visual.md`).
 
 **Critérios de aceite**
 
-- [ ] Versões horizontal, monograma, negativo e monocromática em SVG
-- [ ] Favicons 32, 180 e 512 px
-- [ ] Logo legível em 24 px de altura
+- [x] Logo oficial aprovada e decisão registrada em `docs/AtelierBureau_Identidade_Visual.md`
+- [x] Versões completa e horizontal (monograma) aplicadas no site por `components/brand/brand-logo.tsx`
+- [x] Favicons 32, 180 e 512 px
+- [x] Logo legível em 24 px de altura
+
+**Escopo alterado em 17/11/2026:** as versões em SVG (texto em curvas, negativa e monocromática) saíram desta issue, porque dependem do arquivo-fonte vetorial da arte. O site usa PNG transparente gerado da arte aprovada.
 
 ### AB-015 — Componentes base da biblioteca de UI
 

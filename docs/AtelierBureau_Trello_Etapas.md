@@ -307,13 +307,16 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P1 — Importante, Design  
 **Issue:** #14 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 7
 
-Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
+Novo símbolo sem leitura de botão “+” ou de farmácia e versões de uso. Logo escolhida: monograma AB com pena (ver `docs/AtelierBureau_Identidade_Visual.md`).
 
 Checklist “Critérios de aceite”:
 
-- [ ] Versões horizontal, monograma, negativo e monocromática em SVG
-- [ ] Favicons 32, 180 e 512 px
-- [ ] Logo legível em 24 px de altura
+- [x] Logo oficial aprovada e decisão registrada em `docs/AtelierBureau_Identidade_Visual.md`
+- [x] Versões completa e horizontal (monograma) aplicadas no site por `components/brand/brand-logo.tsx`
+- [x] Favicons 32, 180 e 512 px
+- [x] Logo legível em 24 px de altura
+
+**Escopo alterado em 17/11/2026:** as versões em SVG (texto em curvas, negativa e monocromática) saíram desta issue, porque dependem do arquivo-fonte vetorial da arte. O site usa PNG transparente gerado da arte aprovada.
 
 #### AB-015 — Componentes base da biblioteca de UI
 

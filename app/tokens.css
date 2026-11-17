@@ -167,6 +167,19 @@
   --spacing-margin-mobile: 1.25rem;
   --container-page: 1440px;
 
+  /*
+   * Max widths. Tailwind resolves max-w-* from --max-width, then
+   * --spacing and only then --container, so the named spacing tokens
+   * above would turn max-w-md into 1rem and max-w-xl into 3rem. These
+   * keep the default container sizes for the names that collide.
+   */
+  --max-width-xs: 20rem;
+  --max-width-sm: 24rem;
+  --max-width-md: 28rem;
+  --max-width-lg: 32rem;
+  --max-width-xl: 36rem;
+  --max-width-2xl: 42rem;
+
   /* Breakpoints (RNF15): mobile up to 767px, tablet 768-1199px, desktop 1200px+ */
   --breakpoint-md: 768px;
   --breakpoint-lg: 1200px;
