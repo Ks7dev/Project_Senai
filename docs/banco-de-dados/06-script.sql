@@ -47,6 +47,7 @@ CREATE TABLE `sessions` (
     `user_agent` TEXT NULL,
     `user_id` VARCHAR(36) NOT NULL,
     `active_organization_id` VARCHAR(36) NULL,
+    `two_factor_verified` BOOLEAN NOT NULL DEFAULT false,
 
     UNIQUE INDEX `sessions_token_key`(`token`),
     INDEX `sessions_user_id_idx`(`user_id`),

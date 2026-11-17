@@ -140,7 +140,13 @@ describe("dedicated seller of the customer (#69, RF18)", () => {
     ])
   })
 
-  const user = { id: "u1", name: "Cliente", email: "c@x.test" }
+  const user = {
+    id: "u1",
+    name: "Cliente",
+    email: "c@x.test",
+    twoFactorEnabled: false,
+    twoFactorVerified: false,
+  }
 
   it("keeps the seller assigned to the corporate account", async () => {
     getCorporateContext.mockResolvedValue({

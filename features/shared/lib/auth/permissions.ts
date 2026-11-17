@@ -146,6 +146,68 @@ export function visibleAdminModules(
 }
 
 /**
+ * Single, documented list of the permissions that make 2FA mandatory
+ * (#177, RN19, PCI DSS 8, pending item P5 of the SAQ A checklist). An
+ * internal user holding any of them only enters the back office with
+ * 2FA on and verified in the current session:
+ *
+ * - orders: `order:read`, `order:status:update`, `order:cancel`;
+ * - payments: `credit:approve` (invoiced payment terms);
+ * - refunds: `payment:refund` (also the finance module).
+ */
+export const TWO_FACTOR_REQUIRED_PERMISSIONS = [
+  "order:read",
+  "order:status:update",
+  "order:cancel",
+  "credit:approve",
+  "payment:refund",
+] as const satisfies readonly Permission[]
+
+/**
+ * Whether a set of granted permissions makes 2FA mandatory (#177).
+ *
+ * @param granted - Permissions of the user, from their roles.
+ * @returns True when at least one permission of
+ * `TWO_FACTOR_REQUIRED_PERMISSIONS` is granted.
+ */
+export function requiresTwoFactor(granted: ReadonlySet<string>): boolean {
+  return TWO_FACTOR_REQUIRED_PERMISSIONS.some((key) => granted.has(key))
+}
+
+/** 2FA state of a logged-in user and of the current session. */
+export type TwoFactorState = {
+  /** Whether the account has 2FA turned on. */
+  twoFactorEnabled: boolean
+  /** Whether the current session was opened with the 2FA code. */
+  twoFactorVerified: boolean
+}
+
+/**
+ * Outcome of the 2FA rule for the back office (#177):
+ * - `ok`: the user may enter;
+ * - `setup`: 2FA is mandatory and still off, so the user must turn it on;
+ * - `verify`: 2FA is on, but this session was opened without the code.
+ */
+export type TwoFactorGate = "ok" | "setup" | "verify"
+
+/**
+ * Applies the mandatory 2FA rule to a user (#177).
+ *
+ * @param granted - Permissions of the user.
+ * @param state - 2FA state of the account and the session.
+ * @returns What the user still needs to do to enter the back office.
+ */
+export function twoFactorGate(
+  granted: ReadonlySet<string>,
+  state: TwoFactorState
+): TwoFactorGate {
+  if (!requiresTwoFactor(granted)) return "ok"
+  if (!state.twoFactorEnabled) return "setup"
+  if (!state.twoFactorVerified) return "verify"
+  return "ok"
+}
+
+/**
  * Builds the permission key stored in the database.
  *
  * @param resource - Resource, e.g. "order:status".

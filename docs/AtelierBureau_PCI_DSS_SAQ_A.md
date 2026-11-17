@@ -9,7 +9,9 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | Versão | Data | Autor | Alteração |
 |---|---|---|---|
 | 1.0 | 14/11/2026 | Equipe Atelier Bureau | Primeira versão: elegibilidade, checklist por requisito e pendências, com base no código do checkout das issues #54 a #59 |
-| 1.2 | 17/11/2026 | Equipe Atelier Bureau | Seção 2.2 (campos seguros do Brick confirmados no código e na documentação, E3 passa a Atende), seção 8 (matriz de responsabilidades) e `docs/pci/README.md` para a AOC do Mercado Pago (#178) |
+| 1.1 | 17/11/2026 | Equipe Atelier Bureau | `npm audit` no CI e tratamento das vulnerabilidades das dependências (pendência P4, #176, seção 6.1) |
+| 1.2 | 17/11/2026 | Equipe Atelier Bureau | Requisito 12: links para a política de segurança e o plano de resposta a incidentes de pagamento (#182), com aprovação pendente |
+| 1.3 | 17/11/2026 | Equipe Atelier Bureau | Seção 2.2 (campos seguros do Brick confirmados no código e na documentação, E3 passa a Atende), seção 8 (matriz de responsabilidades) e `docs/pci/README.md` para a AOC do Mercado Pago (#178) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -106,7 +108,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Proteções contra clickjacking | Atende | `X-Frame-Options: DENY` e `frame-ancestors 'none'` |
 | CSP restringindo origens | Parcial | Scripts, frames e conexões externas limitados ao Mercado Pago, mas com `'unsafe-inline'` em `script-src` e curingas como `https://*.mlstatic.com` (pendências P1 e P2) |
 | Valor e dados do pagamento definidos no servidor | Atende | `payOrder` usa o total do pedido gravado, nunca o valor enviado pelo navegador (RF36) |
-| Dependências atualizadas e revisadas | Parcial | `npm audit` não roda no CI. **Incluir verificação de vulnerabilidades das dependências** (pendência P4) |
+| Dependências atualizadas e revisadas | Atende | O CI roda `npm audit --audit-level=high` logo após o `npm ci` e falha com vulnerabilidade alta ou crítica. Situação e justificativas na seção 6.1 (pendência P4, #176) |
 
 ### Requisito 8 — Identificação e autenticação
 
@@ -135,8 +137,8 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | 12.8 Lista de provedores e responsabilidades | Parcial | Mercado Pago é o único provedor que toca dados de cartão. Matriz de responsabilidades registrada na seção 8 (#178). **Falta arquivar a AOC anual do provedor** ([`docs/pci/README.md`](pci/README.md), pendência P6) |
-| 12.10.1 Plano de resposta a incidentes | Não atende | Não há plano escrito de resposta a incidentes de pagamento (pendência P10) |
-| Política de segurança da informação | Parcial | Regras no `CLAUDE.md` e no `ARCHITECTURE.md` (segredos só no `.env`, logs sem dados pessoais). **Falta uma política formal** (pendência P10) |
+| 12.10.1 Plano de resposta a incidentes | Parcial | [Plano de resposta a incidentes de pagamento](AtelierBureau_Resposta_Incidentes_Pagamento.md) escrito (#182): detecção, classificação, contenção, comunicação ao Mercado Pago, às bandeiras, à ANPD e aos titulares, evidências, recuperação, lições aprendidas e teste anual. **Falta a aprovação do responsável e o preenchimento dos contatos** |
+| Política de segurança da informação | Parcial | [Política de segurança da informação](AtelierBureau_Politica_Seguranca.md) escrita (#182): papéis, acesso e 2FA, senhas, segredos, backup, logs e auditoria, dependências, terceiros e revisão anual. **Falta a aprovação do responsável** |
 
 ## 5. Inventário de scripts da página de pagamento (6.4.3)
 
@@ -161,6 +163,22 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 | P8 | Usar certificado de CA pública ao publicar fora da rede local | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
 | P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #181 |
 | P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` | #182 |
+
+### 6.1 Auditoria de dependências (P4, #176)
+
+- **Onde roda:** passo "Audit dependencies" do `.github/workflows/ci.yml`, em todo PR e push para `develop` e `master`, com `npm audit --audit-level=high`. Vulnerabilidade alta ou crítica reprova o CI.
+- **Árvore auditada:** a completa, sem `--omit=dev`. As ferramentas de desenvolvimento (ESLint, Prisma CLI, Vitest, tsx) rodam no próprio CI e no build da imagem Docker, então uma dependência de desenvolvimento comprometida também atinge o artefato entregue.
+- **Moderadas e baixas:** não reprovam o CI, para não travar entregas por avisos sem correção publicada. São revisadas a cada release e corrigidas quando houver versão compatível.
+
+Situação em 17/11/2026 (`npm audit` sobre 919 pacotes):
+
+| Vulnerabilidade | Severidade | Origem | Tratamento |
+|---|---|---|---|
+| `minimatch` 7.0.0 a 11.0.0, negação de serviço por amplificação de padrões ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) | Moderada (10 avisos na cadeia) | `minimatch@10` usado por `@typescript-eslint/typescript-estree` (ESLint) e por `@ts-morph/common` (CLI do `shadcn`) | Corrigida com `overrides` no `package.json`, que fixa `minimatch@^11.0.1` só nesses dois pacotes. O `npm audit fix --force` sugerido trocaria o `shadcn` pela versão 1.0.0, uma regressão |
+
+Depois da correção, `npm audit` não aponta nenhuma vulnerabilidade (0 baixas, 0 moderadas, 0 altas e 0 críticas). Não há vulnerabilidade alta ou crítica pendente de justificativa. Quando surgir uma sem correção, ela é registrada nesta tabela com o motivo, e a exceção é temporária, revista a cada release.
+
+Remover os `overrides` quando o `typescript-eslint` e o `ts-morph` passarem a depender de um `minimatch` corrigido.
 
 ## 7. Pontos que já atendem (resumo)
 

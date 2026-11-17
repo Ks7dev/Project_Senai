@@ -190,7 +190,13 @@ describe("requirePermission (server check)", () => {
   })
 
   it("allows users whose roles grant the permission", async () => {
-    getCurrentUser.mockResolvedValue({ id: "u1", name: "A", email: "a@b" })
+    getCurrentUser.mockResolvedValue({
+      id: "u1",
+      name: "A",
+      email: "a@b",
+      twoFactorEnabled: true,
+      twoFactorVerified: true,
+    })
     findMany.mockResolvedValue(rows(["order:read", "order:status:update"]))
     const result = await requirePermission("order:status:update")
     expect(result.user.id).toBe("u1")
