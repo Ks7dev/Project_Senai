@@ -1,4 +1,4 @@
-# Atelier Bureau — Checklist PCI-DSS SAQ A #173 | #174 | #175 | #176 | #177 | #178 | #179 | #180 | #181 | #182 |
+# Atelier Bureau — Checklist PCI-DSS SAQ A
 
 Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente com o Payment Brick do Mercado Pago (RN19, issue #62). O documento revisa o código real do checkout e lista as pendências encontradas.
 
@@ -9,6 +9,7 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | Versão | Data | Autor | Alteração |
 |---|---|---|---|
 | 1.0 | 14/11/2026 | Equipe Atelier Bureau | Primeira versão: elegibilidade, checklist por requisito e pendências, com base no código do checkout das issues #54 a #59 |
+| 1.1 | 17/11/2026 | Equipe Atelier Bureau | Requisito 12: links para a política de segurança e o plano de resposta a incidentes de pagamento (#182), com aprovação pendente |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -109,8 +110,8 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | 12.8 Lista de provedores e responsabilidades | Parcial | Mercado Pago é o único provedor que toca dados de cartão. **Falta registrar a matriz de responsabilidades e a AOC anual do provedor** (pendência P6) |
-| 12.10.1 Plano de resposta a incidentes | Não atende | Não há plano escrito de resposta a incidentes de pagamento (pendência P10) |
-| Política de segurança da informação | Parcial | Regras no `CLAUDE.md` e no `ARCHITECTURE.md` (segredos só no `.env`, logs sem dados pessoais). **Falta uma política formal** (pendência P10) |
+| 12.10.1 Plano de resposta a incidentes | Parcial | [Plano de resposta a incidentes de pagamento](AtelierBureau_Resposta_Incidentes_Pagamento.md) escrito (#182): detecção, classificação, contenção, comunicação ao Mercado Pago, às bandeiras, à ANPD e aos titulares, evidências, recuperação, lições aprendidas e teste anual. **Falta a aprovação do responsável e o preenchimento dos contatos** |
+| Política de segurança da informação | Parcial | [Política de segurança da informação](AtelierBureau_Politica_Seguranca.md) escrita (#182): papéis, acesso e 2FA, senhas, segredos, backup, logs e auditoria, dependências, terceiros e revisão anual. **Falta a aprovação do responsável** |
 
 ## 5. Inventário de scripts da página de pagamento (6.4.3)
 
