@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { MenuIcon } from "lucide-react"
+import { BrandLogo } from "@/components/brand/brand-logo"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -45,8 +46,8 @@ export function MobileMenu({ categories, services }: MobileMenuProps) {
       </SheetTrigger>
       <SheetContent side="left" className="w-80 bg-canvas">
         <SheetHeader>
-          <SheetTitle className="font-serif text-headline-sm">
-            Atelier Bureau
+          <SheetTitle>
+            <BrandLogo size="compact" />
           </SheetTitle>
           <SheetDescription className="sr-only">
             Navegação principal da loja

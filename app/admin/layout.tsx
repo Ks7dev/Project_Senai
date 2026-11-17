@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import Link from "next/link"
+import { BrandLogo } from "@/components/brand/brand-logo"
 import { MAIN_CONTENT_ID, SkipLink } from "@/components/layout/skip-link"
 import { AdminNav } from "@/features/backoffice/shell/admin-nav"
 
@@ -23,11 +24,8 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
       <SkipLink />
       <aside className="border-b border-line-subtle bg-subtle lg:w-64 lg:border-r lg:border-b-0">
         <div className="flex h-16 items-center px-md">
-          <Link
-            href="/admin"
-            className="rounded font-serif text-headline-sm text-ink"
-          >
-            Atelier Bureau
+          <Link href="/admin" className="rounded">
+            <BrandLogo size="compact" />
           </Link>
           <span className="ml-sm text-caps text-clay uppercase">Admin</span>
         </div>
