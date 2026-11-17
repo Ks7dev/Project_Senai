@@ -97,7 +97,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Migrations:** `npx prisma migrate dev` em dev, `npx prisma migrate deploy` no deploy, e uma por mudança coesa, versionada no PR. Nunca se altera o banco à mão em homologação ou produção. Seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
 - **Seed** (`prisma/seed.ts`): valores das regras de negócio confirmados na #5 (tabela de configuração), perfis e permissões, e dados fictícios de desenvolvimento (#8).
 - **Segurança (RNF03):** o MySQL exige TLS (`require_secure_transport=ON`) em conexões vindas da rede. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar, com AES-256-GCM e a chave `DATA_ENCRYPTION_KEY` (`features/shared/lib/crypto/personal-data-cipher.ts`). Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
-- **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`, e a restauração é testada e documentada (#81).
+- **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`. A restauração usa `deploy/backup/restore.sh` (ou `restore.ps1` no Windows), que confere o dump, pede confirmação, faz um dump de segurança e recria o banco. Passo a passo, RTO de 4 h e roteiro de teste em [`docs/AtelierBureau_Backup_Restauracao.md`](docs/AtelierBureau_Backup_Restauracao.md) (#81).
 - **Configuração:** `DATABASE_URL` e as demais chaves vêm do `.env` (não versionado), e o `.env.example` traz o modelo.
 
 ### 5.1 Servidor local (Docker) e acesso pela rede
