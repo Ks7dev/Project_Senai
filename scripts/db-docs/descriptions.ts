@@ -92,7 +92,13 @@ export const domains: { key: string; name: string; tables: string[] }[] = [
   {
     key: "plataforma",
     name: "Plataforma e auditoria",
-    tables: ["settings", "institutional_pages", "audit_logs", "email_outbox"],
+    tables: [
+      "settings",
+      "institutional_pages",
+      "audit_logs",
+      "email_outbox",
+      "rate_limit_buckets",
+    ],
   },
 ]
 
@@ -298,6 +304,10 @@ export const tables: Record<string, [string, string]> = {
   email_outbox: [
     "E-mail",
     "Fila de e-mails transacionais com novas tentativas (RF53).",
+  ],
+  rate_limit_buckets: [
+    "Limite de tentativas",
+    "Contador por janela fixa das tentativas de pagamento (por pedido e por IP) e das solicitações de estorno (por usuário), que sobrevive ao reinício do app (#175, PCI 8).",
   ],
 }
 
@@ -699,6 +709,15 @@ export const columns: Record<string, string> = {
   "email_outbox.text": "Corpo em texto puro",
   "email_outbox.html": "Corpo em HTML",
   "email_outbox.sent_at": "Data e hora do envio",
+  "rate_limit_buckets.key_hash":
+    "Hash SHA-256 do escopo com o pedido, IP ou usuário contado, sem guardar o valor em claro",
+  "rate_limit_buckets.window_start": "Início da janela fixa (UTC)",
+  "rate_limit_buckets.scope":
+    "O que é limitado: payment.order, payment.ip ou refund.user",
+  "rate_limit_buckets.hits":
+    "Tentativas contadas na janela, recusadas inclusive",
+  "rate_limit_buckets.expires_at":
+    "Fim da janela; as linhas vencidas são apagadas por um job",
 }
 
 /** Verbo do relacionamento no DER, por "tabela.coluna_fk". */
