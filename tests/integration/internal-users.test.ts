@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 
 try {
   process.loadEnvFile()
@@ -14,7 +14,6 @@ vi.mock("next/cache", () => ({
 }))
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { listInternalUsers, setInternalUserRoles } =
   await import("@/features/backoffice/internal-users/action/internal-users-actions")
 const { loadUserPermissions } =
@@ -25,16 +24,14 @@ const admin = "admin@atelierbureau.test"
 const customer = "cliente.pf@atelierbureau.test"
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  expect(await signIn({ email, password })).toEqual({
-    success: true,
-    twoFactor: false,
-  })
+  await signInSeedAccount(email, password)
 }
 
 beforeEach(() => {
@@ -49,6 +46,7 @@ afterAll(async () => {
   })
   await prisma.userRole.deleteMany({ where: { userId: user.id } })
   // audit_logs is append-only (database trigger), so its rows stay
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 

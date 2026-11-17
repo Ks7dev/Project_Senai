@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fails on high or critical advisories in the whole tree, dev tools
+      # included, since they run in this pipeline and in the Docker build
+      # (PCI DSS 6.3, #176). Moderate and low ones are reviewed by hand.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       - name: Format
         run: npm run format:check
 

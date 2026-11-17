@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 import { orderFixtures } from "./order-fixtures"
 
 try {
@@ -17,7 +17,6 @@ vi.mock("next/cache", () => ({
 }))
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { reserveStock } =
   await import("@/features/shared/lib/stock/stock-service")
 const { transitionOrder } =
@@ -30,14 +29,14 @@ const fixtures = orderFixtures(prisma)
 const customer = "cliente.pf@atelierbureau.test"
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  const result = await signIn({ email, password })
-  expect(result).toEqual({ success: true, twoFactor: false })
+  await signInSeedAccount(email, password)
 }
 
 /**
@@ -80,6 +79,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   await fixtures.cleanup()
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 
