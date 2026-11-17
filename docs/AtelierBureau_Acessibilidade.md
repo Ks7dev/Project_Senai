@@ -23,4 +23,4 @@ Issue #20 · RNF13 · Revisão de código em 14/11/2026.
 
 ## Pendente (teste humano)
 
-- Passada com leitor de tela (NVDA no Windows) e navegação só por teclado no servidor local, com banco e Mercado Pago sandbox. O Brick de cartão do Mercado Pago é de terceiros e não entra na verificação automática.
+- Passada com leitor de tela (NVDA no Windows) e navegação só por teclado no servidor de entrega (VPS) ou no servidor local, com banco e Mercado Pago sandbox. O Brick de cartão do Mercado Pago é de terceiros e não entra na verificação automática.

@@ -1,0 +1,38 @@
+# Atelier Bureau — HTTPS reverse proxy on the public VPS (RNF06)
+# Used by docker-compose.vps.yml. Caddy gets and renews a Let's Encrypt
+# certificate for {$SITE_HOST} by itself: the domain must point to the
+# VPS (DNS record A) and ports 80 and 443 must be open.
+# Guide: docs/AtelierBureau_Deploy_VPS.md
+
+{
+	email {$ACME_EMAIL}
+	admin 127.0.0.1:2019
+}
+
+# Port 80 only answers the ACME challenge and redirects to HTTPS
+# (Caddy adds the redirect for the site below automatically).
+
+# www goes to the bare domain
+www.{$SITE_HOST} {
+	redir https://{$SITE_HOST}{uri} 308
+}
+
+{$SITE_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(self)"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		-Server
+		-X-Powered-By
+	}
+
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-Proto https
+	}
+}

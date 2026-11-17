@@ -21,7 +21,7 @@ Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeç
 
 | Item | Situação no projeto |
 |---|---|
-| Canal | E-commerce (site Next.js servido pelo Caddy em HTTPS, rede local da entrega) |
+| Canal | E-commerce (site Next.js servido pelo Caddy em HTTPS, numa VPS pública com domínio próprio, #206) |
 | Meios com cartão | Cartão de crédito pelo Payment Brick do Mercado Pago (RF28, RF35, RF36) |
 | Meios sem cartão | Pix e boleto pelo Mercado Pago (RF29); faturado 28/56 dias com boleto próprio (RF12, RF33), fora do escopo do PCI |
 | Provedor de pagamento | Mercado Pago (Checkout Transparente, ambiente de teste) |
@@ -84,7 +84,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | 2.2.2 Contas e senhas padrão de fornecedores alteradas ou desativadas | Parcial | MySQL sem `root` remoto e app com usuário sem DDL (`deploy/mysql/init/01-users.sh`). As contas fictícias do seed usam `SEED_PASSWORD` do `.env`: **no servidor de entrega, trocar ou desativar as contas do seed** (pendência P7) |
-| Serviços desnecessários desligados | Atende | Caddy expõe só 80 (redireciona para 443) e 443; o túnel do webhook aceita só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`) |
+| Serviços desnecessários desligados | Atende | Na VPS, só 22 (SSH com chave), 80 (redireciona para 443) e 443 ficam abertas; MySQL e painel de monitoramento só no loopback. No servidor local, o túnel do webhook aceita só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`) |
 
 ### Requisito 3 — Proteção dos dados armazenados
 
@@ -99,7 +99,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | HTTPS em todas as páginas, sem retorno ao HTTP | Atende | `deploy/caddy/Caddyfile`: redirecionamento 308 e HSTS; `upgrade-insecure-requests` na CSP (`features/shared/lib/security/headers.ts`) |
-| Certificado confiável | Parcial | `tls internal` (CA local) serve à rede da entrega acadêmica. **Em produção, usar certificado de CA pública** (pendência P8) |
+| Certificado confiável | Atende | Na VPS de entrega, certificado Let's Encrypt (CA pública) para o domínio, renovado pelo Caddy (`deploy/caddy/Caddyfile.vps`, #180, #206). O `tls internal` (CA local) fica só no servidor local de desenvolvimento |
 | Chamadas ao Mercado Pago em TLS | Atende | Base `https://api.mercadopago.com`; o SDK é carregado por HTTPS |
 
 ### Requisito 6 — Sistemas e software seguros
@@ -131,7 +131,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Item | Situação | Evidência ou observação |
 |---|---|---|
-| 11.3.2 Varredura externa de vulnerabilidades por ASV, trimestral | Não atende | O servidor da entrega fica na rede local; só o webhook é exposto pelo túnel. **Contratar varredura ASV ao publicar na internet** (pendência P9) |
+| 11.3.2 Varredura externa de vulnerabilidades por ASV, trimestral | Não atende | O site da entrega fica exposto na internet (VPS, #206), mas o Mercado Pago roda em sandbox e não há transação real com cartão. **Contratar varredura ASV antes de aceitar pagamentos reais** (pendência P9, decisão a registrar na #181) |
 | 11.6.1 Detecção de alteração não autorizada na página de pagamento | Atende | Quatro camadas (seção 5.2): o teste `tests/shared/payment-page-csp.test.ts` falha no CI se a CSP mudar sem atualizar o baseline; `npm run security:payment-page -- <url>` compara a página publicada com o baseline e sai com erro em divergência; as violações da CSP chegam a `/api/csp-report`, que grava `csp violation` no log; e `deploy/check-headers.sh` confere o nonce (#173) |
 
 ### Requisito 12 — Políticas
@@ -165,7 +165,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Camada | Como funciona | Alerta |
 |---|---|---|
 | Baseline versionado | `deploy/payment-page-baseline.json` guarda a CSP aprovada (com `{nonce}` no lugar do nonce) e os scripts aprovados. O teste `tests/shared/payment-page-csp.test.ts` compara a CSP gerada pelo código com o baseline | O CI falha em qualquer divergência |
-| Verificação da página publicada | `npm run security:payment-page -- https://<ip-do-servidor> [id-do-pedido]` (com `NODE_EXTRA_CA_CERTS=deploy/certs/root.crt`) busca a página, compara a CSP e os `<script>` do HTML com o baseline e confere o nonce de cada script. Com `PAYMENT_CHECK_COOKIE` (cookie de sessão de um cliente fictício), confere a página já autenticada. Agendar no servidor (cron, a cada hora) | Sai com código 1 e linhas `ALERTA:` |
+| Verificação da página publicada | `npm run security:payment-page -- https://<domínio> [id-do-pedido]` (no servidor local, com o IP e `NODE_EXTRA_CA_CERTS=deploy/certs/root.crt`) busca a página, compara a CSP e os `<script>` do HTML com o baseline e confere o nonce de cada script. Com `PAYMENT_CHECK_COOKIE` (cookie de sessão de um cliente fictício), confere a página já autenticada. Agendar no servidor (cron, a cada hora) | Sai com código 1 e linhas `ALERTA:` |
 | Relatórios do navegador | A CSP da página de pagamento tem `report-uri /api/csp-report` e `report-to csp-endpoint` (`Reporting-Endpoints`). A rota só grava `csp violation` no log, com a diretiva, a origem bloqueada e o caminho da página, sem query string nem dados pessoais | Linha `warn` no log do `app` |
 | Conferência da rede | `sh deploy/check-headers.sh <ip>` também confere que o `script-src` da página de pagamento tem nonce e não tem `'unsafe-inline'` | Sai com código 1 |
 
@@ -184,7 +184,7 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 | P5 | Tornar o 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos | 8 | P1 | `tipo: task`, `área: acesso`, `segurança` | #177 |
 | P6 | Arquivar a AOC do Mercado Pago, confirmar que os campos de cartão do Brick são campos seguros em iframe e registrar a matriz de responsabilidades | E2, E3, 12.8 | P1 | `tipo: task`, `área: pagamento`, `documentação` | #178 |
 | P7 | No servidor de entrega, trocar ou desativar as contas fictícias do seed e a senha `SEED_PASSWORD` | 2.2.2 | P1 | `tipo: task`, `área: app`, `infra`, `segurança` | #179 |
-| P8 | Usar certificado de CA pública ao publicar fora da rede local | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
+| P8 | Usar certificado de CA pública ao publicar fora da rede local (atendida pela VPS com Let's Encrypt, #206) | 4 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #180 |
 | P9 | Contratar varredura trimestral por ASV ao expor o site na internet | 11.3.2 | P2 | `tipo: task`, `área: app`, `infra`, `segurança`, `escopo a validar` | #181 |
 | P10 | Escrever a política de segurança da informação e o plano de resposta a incidentes de pagamento | 12.10.1 | P2 | `tipo: task`, `área: pagamento`, `documentação` | #182 |
 
@@ -211,7 +211,7 @@ Remover os `overrides` quando o `typescript-eslint` e o `ts-morph` passarem a de
 - Nenhum dado de cartão no banco; só o `payment_id` e o status (RN19, RF32).
 - Access token só no servidor; chave pública só no navegador.
 - Valor do pagamento definido pelo servidor; chave de idempotência em pagamentos e estornos.
-- Webhook com assinatura HMAC, idempotência e túnel restrito à rota do webhook (RF30).
+- Webhook com assinatura HMAC e idempotência (RF30), chegando direto pelo domínio na VPS ou por túnel restrito à rota do webhook no servidor local.
 - HTTPS com HSTS, CSP, `X-Frame-Options: DENY` e `frame-ancestors 'none'`.
 - Estornos pela API com auditoria (RF34, RNF12).
 
@@ -229,7 +229,7 @@ Divisão dos requisitos do PCI DSS entre a Atelier Bureau e o Mercado Pago, o ú
 | 6.3 — Vulnerabilidades e atualizações | Dependências do site e imagens Docker (pendência P4) | SDK JS v2 e ambiente de dados do cartão | — |
 | 6.4.3 e 11.6.1 — Scripts e alterações na página de pagamento | Inventário, autorização e monitoramento dos scripts e cabeçalhos da página (seção 5, pendência P1) | Integridade do SDK e do conteúdo dos iframes servidos por ele | Conferir, a cada versão do SDK, os domínios que o Brick usa (pendência P2) |
 | 8 — Identificação e autenticação | Contas nominais e 2FA no back office (pendência P5) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
-| 9 — Acesso físico | Máquina servidora e backups (sem dados de cartão) | Data centers do ambiente de cartão | — |
+| 9 — Acesso físico | VPS (data center da Hostinger), máquina local de desenvolvimento e backups (sem dados de cartão) | Data centers do ambiente de cartão | — |
 | 11.3.2 — Varredura ASV | Site público, quando houver (pendência P9) | Ambiente próprio | — |
 | 12.8 — Gestão do provedor | Manter a lista de provedores, obter e conferir a AOC todo ano e acompanhar a validade | Fornecer a AOC e manter a certificação PCI DSS | Esta matriz, revisada todo ano |
 | 12.10 — Resposta a incidentes | Plano de resposta e comunicação ao Mercado Pago (issue #182) | Resposta no ambiente de cartão e comunicação às bandeiras | Investigação conjunta de incidente na página de pagamento ou de fraude |

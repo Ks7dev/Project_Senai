@@ -20,9 +20,9 @@ Proteger a confidencialidade, a integridade e a disponibilidade dos dados de cli
 
 A política vale para:
 
-- **Sistemas:** a aplicação Next.js, o banco MySQL e os containers do servidor local (`proxy`, `app`, `db`, `backup` e, quando ligado, `tunnel` e `webhook-gate`), descritos no `ARCHITECTURE.md`, seção 5.1.
+- **Sistemas:** a aplicação Next.js, o banco MySQL e os containers do servidor (`proxy`, `app`, `db`, `backup`, `uptime-kuma` e, só no servidor local, `tunnel` e `webhook-gate`) e a VPS que os hospeda na entrega (Hostinger), descritos no `ARCHITECTURE.md`, seções 5.1 e 5.2.
 - **Código e configuração:** o repositório no GitHub, o CI (`.github/workflows/`) e o arquivo `.env` do servidor.
-- **Provedores:** Mercado Pago, Cloudflare (túnel do webhook), ViaCEP, Correios, transportadora, BrasilAPI, provedor de NF-e e servidor SMTP.
+- **Provedores:** Hostinger (VPS de entrega), registrador do domínio, Let's Encrypt (certificado), Mercado Pago, Cloudflare (túnel do webhook, só no servidor local), ViaCEP, Correios, transportadora, BrasilAPI, provedor de NF-e e servidor SMTP.
 - **Pessoas:** a equipe de desenvolvimento e todos os usuários internos do back office (perfis do RF55).
 
 Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN19); o Payment Brick do Mercado Pago captura e tokeniza o cartão no navegador.
@@ -33,7 +33,7 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 |---|---|---|
 | 3.1 Responsável pela segurança | _a preencher_ | Aprova esta política e o plano de incidentes, decide sobre exceções, conduz a revisão anual e coordena incidentes |
 | 3.2 Encarregado de dados (DPO, LGPD) | _a preencher_ | Recebe as solicitações dos titulares (RF42) e conduz a comunicação à ANPD e aos titulares em incidente com dado pessoal |
-| 3.3 Administrador do servidor | _a preencher_ | Mantém o servidor local, o `.env`, o firewall, os backups e os certificados |
+| 3.3 Administrador do servidor | _a preencher_ | Mantém a VPS (acesso SSH, atualizações), o servidor local, o `.env`, o firewall, os backups e os certificados |
 | 3.4 Desenvolvedores | Equipe do projeto | Seguem o `CLAUDE.md` e o `ARCHITECTURE.md`, revisam PRs, não commitam segredos e mantêm as dependências atualizadas |
 | 3.5 Usuários internos (back office) | Administrador, comercial, financeiro e estoque/logística | Usam conta nominal, protegem a senha e o segundo fator e comunicam qualquer suspeita ao responsável (3.1) |
 | 3.6 Provedor de pagamento | Mercado Pago | Captura, tokeniza e processa o cartão; mantém a própria certificação PCI DSS (matriz de responsabilidades no checklist SAQ A) |
@@ -51,8 +51,9 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 ### 4.2 Infraestrutura
 
 - O MySQL aceita só usuários nomeados, com host restrito à sub-rede e TLS obrigatório (`require_secure_transport=ON`). O `root` não tem acesso remoto, o app usa `atelier_app` sem DDL, as migrations usam `atelier_migrate` e o backup usa `atelier_backup` (`deploy/mysql/init/01-users.sh`).
-- A porta 3306 é publicada só em `127.0.0.1`, salvo decisão explícita (`MYSQL_PUBLISH_ADDR`). As portas 80 e 443 ficam liberadas no firewall só no perfil de rede **Privada**.
-- O túnel do webhook (`cloudflared`) só alcança o `webhook-gate`, que repassa ao app apenas `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`).
+- **VPS (entrega):** só 22, 80 e 443 abertas no `ufw` e no firewall da Hostinger. MySQL (3306) e Uptime Kuma (3001) ficam no `127.0.0.1` da VPS, acessíveis só por túnel SSH. SSH só com chave, sem login do `root` nem por senha, com `fail2ban` e atualizações automáticas de segurança.
+- **Servidor local:** a porta 3306 é publicada só em `127.0.0.1`, salvo decisão explícita (`MYSQL_PUBLISH_ADDR`). As portas 80 e 443 ficam liberadas no firewall só no perfil de rede **Privada**.
+- No servidor local, o túnel do webhook (`cloudflared`) só alcança o `webhook-gate`, que repassa ao app apenas `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`).
 - O acesso ao repositório no GitHub é restrito aos membros da equipe. A `master` e a `develop` só recebem PR, sem `push --force` (`CLAUDE.md`, seção 10).
 
 ## 5. Senhas e autenticação
@@ -77,7 +78,7 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 
 - O container `backup` roda `mysqldump` (`--single-transaction --routines --triggers`) uma vez por dia, no horário `BACKUP_HOUR` (UTC), com o usuário `atelier_backup`, e grava `backups/atelier_bureau-<data>.sql.gz` (`deploy/backup/backup.sh`).
 - A retenção é de **30 dias** (`BACKUP_RETENTION_DAYS`); os arquivos mais antigos são apagados pelo próprio script.
-- Os backups ficam na pasta `backups/` da máquina servidora, fora do Git. Eles contêm dados pessoais (documento e telefone criptografados com AES-256-GCM, e-mail e endereço em claro), mas **nenhum dado de cartão** (RN19). O acesso à pasta é restrito ao administrador do servidor (3.3).
+- Os backups ficam na pasta `backups/` do servidor, fora do Git, e na VPS também numa cópia diária fora dela (`rclone`), com acesso restrito ao administrador do servidor. Eles contêm dados pessoais (documento e telefone criptografados com AES-256-GCM, e-mail e endereço em claro), mas **nenhum dado de cartão** (RN19). O acesso à pasta é restrito ao administrador do servidor (3.3).
 - A restauração é feita importando o dump no MySQL (`gunzip -c <arquivo> | mysql ...`) com o usuário de migração. O teste de restauração documentado é a issue #81, ainda aberta; até ela fechar, o responsável (3.1) confere manualmente, ao menos uma vez por mês, que o backup do dia existe e não está vazio.
 - **Cópia fora da máquina:** hoje não há. Uma cópia externa criptografada é recomendada antes de qualquer uso com dados reais.
 
@@ -104,7 +105,8 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 | Provedor | Dados que recebe | Exigência |
 |---|---|---|
 | Mercado Pago | Cartão (direto no Brick), token, valor, e-mail e documento do pagador | Certificação PCI DSS vigente com AOC arquivada (issue #178); credenciais de sandbox |
-| Cloudflare (túnel) | Tráfego do webhook do Mercado Pago | Túnel restrito à rota do webhook; token só no `.env` |
+| Hostinger (VPS) | Toda a aplicação, o banco e os backups na entrega | SSH só com chave, firewall com 22, 80 e 443, banco no loopback, conta do painel com 2FA |
+| Cloudflare (túnel, só no servidor local) | Tráfego do webhook do Mercado Pago | Túnel restrito à rota do webhook; token só no `.env` |
 | Correios, transportadora, ViaCEP, BrasilAPI | CEP, endereço e dados de envio | Chamada só no servidor, com timeout, fallback e log sem dados pessoais (`CLAUDE.md`, seção 9) |
 | Provedor de NF-e | Dados fiscais do pedido e do destinatário | Homologação; token só no `.env` |
 | Servidor SMTP | E-mail e conteúdo das mensagens transacionais | Conexão autenticada; senha só no `.env` |

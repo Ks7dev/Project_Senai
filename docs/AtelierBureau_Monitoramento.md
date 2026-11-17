@@ -1,6 +1,6 @@
 # Monitoramento de disponibilidade e alertas — Atelier Bureau
 
-Issue #80 · RNF01 (disponibilidade) e RNF16 (servidor local). Complementa a seção 5.1 do `ARCHITECTURE.md`.
+Issue #80 · RNF01 (disponibilidade) e RNF16 (servidor). Complementa as seções 5.1 (servidor local) e 5.2 (VPS de entrega, #206) do `ARCHITECTURE.md`.
 
 ## 1. Visão geral
 
@@ -10,7 +10,7 @@ O monitoramento tem três camadas:
 |---|---|---|
 | Healthcheck e `restart: unless-stopped` | Todo container tem um healthcheck e volta sozinho se o processo cair ou a máquina reiniciar | `docker-compose.yml` |
 | Rota de saúde | `GET /api/health` roda `SELECT 1` no MySQL e responde `200 {"status":"ok"}` ou `503 {"status":"unavailable"}`, sem detalhe interno | `app/api/health/route.ts` |
-| Painel e alertas | Uptime Kuma checa o site, o app e o banco a cada minuto, guarda o histórico de disponibilidade e manda e-mail quando algo cai | serviço `uptime-kuma`, em `https://<SITE_HOST>:3001` |
+| Painel e alertas | Uptime Kuma checa o site, o app e o banco a cada minuto, guarda o histórico de disponibilidade e manda e-mail quando algo cai | serviço `uptime-kuma`: na VPS, `http://localhost:3001` por túnel SSH; no servidor local, `https://<SITE_HOST>:3001` |
 
 ### Healthcheck de cada container
 
@@ -21,12 +21,24 @@ O monitoramento tem três camadas:
 | `db` | `mysqladmin ping` |
 | `backup` | `backup.sh --health`: o laço diário está vivo e o último backup não falhou |
 | `uptime-kuma` | requisição HTTP local na porta 3001 |
-| `webhook-gate` (perfil `tunnel`) | listener local `127.0.0.1:8081`, fora do alcance do túnel |
-| `tunnel` (perfil `tunnel`) | `cloudflared tunnel ready`, que pergunta ao servidor de métricas se o túnel está conectado |
+| `webhook-gate` (perfil `tunnel`, só no servidor local) | listener local `127.0.0.1:8081`, fora do alcance do túnel |
+| `tunnel` (perfil `tunnel`, só no servidor local) | `cloudflared tunnel ready`, que pergunta ao servidor de métricas se o túnel está conectado |
 
 > O `restart: unless-stopped` reinicia o container quando o processo termina, mas o Docker **não** reinicia um container só por ele estar `unhealthy`. Quem avisa nesse caso é o alerta do Uptime Kuma. Para ver o estado: `docker compose ps` (coluna `STATUS`).
 
 ## 2. Acesso ao painel
+
+### Na VPS (entrega)
+
+- O `docker-compose.vps.yml` publica a 3001 só no `127.0.0.1` da VPS, e o Caddy da VPS não serve o painel. Abra um túnel SSH a partir do seu computador e acesse `http://localhost:3001`:
+
+  ```bash
+  ssh -L 3001:127.0.0.1:3001 deploy@<ip-da-vps>
+  ```
+
+- **Primeiro acesso:** crie o usuário administrador logo depois do `docker compose up -d`, com uma senha forte guardada no gerenciador de senhas da equipe.
+
+### No servidor local
 
 - Endereço: `https://<SITE_HOST>:3001` (ex.: `https://192.168.0.50:3001`). Usa o mesmo certificado raiz do site (`deploy/certs/root.crt`).
 - O Caddy só deixa passar endereços privados (rede local). Qualquer outro cliente tem a conexão encerrada.
@@ -41,7 +53,7 @@ No painel, **Adicionar novo monitor**:
 | Nome | Tipo | Alvo | Intervalo | Tentativas antes do alerta |
 |---|---|---|---|---|
 | Loja — app e banco | HTTP(s) | `http://app:3000/api/health` | 60 s | 2 |
-| Loja — HTTPS pela rede | HTTP(s) | `https://<SITE_HOST>/api/health` (o IP fixo da máquina; marque **Ignorar erro de TLS**: o certificado é da CA local) | 60 s | 2 |
+| Loja — HTTPS pela rede | HTTP(s) | `https://<SITE_HOST>/api/health`. Na VPS, o domínio, com o certificado válido. No servidor local, o IP fixo da máquina, com **Ignorar erro de TLS** marcado (o certificado é da CA local) | 60 s | 2 |
 | MySQL | TCP Port | host `db`, porta `3306` | 60 s | 2 |
 | Backup diário | Push | copie a URL gerada para `BACKUP_PUSH_URL` (ver abaixo) | 90000 s (25 h) | 1 |
 
@@ -77,7 +89,7 @@ Feito por uma pessoa no servidor, com o `docker compose up -d` rodando:
 | Passo | Comando ou ação | Resultado esperado |
 |---|---|---|
 | 1 | `docker compose ps` | Todos os serviços `healthy` |
-| 2 | Abrir `https://<SITE_HOST>:3001` de outro dispositivo da rede | Painel abre com os monitores verdes |
+| 2 | Abrir o painel (na VPS, pelo túnel SSH; no servidor local, `https://<SITE_HOST>:3001` de outro dispositivo da rede) | Painel abre com os monitores verdes |
 | 3 | `docker compose stop app` | Em até 2 min, monitores "Loja" vermelhos e e-mail de alerta recebido |
 | 4 | `docker compose start app` | Monitores voltam a verde e chega o e-mail de recuperação |
 | 5 | `docker compose stop db` | `/api/health` responde 503; monitores "Loja — app e banco" e "MySQL" vermelhos e e-mail recebido |
@@ -90,4 +102,4 @@ Feito por uma pessoa no servidor, com o `docker compose up -d` rodando:
 ## 6. Painel de disponibilidade
 
 - O painel principal mostra o histórico de cada monitor (24 h, 30 dias) e a porcentagem de disponibilidade.
-- Opcional: **Status Pages → Nova página de status** com os monitores "Loja" para mostrar a disponibilidade na apresentação final. A página também fica só na rede local (porta 3001).
+- Opcional: **Status Pages → Nova página de status** com os monitores "Loja" para mostrar a disponibilidade na apresentação final. A página também fica fechada como o painel (túnel SSH na VPS, rede local no servidor local). Para mostrá-la na apresentação, abra pelo túnel no notebook da apresentação.

@@ -17,7 +17,7 @@ Padrão técnico do projeto (issue #1, RNF07): stack, organização de código, 
 | Qualidade | ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) + `tsc --noEmit` |
 | Testes (RNF07) | **Vitest**: unitários de schema, action e regras de negócio. **Playwright**: ponta a ponta do fluxo de compra |
 | Documentação de código (RNF08) | **JSDoc** em toda função exportada, cobrado por `eslint-plugin-jsdoc` |
-| Servidor | **Docker Compose** numa máquina local, que é o servidor: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06) e backup diário (RNF11). Outros dispositivos acessam pela rede local, por IP ou hostname da máquina. Detalhes na seção 5.1 |
+| Servidor | **Docker Compose**: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06) e backup diário (RNF11). A entrega roda numa **VPS pública** (Hostinger KVM) com domínio próprio e certificado Let's Encrypt (seção 5.2, #206). O mesmo compose roda numa máquina local para desenvolvimento e testes pela rede (seção 5.1) |
 
 Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transparente/Bricks), ViaCEP, Correios, agregador de transportadoras, BrasilAPI (CNPJ) e emissor de NF-e.
 
@@ -39,7 +39,8 @@ prisma/schema.prisma    → modelo de dados (fonte única do schema MySQL)
 prisma/migrations/      → migrations SQL versionadas, geradas pelo Prisma (uma por mudança coesa)
 prisma/seed.ts          → seed de configuração (valores das RN) e dados de desenvolvimento
 features/shared/lib/db/ → client Prisma único (server-only) e camada de acesso a dados com permissão
-docker-compose.yml      → servidor local: app, MySQL 8, Caddy e backup
+docker-compose.yml      → servidor: app, MySQL 8, Caddy, backup e monitoramento
+docker-compose.vps.yml  → override da VPS pública (domínio, só 80 e 443 abertas)
 Dockerfile              → imagem do app (Next.js standalone)
 deploy/                 → Caddyfile, scripts de backup/restauração e config do MySQL
 tests/                  → testes Vitest e Playwright
@@ -103,7 +104,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 
 ### 5.1 Servidor local (Docker) e acesso pela rede
 
-A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tudo, e os outros dispositivos da mesma rede (notebooks, celulares) acessam por ela.
+Ambiente de desenvolvimento e de testes pela rede. A entrega roda na VPS (seção 5.2), com o mesmo compose. Aqui, a máquina com o projeto é o servidor: um único `docker compose up -d` sobe tudo, e os outros dispositivos da mesma rede (notebooks, celulares) acessam por ela.
 
 | Serviço | Imagem | Porta publicada na rede | Papel |
 |---|---|---|---|
@@ -124,7 +125,7 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
   - A porta 3306 é publicada só em `127.0.0.1` por padrão. No Docker Desktop, toda conexão que entra pela porta publicada chega ao MySQL com o IP do gateway do Docker, então o MySQL não consegue separar quem vem da LAN. Por isso, abrir o banco à rede é uma decisão explícita: `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env`, com o firewall no perfil Privado e senhas fortes em todos os usuários.
   - As configurações do servidor (charset, fuso UTC, TLS e conexões) vão como flags do `mysqld` no `docker-compose.yml`. Um `.cnf` montado do Windows chega com permissão de escrita para todos, e o MySQL o ignora.
   - A conexão do app com o MySQL é criptografada por padrão (`DATABASE_TLS=required`, em `features/shared/lib/db/connection-config.ts`). O certificado do container é autoassinado, então o padrão não confere a cadeia; `DATABASE_TLS=verify` com `DATABASE_TLS_CA` apontando para o `ca.pem` do volume confere. Só com `DATABASE_TLS=disabled` (MySQL local sem TLS) o driver busca a chave pública RSA do servidor (`allowPublicKeyRetrieval`), exigida pelo `caching_sha2_password`.
-- **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. Um túnel (`cloudflared`, perfil opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago` (#57):
+- **Webhook do Mercado Pago:** o Mercado Pago precisa alcançar o servidor pela internet. No servidor local, um túnel (`cloudflared`, perfil opcional `tunnel`) expõe **só** a rota `/api/webhooks/mercadopago` (#57). Na VPS o túnel não é usado: o webhook chega direto pelo domínio (seção 5.2).
   - `docker compose --profile tunnel up -d` sobe o `tunnel` e o `webhook-gate`. O túnel fica sozinho com o gate na rede `tunnel` e não alcança o app, o proxy nem o banco.
   - O gate (`deploy/caddy/Caddyfile.webhook`, porta 8080 não publicada) repassa ao app só `POST /api/webhooks/mercadopago`. Qualquer outro método ou caminho recebe 404.
   - No painel da Cloudflare, o hostname público do túnel aponta para `http://webhook-gate:8080`. A URL pública completa vai em `MERCADOPAGO_NOTIFICATION_URL` (ou no painel de webhooks do Mercado Pago), e a chave secreta do webhook vai em `MERCADOPAGO_WEBHOOK_SECRET`.
@@ -133,6 +134,26 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
   - Se o webhook não chegar, a reconciliação (job a cada 5 minutos e antes de expirar Pix e boleto) consulta `GET /v1/payments/{id}`, ou busca pelo `external_reference` quando a criação ficou sem resposta.
 - **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O `GET /api/health` roda `SELECT 1` no MySQL e responde 503 sem detalhe se o banco cair. O Uptime Kuma (`https://<ip>:3001`, só para endereços da rede local) guarda o histórico de disponibilidade e manda e-mail em queda. Monitores, alerta e roteiro de teste em [`docs/AtelierBureau_Monitoramento.md`](docs/AtelierBureau_Monitoramento.md) (#80).
 - **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
+
+### 5.2 VPS pública (entrega)
+
+A entrega roda numa VPS Linux na internet (Hostinger **KVM 2**: 2 vCPU e 8 GB de RAM, Ubuntu 24.04 LTS), com domínio próprio, sem depender de nenhuma máquina local (#206). Usa o mesmo `docker-compose.yml` da seção 5.1, mais o override `docker-compose.vps.yml`, carregado sozinho com `COMPOSE_FILE=docker-compose.yml:docker-compose.vps.yml` no `.env`. Passo a passo de instalação em [`docs/AtelierBureau_Deploy_VPS.md`](docs/AtelierBureau_Deploy_VPS.md).
+
+| Serviço | Porta publicada na VPS | Diferença em relação ao servidor local |
+|---|---|---|
+| `proxy` | **80 e 443**, em todas as interfaces | Usa `deploy/caddy/Caddyfile.vps`: certificado Let's Encrypt para `SITE_HOST` (o domínio), renovado pelo próprio Caddy. A 3001 não é publicada |
+| `app` | nenhuma | Igual. `BETTER_AUTH_URL` é `https://<domínio>` |
+| `db` | 3306 só em `127.0.0.1` da VPS, sempre | Sem usuário de desenvolvedor (`MYSQL_DEV_PASSWORD` vazio). Acesso de fora só por túnel SSH |
+| `backup` | nenhuma | Igual, mais uma cópia diária para fora da VPS (`rclone`) e snapshots da Hostinger |
+| `uptime-kuma` | 3001 só em `127.0.0.1` da VPS | Acesso só por túnel SSH (`ssh -L 3001:127.0.0.1:3001`) |
+| `tunnel`, `webhook-gate` | não sobem | O webhook do Mercado Pago chega direto em `https://<domínio>/api/webhooks/mercadopago` |
+
+- **Rede:** firewall da VPS (`ufw` e o do painel da Hostinger) com só 22, 80 e 443 abertas. O Docker publica portas por fora do `ufw`, por isso o override amarra o MySQL e o Uptime Kuma ao loopback.
+- **Acesso administrativo:** SSH só com chave, sem login do `root` nem por senha, `fail2ban` e atualizações automáticas de segurança.
+- **HTTPS (RNF06):** certificado de CA pública (#180). Os dispositivos não precisam instalar certificado raiz, e os mesmos headers de segurança da seção 5.1 continuam saindo do Caddy. A conferência é `sh deploy/check-headers.sh <domínio>`.
+- **E-mail (RF53):** SMTP de um provedor transacional (Brevo ou Resend) na porta 587, com SPF, DKIM e DMARC configurados no domínio.
+- **Seed:** a imagem do app não leva o `tsx`, então o seed roda uma vez num container Node temporário na rede do Compose, com `SEED_PASSWORD` obrigatório. As contas fictícias são trocadas ou desativadas com `npm run accounts:rotate-seed` antes da apresentação (#179).
+- **Continua sendo demonstração:** Mercado Pago em sandbox (`MERCADOPAGO_ALLOW_PRODUCTION=false`), integrações em homologação e só dados fictícios. O rodapé avisa que é um projeto acadêmico.
 
 ## 6. Convenções de código
 

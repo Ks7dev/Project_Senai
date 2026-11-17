@@ -6,8 +6,8 @@ Issue #78 · RNF10.
 
 | Métrica | Meta | Onde se mede |
 |---|---|---|
-| LCP das páginas de vitrine (home, categoria, produto, busca) | até 2,5 s em 4G | Lighthouse do Chrome (modo navegação, celular, limitação "Slow 4G") contra o servidor local |
-| Tempo de resposta da API | p95 de até 500 ms, exceto chamadas a serviços externos | `npm run perf:api -- https://<ip-do-servidor>` |
+| LCP das páginas de vitrine (home, categoria, produto, busca) | até 2,5 s em 4G | Lighthouse do Chrome (modo navegação, celular, limitação "Slow 4G") contra o servidor de entrega (VPS) |
+| Tempo de resposta da API | p95 de até 500 ms, exceto chamadas a serviços externos | `npm run perf:api -- https://<domínio-ou-ip-do-servidor>` |
 | JavaScript da primeira carga (gzip) | home, categoria e busca até 235 KB; produto até 270 KB | `npm run perf:budget`, no CI depois do build |
 | CSS da primeira carga (gzip) | até 15 KB | `npm run perf:budget`, no CI depois do build |
 
@@ -16,8 +16,8 @@ Os valores ficam em `performance-budget.json`. O orçamento de JavaScript e CSS 
 ## Como medir
 
 1. **Orçamento de bundle (automático):** `npm run build && npm run perf:budget`. O script lê os manifestos do `.next`, soma os arquivos da primeira carga de cada rota de vitrine e falha se passar do orçamento. Roda no CI.
-2. **Latência (servidor local, com banco e seed):** `npm run perf:api -- https://<ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI, que ainda não tem MySQL.
-3. **LCP:** Lighthouse no Chrome, perfil celular com "Slow 4G", nas URLs de home, categoria, produto e busca do servidor local. Registrar o resultado no PR de release.
+2. **Latência (servidor com banco e seed, de preferência a VPS):** `npm run perf:api -- https://<domínio-ou-ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI, que ainda não tem MySQL.
+3. **LCP:** Lighthouse no Chrome, perfil celular com "Slow 4G", nas URLs de home, categoria, produto e busca do servidor de entrega (VPS). Registrar o resultado no PR de release.
 
 ## Otimizações aplicadas
 
@@ -56,7 +56,13 @@ O teste reprova a fase de carga (3x) se passar de qualquer limite abaixo, que fi
 
 ### Como executar
 
-No servidor local de entrega, com o banco, as migrations e o seed aplicados (`docker compose up -d`):
+No servidor de entrega (VPS), com o banco, as migrations e o seed aplicados (`docker compose up -d`). Contra a VPS, o certificado é público e o `NODE_EXTRA_CA_CERTS` não é necessário:
+
+```bash
+npm run perf:load -- https://<domínio> --out docs/relatorios/teste-de-carga-<data>.md
+```
+
+No servidor local:
 
 ```bash
 NODE_EXTRA_CA_CERTS=deploy/certs/root.crt npm run perf:load -- https://<ip-do-servidor> --out docs/relatorios/teste-de-carga-<data>.md
@@ -64,9 +70,9 @@ NODE_EXTRA_CA_CERTS=deploy/certs/root.crt npm run perf:load -- https://<ip-do-se
 
 Opções: `--users N` (tráfego médio), `--multiplier N`, `--duration S` e `--think MS`. O script aquece o cache uma vez, roda a fase de tráfego médio (1x) e depois a fase de carga (3x), mede p50, p95 e p99, a taxa de erro e as requisições por segundo, no geral e por rota, e imprime o relatório em Markdown. Com `--out`, grava o mesmo relatório no arquivo. O código de saída é 1 quando algum limite é violado.
 
-Como o Caddy usa `tls internal`, o Node precisa confiar na autoridade certificadora local: exporte `deploy/certs/root.crt` (`deploy/export-root-cert.sh` ou `.ps1`) e rode com `NODE_EXTRA_CA_CERTS=deploy/certs/root.crt`. Sem isso, toda requisição HTTPS falha e conta como erro.
+No servidor local, como o Caddy usa `tls internal`, o Node precisa confiar na autoridade certificadora local: exporte `deploy/certs/root.crt` (`deploy/export-root-cert.sh` ou `.ps1`) e rode com `NODE_EXTRA_CA_CERTS=deploy/certs/root.crt`. Sem isso, toda requisição HTTPS falha e conta como erro.
 
-Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outro dispositivo da rede mede também o proxy (Caddy) e o TLS, como o cliente real.
+Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outra máquina (fora da VPS, ou de outro dispositivo da rede no servidor local) mede também o proxy (Caddy), o TLS e a rede, como o cliente real.
 
 ### Situação
 

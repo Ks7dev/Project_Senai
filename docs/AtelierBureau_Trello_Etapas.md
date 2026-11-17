@@ -1173,6 +1173,7 @@ AB-179 — Trocar as contas fictícias do seed no servidor de entrega
 AB-180 — Certificado de CA pública ao publicar fora da rede local
 AB-181 — Varredura trimestral por ASV ao expor o site
 AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
+AB-206 — Publicar a loja numa VPS com domínio próprio
 ```
 
 ### Detalhamento dos cards
@@ -1282,16 +1283,16 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P0 — MVP, Infra/Qualidade  
 **Issue:** #82 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF01, RNF06, RNF16
 
-Subir o servidor local em Docker (app, MySQL, Caddy e backup), acessível pelos dispositivos da rede, e executar o checklist final.
+Subir o servidor de entrega na VPS pública (Docker: app, MySQL, Caddy, backup e monitoramento), com domínio próprio, e executar o checklist final. Escopo alterado em 17/11/2026 pela #206: antes, o servidor de entrega era local, acessível pelos dispositivos da rede.
 
 Checklist “Critérios de aceite”:
 
-- [ ] Site acessível via HTTPS por outro dispositivo da rede (IP fixo da máquina servidora)
+- [ ] Site acessível via HTTPS pelo domínio, de qualquer rede, com certificado de CA pública
 - [ ] Checklist de lançamento concluído
 - [ ] Apresentação final preparada
-- [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
-- [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
-- [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada
+- [ ] `docker compose up -d` sobe o servidor na VPS e `prisma migrate deploy` roda ao iniciar o app
+- [ ] MySQL só no loopback da VPS, com usuários nomeados e TLS; `root` sem acesso remoto
+- [ ] Só as portas 22, 80 e 443 abertas no firewall da VPS
 
 #### AB-173 — Trocar unsafe-inline da CSP por nonce nas páginas de pagamento
 
@@ -1415,3 +1416,20 @@ Checklist “Critérios de aceite”:
 
 - [ ] Política de segurança da informação versionada em `docs/`
 - [ ] Plano de resposta a incidentes de pagamento versionado em `docs/`
+
+#### AB-206 — Publicar a loja numa VPS com domínio próprio
+
+**Etiquetas:** P0 — MVP, Infra/Qualidade
+**Issue:** #206 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF06, RNF11, RNF16, RN19
+
+Publicar a loja numa VPS (Hostinger KVM) na internet, com domínio próprio e certificado de CA pública (Let's Encrypt), sem depender de nenhuma máquina local. Mesmo Docker Compose, mais o override da VPS. Continua em sandbox e homologação, só com dados fictícios. Mudança de escopo: o RNF16 passa a aceitar a VPS como servidor de entrega. Depende de #7 e #180.
+
+Checklist “Critérios de aceite”:
+
+- [ ] `docker-compose.vps.yml` publica só as portas 80 e 443; MySQL e Uptime Kuma ficam no loopback da VPS, acessíveis por túnel SSH
+- [ ] `deploy/caddy/Caddyfile.vps` com certificado Let's Encrypt para o domínio e os mesmos headers de segurança (RNF06)
+- [ ] Webhook do Mercado Pago chega direto pelo domínio, sem o túnel `cloudflared`
+- [ ] Guia de instalação em `docs/AtelierBureau_Deploy_VPS.md`: contratação, DNS, endurecimento da VPS, `.env`, seed, monitoramento, backup fora da VPS e atualização
+- [ ] Backup diário copiado para fora da VPS (RNF11)
+- [ ] `ARCHITECTURE.md`, `CLAUDE.md`, `README.md` e os docs de `docs/` atualizados para a VPS
+- [ ] RNF16 alterado e NC registrada no documento de requisitos (`.docx`)
