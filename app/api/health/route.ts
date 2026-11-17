@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server"
+import { connection, NextResponse } from "next/server"
 import { checkHealth } from "@/features/shared/lib/db/health"
-
-/** Always evaluated on request: the answer reflects the live database. */
-export const dynamic = "force-dynamic"
 
 /**
  * Readiness check used by the Docker healthcheck and by the uptime
@@ -13,6 +10,8 @@ export const dynamic = "force-dynamic"
  * @returns The health status as JSON, never cached.
  */
 export async function GET() {
+  // Evaluated on every request: the answer reflects the live database
+  await connection()
   const health = await checkHealth()
   return NextResponse.json(health, {
     status: health.status === "ok" ? 200 : 503,
