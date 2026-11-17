@@ -236,8 +236,11 @@ function PendingInstructions({ payment }: { payment: PaymentView }) {
  */
 export function OrderPaymentView({
   context,
+  nonce,
 }: {
   context: OrderPaymentContext
+  /** CSP nonce of the request, set by the proxy (#173). */
+  nonce?: string
 }) {
   const id = useId().replace(/:/g, "")
   const paymentContainer = `${id}-payment-brick`
@@ -396,6 +399,7 @@ export function OrderPaymentView({
         <Script
           src={MERCADO_PAGO_SDK_URL}
           strategy="afterInteractive"
+          nonce={nonce}
           onReady={() => setSdkReady(true)}
         />
       )}

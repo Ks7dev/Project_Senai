@@ -9,6 +9,7 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | Versão | Data | Autor | Alteração |
 |---|---|---|---|
 | 1.0 | 14/11/2026 | Equipe Atelier Bureau | Primeira versão: elegibilidade, checklist por requisito e pendências, com base no código do checkout das issues #54 a #59 |
+| 1.1 | 17/11/2026 | Equipe Atelier Bureau | CSP da página de pagamento com nonce, inventário de scripts com baseline versionado e detecção de mudança (#173); hosts concretos do Mercado Pago no lugar dos curingas (#174) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -43,9 +44,9 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | E3 | Os elementos da página de pagamento que capturam o cartão vêm do provedor (iframe ou campos seguros) | Parcial | Os campos são do Payment Brick. **Falta confirmar na documentação e na AOC do Mercado Pago que os campos de cartão do Brick são campos seguros em iframe** (pendência P6) |
 | E4 | O comerciante não armazena, processa nem transmite dados de cartão nos seus sistemas | Atende | Só o token passa pelo servidor; `containsCardData` recusa payloads com dados de cartão; o banco não tem colunas de cartão |
 | E5 | Cópias em papel ou eletrônicas de dados de cartão, se houver, não são eletrônicas | N/A | Não há coleta de cartão por telefone, e-mail ou papel |
-| E6 | O site não está suscetível a ataques de scripts que afetem a página de pagamento (critério da revisão de 2025 do SAQ A; conferir no formulário oficial) | Parcial | CSP limita scripts externos ao Mercado Pago, mas mantém `'unsafe-inline'` e curingas de domínio (pendências P1 e P2) |
+| E6 | O site não está suscetível a ataques de scripts que afetem a página de pagamento (critério da revisão de 2025 do SAQ A; conferir no formulário oficial) | Parcial | Na página de pagamento, `script-src` aceita só scripts da mesma origem, com o nonce da requisição ou dos hosts concretos do Mercado Pago, sem `'unsafe-inline'` e sem curingas (#173, #174). Mudanças na CSP e nos scripts são detectadas (seção 5.2). **Falta o teste do pagamento em sandbox com a CSP restrita** (pendência P2) |
 
-**Conclusão de elegibilidade:** o desenho do checkout é compatível com o SAQ A. A elegibilidade formal depende das pendências P1, P2 e P6.
+**Conclusão de elegibilidade:** o desenho do checkout é compatível com o SAQ A. A elegibilidade formal depende das pendências P2 (teste em sandbox) e P6.
 
 ## 4. Checklist por requisito
 
@@ -76,9 +77,9 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Item | Situação | Evidência ou observação |
 |---|---|---|
-| 6.4.3 Inventário, autorização e integridade dos scripts da página de pagamento | Parcial | Único script externo: `https://sdk.mercadopago.com/js/v2`, carregado só na página de pagamento (`MERCADO_PAGO_SDK_URL`, `features/shared/lib/mercadopago/bricks.ts`). O inventário está na seção 5. **Falta a justificativa formal aprovada e a política para scripts inline** (pendência P1) |
+| 6.4.3 Inventário, autorização e integridade dos scripts da página de pagamento | Atende | Único script externo: `https://sdk.mercadopago.com/js/v2`, carregado só na página de pagamento (`MERCADO_PAGO_SDK_URL`, `features/shared/lib/mercadopago/bricks.ts`). O inventário, com a justificativa de cada script, está na seção 5 e no baseline versionado `deploy/payment-page-baseline.json`. Scripts inline só rodam com o nonce da requisição (#173) |
 | Proteções contra clickjacking | Atende | `X-Frame-Options: DENY` e `frame-ancestors 'none'` |
-| CSP restringindo origens | Parcial | Scripts, frames e conexões externas limitados ao Mercado Pago, mas com `'unsafe-inline'` em `script-src` e curingas como `https://*.mlstatic.com` (pendências P1 e P2) |
+| CSP restringindo origens | Parcial | Scripts, frames e conexões externas limitados aos hosts concretos do Mercado Pago (`MERCADO_PAGO_CSP_HOSTS`, `features/shared/lib/security/headers.ts`, #174). Na página de pagamento, `script-src` usa nonce, sem `'unsafe-inline'` (#173). **Falta o teste do pagamento em sandbox com a CSP restrita** (pendência P2) |
 | Valor e dados do pagamento definidos no servidor | Atende | `payOrder` usa o total do pedido gravado, nunca o valor enviado pelo navegador (RF36) |
 | Dependências atualizadas e revisadas | Parcial | `npm audit` não roda no CI. **Incluir verificação de vulnerabilidades das dependências** (pendência P4) |
 
@@ -102,7 +103,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 | Item | Situação | Evidência ou observação |
 |---|---|---|
 | 11.3.2 Varredura externa de vulnerabilidades por ASV, trimestral | Não atende | O servidor da entrega fica na rede local; só o webhook é exposto pelo túnel. **Contratar varredura ASV ao publicar na internet** (pendência P9) |
-| 11.6.1 Detecção de alteração não autorizada na página de pagamento | Não atende | Não há monitoramento de mudança dos scripts e cabeçalhos da página de pagamento (pendência P1). `deploy/check-headers.sh` confere os cabeçalhos manualmente |
+| 11.6.1 Detecção de alteração não autorizada na página de pagamento | Atende | Quatro camadas (seção 5.2): o teste `tests/shared/payment-page-csp.test.ts` falha no CI se a CSP mudar sem atualizar o baseline; `npm run security:payment-page -- <url>` compara a página publicada com o baseline e sai com erro em divergência; as violações da CSP chegam a `/api/csp-report`, que grava `csp violation` no log; e `deploy/check-headers.sh` confere o nonce (#173) |
 
 ### Requisito 12 — Políticas
 
@@ -116,12 +117,34 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 
 | Script | Origem | Onde carrega | Justificativa | Integridade |
 |---|---|---|---|---|
-| Mercado Pago JS SDK v2 | `https://sdk.mercadopago.com/js/v2` | Só em `/conta/pedidos/[id]/pagamento` (componente `Script` do Next.js) | Obrigatório para o Payment Brick e a tokenização (RF28, RF35) | O provedor publica o SDK sem versão fixa; SRI não se aplica. Mitigação: CSP restrita à origem do Mercado Pago |
-| Scripts do próprio site | Mesma origem (`'self'`) | Todas as páginas | Aplicação Next.js | Gerados no build; scripts inline do Next.js liberados por `'unsafe-inline'` (pendência P1) |
+| Mercado Pago JS SDK v2 | `https://sdk.mercadopago.com/js/v2` | Só em `/conta/pedidos/[id]/pagamento` (componente `Script` do Next.js, com o nonce) | Obrigatório para o Payment Brick e a tokenização (RF28, RF35) | O provedor publica o SDK sem versão fixa; SRI não se aplica. Mitigação: CSP restrita aos hosts concretos do Mercado Pago |
+| Assets do Payment Brick | `https://http2.mlstatic.com` | Carregados pelo SDK na página de pagamento | Scripts, estilos, fontes e logos do Brick | Controlados pelo Mercado Pago; liberados só nesse host |
+| Scripts do próprio site | Mesma origem (`/_next/static/`) | Todas as páginas | Aplicação Next.js | Gerados no build. Na página de pagamento, os scripts inline do Next.js só rodam com o nonce da requisição (#173) |
+
+**Aprovação:** o inventário vale como aprovado quando o PR que altera esta seção ou o `deploy/payment-page-baseline.json` é revisado e aprovado pelo responsável pelo checkout. Script novo na página de pagamento só entra com a linha nesta tabela, a entrada no baseline e essa aprovação.
+
+### 5.1 CSP da página de pagamento (#173, #174)
+
+- O `proxy.ts` gera um nonce aleatório de 128 bits por requisição e envia a CSP da página de pagamento (`buildPaymentContentSecurityPolicy`) na resposta e na requisição, com o nonce também em `x-nonce`. O Next.js aplica o nonce aos próprios scripts, e a página o repassa ao `<Script>` do SDK.
+- A página de pagamento é renderizada inteira por requisição (`instant = false` e leitura dos cabeçalhos antes de qualquer `Suspense`), porque um shell estático não teria o nonce.
+- Os links para a página de pagamento fazem carregamento completo do documento (`<a>` e `window.location.assign`), para que a CSP com nonce venha com a página, e não da página anterior.
+- As demais páginas continuam estáticas, com a CSP de `next.config.ts` (com `'unsafe-inline'`), que não se aplica à página de pagamento (`STATIC_CSP_SOURCE`).
+- Hosts liberados, sem curingas: `sdk.mercadopago.com` e `http2.mlstatic.com` (scripts); `api.mercadopago.com`, `api.mercadolibre.com` e `http2.mlstatic.com` (conexões); `secure-fields.mercadopago.com`, `api-static.mercadopago.com`, `sdk.mercadopago.com`, `www.mercadopago.com.br` e `www.mercadolivre.com.br` (iframes); `http2.mlstatic.com` (imagens, estilos e fontes). A lista saiu dos hosts referenciados pelo SDK JS v2 para o Brasil, porque o Mercado Pago não publica uma lista oficial de CSP para o Checkout Bricks.
+
+### 5.2 Detecção de mudança (11.6.1)
+
+| Camada | Como funciona | Alerta |
+|---|---|---|
+| Baseline versionado | `deploy/payment-page-baseline.json` guarda a CSP aprovada (com `{nonce}` no lugar do nonce) e os scripts aprovados. O teste `tests/shared/payment-page-csp.test.ts` compara a CSP gerada pelo código com o baseline | O CI falha em qualquer divergência |
+| Verificação da página publicada | `npm run security:payment-page -- https://<ip-do-servidor> [id-do-pedido]` (com `NODE_EXTRA_CA_CERTS=deploy/certs/root.crt`) busca a página, compara a CSP e os `<script>` do HTML com o baseline e confere o nonce de cada script. Com `PAYMENT_CHECK_COOKIE` (cookie de sessão de um cliente fictício), confere a página já autenticada. Agendar no servidor (cron, a cada hora) | Sai com código 1 e linhas `ALERTA:` |
+| Relatórios do navegador | A CSP da página de pagamento tem `report-uri /api/csp-report` e `report-to csp-endpoint` (`Reporting-Endpoints`). A rota só grava `csp violation` no log, com a diretiva, a origem bloqueada e o caminho da página, sem query string nem dados pessoais | Linha `warn` no log do `app` |
+| Conferência da rede | `sh deploy/check-headers.sh <ip>` também confere que o `script-src` da página de pagamento tem nonce e não tem `'unsafe-inline'` | Sai com código 1 |
 
 ## 6. Pendências (viram issues)
 
 Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados, o milestone v1.0.0 e o vínculo com a RN19. A coluna "Issue" leva a ela.
+
+**Situação em 17/11/2026:** P1 implementada (#173). P2 implementada no código (#174), faltando o teste do pagamento em sandbox com a CSP restrita, que precisa ser feito por uma pessoa no navegador.
 
 | # | Pendência | Requisito | Prioridade | Labels | Issue |
 |---|---|---|---|---|---|

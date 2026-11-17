@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "perf:budget": "tsx scripts/performance-budget.ts",
     "perf:api": "tsx scripts/api-latency.ts",
+    "security:payment-page": "tsx scripts/check-payment-page.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

@@ -73,6 +73,25 @@ else
   done
 fi
 
+# 3. The payment page CSP uses a per request nonce, never
+# 'unsafe-inline' in script-src (#173). The full comparison with the
+# approved baseline is done by scripts/check-payment-page.ts.
+# shellcheck disable=SC2086
+payment_csp=$(curl -s -o /dev/null -D - --max-time 10 $CURL_TLS \
+  "https://$HOST/conta/pedidos/verificacao/pagamento" |
+  grep -i '^content-security-policy:' | tr -d '\r' || true)
+payment_script_src=$(printf '%s' "$payment_csp" | tr ';' '\n' |
+  grep -i 'script-src' || true)
+if [ -z "$payment_csp" ]; then
+  fail "Content-Security-Policy ausente na página de pagamento"
+elif printf '%s' "$payment_script_src" | grep -q "'unsafe-inline'"; then
+  fail "script-src da página de pagamento com 'unsafe-inline'"
+elif printf '%s' "$payment_script_src" | grep -q "'nonce-"; then
+  ok "script-src da página de pagamento com nonce"
+else
+  fail "script-src da página de pagamento sem nonce"
+fi
+
 if [ "$failures" -gt 0 ]; then
   echo "$failures alerta(s) crítico(s)."
   exit 1
