@@ -5,8 +5,17 @@ import {
   RateLimiter,
 } from "@/features/shared/lib/rate-limit/rate-limit"
 import { REQUEST_ID_HEADER } from "@/features/shared/lib/request/request-id-header"
+import {
+  buildPaymentContentSecurityPolicy,
+  createNonce,
+  isPaymentPagePath,
+  NONCE_HEADER,
+  reportingEndpoints,
+} from "@/features/shared/lib/security/headers"
 
 const limiter = new RateLimiter()
+
+const isDev = process.env.NODE_ENV !== "production"
 
 /**
  * Client IP as seen by the app. The Caddy proxy sets
@@ -22,8 +31,8 @@ function clientIp(request: NextRequest): string {
 
 /**
  * Runs before every request: assigns a request id for log
- * correlation and applies rate limiting to auth forms and APIs
- * (RNF05).
+ * correlation, applies rate limiting to auth forms and APIs (RNF05)
+ * and sets the CSP with a per request nonce on the payment page (#173).
  *
  * @param request - Incoming request.
  * @returns The response, or 429 when the client exceeded the limit.
@@ -63,8 +72,25 @@ export function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set(REQUEST_ID_HEADER, requestId)
+  // A client-sent nonce is never trusted
+  requestHeaders.delete(NONCE_HEADER)
+
+  let csp: string | null = null
+  if (isPaymentPagePath(pathname)) {
+    const nonce = createNonce()
+    csp = buildPaymentContentSecurityPolicy(isDev, nonce)
+    // Next.js reads the nonce from the request CSP and applies it to
+    // its own scripts; the page reads it from x-nonce for <Script>
+    requestHeaders.set(NONCE_HEADER, nonce)
+    requestHeaders.set("Content-Security-Policy", csp)
+  }
+
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   response.headers.set(REQUEST_ID_HEADER, requestId)
+  if (csp) {
+    response.headers.set("Content-Security-Policy", csp)
+    response.headers.set("Reporting-Endpoints", reportingEndpoints())
+  }
   return response
 }
 

@@ -3,8 +3,15 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getOrderPayment } from "@/features/payment/order-payment/action/payment-actions"
 import { OrderPaymentView } from "@/features/payment/order-payment/order-payment-view"
+import { getRequestNonce } from "@/features/shared/lib/security/nonce"
 
 export const metadata = { title: "Pagamento do pedido — Atelier Bureau" }
+
+/**
+ * The whole page renders at request time, without a static shell, so
+ * every script of the document carries the CSP nonce (#173).
+ */
+export const instant = false
 
 /**
  * Loads the order payment of the logged-in customer.
@@ -12,7 +19,13 @@ export const metadata = { title: "Pagamento do pedido — Atelier Bureau" }
  * @param props - Route params promise.
  * @returns The payment content.
  */
-async function OrderPayment({ params }: { params: Promise<{ id: string }> }) {
+async function OrderPayment({
+  params,
+  nonce,
+}: {
+  params: Promise<{ id: string }>
+  nonce?: string
+}) {
   const { id } = await params
   const result = await getOrderPayment({ orderId: id })
   if (!result.success) {
@@ -43,7 +56,7 @@ async function OrderPayment({ params }: { params: Promise<{ id: string }> }) {
           Pagamento
         </h1>
       </header>
-      <OrderPaymentView context={result.context} />
+      <OrderPaymentView context={result.context} nonce={nonce} />
       <Link
         href="/conta/pedidos"
         className="text-body-sm text-primary underline"
@@ -55,17 +68,19 @@ async function OrderPayment({ params }: { params: Promise<{ id: string }> }) {
 }
 
 /**
- * Order payment route (RF28, RF31).
+ * Order payment route (RF28, RF31). Reads the CSP nonce before any
+ * Suspense boundary, so the document is rendered per request (#173).
  *
  * @param props - Page props.
  * @returns The page.
  */
-export default function OrderPaymentPage(
+export default async function OrderPaymentPage(
   props: PageProps<"/conta/pedidos/[id]/pagamento">
 ) {
+  const nonce = await getRequestNonce()
   return (
     <Suspense fallback={<p className="text-body">Carregando pagamento…</p>}>
-      <OrderPayment params={props.params} />
+      <OrderPayment params={props.params} nonce={nonce} />
     </Suspense>
   )
 }

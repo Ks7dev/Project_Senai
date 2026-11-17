@@ -139,14 +139,16 @@ export function AccountOrdersTable({
                   {order.number}
                 </Link>
                 {order.ownOrder && (
-                  <Link
+                  // Full page load: the payment page CSP (nonce) comes
+                  // with the document, not with a client navigation (#173)
+                  <a
                     href={`/conta/pedidos/${order.id}/pagamento`}
                     className="block text-label-sm text-ink-muted underline hover:text-ink"
                   >
                     {order.status === "AWAITING_PAYMENT"
                       ? "Pagar ou ver pagamento"
                       : "Ver pagamento"}
-                  </Link>
+                  </a>
                 )}
                 {order.addressChangeable && (
                   <Link
