@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest"
 import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 
 try {
   process.loadEnvFile()
@@ -57,14 +58,14 @@ const created = {
 }
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  const result = await signIn({ email, password })
-  expect(result).toEqual({ success: true, twoFactor: false })
+  await signInSeedAccount(email, password)
 }
 
 /**
@@ -98,6 +99,7 @@ afterAll(async () => {
   await prisma.category.deleteMany({
     where: { slug: { in: created.categorySlugs } },
   })
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 

@@ -8,6 +8,24 @@ import { getPrisma } from "@/features/shared/lib/db/prisma"
 import { sendEmail } from "@/features/shared/lib/email/mailer"
 
 /**
+ * Whether a session being created was opened with the 2FA code (#177).
+ * With 2FA on, Better Auth only keeps a session after the code: on
+ * login the session made before the code is dropped, and on activation
+ * the user is flagged first and then gets a new session. So a session
+ * created while 2FA is on has passed the code; older sessions have not.
+ *
+ * @param userId - Owner of the session.
+ * @returns True when the account has 2FA on at creation time.
+ */
+async function sessionPassedTwoFactor(userId: string): Promise<boolean> {
+  const user = await getPrisma().user.findUnique({
+    where: { id: userId },
+    select: { twoFactorEnabled: true },
+  })
+  return user?.twoFactorEnabled === true
+}
+
+/**
  * Builds the Better Auth server instance: e-mail and password with
  * hashed passwords, httpOnly session cookie, optional 2FA (RF40) and
  * organizations for multi-user corporate accounts (RF09, RF10).
@@ -43,6 +61,29 @@ function createAuth() {
         personType: { type: "string", required: true, input: true },
         document: { type: "string", required: true, input: true },
         phone: { type: "string", required: false, input: true },
+      },
+    },
+    session: {
+      additionalFields: {
+        // Set only by the hook below, never by the client (#177)
+        twoFactorVerified: {
+          type: "boolean",
+          required: false,
+          defaultValue: false,
+          input: false,
+        },
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => ({
+            data: {
+              ...session,
+              twoFactorVerified: await sessionPassedTwoFactor(session.userId),
+            },
+          }),
+        },
       },
     },
     plugins: [

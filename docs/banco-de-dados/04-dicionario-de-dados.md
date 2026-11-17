@@ -67,6 +67,7 @@ Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando 
 | `user_agent` | TEXT | Sim | NULL | — | Navegador de origem |
 | `user_id` | VARCHAR(36) | Não | — | FK | Usuário da sessão. Referencia `users.id` |
 | `active_organization_id` | VARCHAR(36) | Sim | NULL | — | Conta corporativa ativa na sessão |
+| `two_factor_verified` | BOOLEAN | Não | `false` | — | Indica se a sessão foi aberta com o código do 2FA; exigido no back office para perfis com acesso a pedidos, pagamentos ou estornos (#177) |
 
 **Índices**
 

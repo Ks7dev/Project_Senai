@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 import { PDF_BYTES, quoteFixtures } from "./quote-fixtures"
 
 try {
@@ -23,7 +24,6 @@ const storageDir = await mkdtemp(join(tmpdir(), "atelier-quote-desk-"))
 process.env.STORAGE_DIR = storageDir
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { requestQuote } =
   await import("@/features/cart/quote-request/action/quote-request-actions")
 const { decideMyQuote, getMyQuote } =
@@ -48,14 +48,14 @@ const FORBIDDEN = "Você não tem permissão para esta ação."
 const addressIds: string[] = []
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  const result = await signIn({ email, password })
-  expect(result).toEqual({ success: true, twoFactor: false })
+  await signInSeedAccount(email, password)
 }
 
 /**
@@ -164,6 +164,7 @@ beforeEach(() => {
 afterAll(async () => {
   await fixtures.cleanup()
   await prisma.address.deleteMany({ where: { id: { in: addressIds } } })
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
   await rm(storageDir, { recursive: true, force: true })
 })
