@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
+import { BrandLogo } from "@/components/brand/brand-logo"
 import { SearchIcon, ShoppingBagIcon, UserIcon } from "lucide-react"
 import { MobileMenu } from "@/components/layout/mobile-menu"
 import { PageContainer } from "@/components/layout/page-container"
@@ -36,11 +37,8 @@ export function SiteHeader({
     <header className="sticky top-0 z-40 border-b border-line-subtle bg-canvas/95 backdrop-blur">
       <PageContainer className="flex h-16 items-center gap-md lg:h-20">
         <MobileMenu categories={categories} services={services} />
-        <Link
-          href="/"
-          className="shrink-0 rounded font-serif text-headline-sm text-ink lg:text-headline-md"
-        >
-          Atelier Bureau
+        <Link href="/" className="shrink-0 rounded">
+          <BrandLogo />
         </Link>
         <form
           action="/busca"

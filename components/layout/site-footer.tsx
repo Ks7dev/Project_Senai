@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
+import { BrandLogo } from "@/components/brand/brand-logo"
 import { PageContainer, PageGrid } from "@/components/layout/page-container"
 import type { NavLink } from "@/features/shared/config/navigation"
 
@@ -58,9 +59,7 @@ export function SiteFooter({
       <PageContainer className="py-xl">
         <PageGrid className="gap-y-lg">
           <div className="col-span-4 flex flex-col gap-sm md:col-span-2 lg:col-span-3">
-            <p className="font-serif text-headline-sm text-ink">
-              Atelier Bureau
-            </p>
+            <BrandLogo variant="full" />
             <p className="text-body-sm text-ink-muted">
               Papelaria nobre e mobiliário executivo para empresas e pessoas.
             </p>

@@ -1,4 +1,3 @@
-import Link from "next/link"
 import {
   CalendarDaysIcon,
   CircleCheckIcon,
@@ -262,12 +261,14 @@ export function OrderTrackingView({ tracking }: { tracking: OrderTracking }) {
             {dateTime.format(new Date(tracking.createdAt))}
           </p>
           {tracking.ownOrder && (
-            <Link
+            // Full page load: the payment page CSP (nonce) comes with the
+            // document, not with a client navigation (#173)
+            <a
               href={`/conta/pedidos/${tracking.orderId}/pagamento`}
               className="text-body-sm text-primary underline"
             >
               Ver pagamento
-            </Link>
+            </a>
           )}
         </section>
       </aside>

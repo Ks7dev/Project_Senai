@@ -11,35 +11,68 @@ import {
   type TwoFactorCodeInput,
 } from "@/features/shared/schema/two-factor-code-schema"
 import { getAuth } from "@/features/shared/lib/auth/auth"
+import { requiresTwoFactor } from "@/features/shared/lib/auth/permissions"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { prisma } from "@/features/shared/lib/db/prisma"
-import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
+import {
+  loadUserPermissions,
+  UNAUTHENTICATED_MESSAGE,
+} from "@/features/shared/lib/db/permissions"
 import {
   AppError,
   toActionError,
   type ActionResult,
 } from "@/features/shared/lib/errors/action-result"
 
+/** Who may use 2FA and whether their profile makes it mandatory. */
+type TwoFactorAccess = {
+  /** Whether the user belongs to a corporate account. */
+  corporate: boolean
+  /** Whether the user has an internal (back office) profile. */
+  internal: boolean
+  /** Whether 2FA is mandatory for the profile (#177). */
+  required: boolean
+}
+
 /**
- * Ensures the logged-in user belongs to a corporate account: 2FA is
- * offered to corporate accounts (RF40).
+ * Reads how 2FA applies to a user: offered to corporate accounts
+ * (RF40) and to internal profiles, and mandatory for the profiles that
+ * access orders, payments or refunds (#177).
  *
- * @returns The user id.
+ * @param userId - User id, from the session.
+ * @returns The 2FA access of the user.
  */
-async function requireCorporateUser(): Promise<string> {
+async function loadTwoFactorAccess(userId: string): Promise<TwoFactorAccess> {
+  const [member, permissions] = await Promise.all([
+    prisma.member.findFirst({ where: { userId }, select: { id: true } }),
+    loadUserPermissions(userId),
+  ])
+  return {
+    corporate: Boolean(member),
+    internal: permissions.size > 0,
+    required: requiresTwoFactor(permissions),
+  }
+}
+
+/**
+ * Ensures the logged-in user may use 2FA: corporate accounts (RF40) and
+ * internal profiles (#177).
+ *
+ * @returns The user id and their 2FA access.
+ */
+async function requireTwoFactorUser(): Promise<
+  { userId: string } & TwoFactorAccess
+> {
   const user = await getCurrentUser()
   if (!user) throw new AppError(UNAUTHENTICATED_MESSAGE, "unauthenticated")
-  const member = await prisma.member.findFirst({
-    where: { userId: user.id },
-    select: { id: true },
-  })
-  if (!member) {
+  const access = await loadTwoFactorAccess(user.id)
+  if (!access.corporate && !access.internal) {
     throw new AppError(
       "A verificação em duas etapas está disponível para contas corporativas.",
       "not_corporate"
     )
   }
-  return user.id
+  return { userId: user.id, ...access }
 }
 
 /**
@@ -54,11 +87,11 @@ function passwordError(error: unknown): never {
 }
 
 /** 2FA situation of the logged-in user, for the security page. */
-export type SecurityStatus = {
-  /** Whether the user belongs to a corporate account. */
-  corporate: boolean
+export type SecurityStatus = TwoFactorAccess & {
   /** Whether 2FA is on. */
   twoFactorEnabled: boolean
+  /** Whether the current session was opened with the 2FA code. */
+  sessionVerified: boolean
 }
 
 /**
@@ -70,19 +103,11 @@ export type SecurityStatus = {
 export async function getSecurityStatus(): Promise<SecurityStatus | null> {
   const user = await getCurrentUser()
   if (!user) return null
-  const [member, account] = await Promise.all([
-    prisma.member.findFirst({
-      where: { userId: user.id },
-      select: { id: true },
-    }),
-    prisma.user.findUnique({
-      where: { id: user.id },
-      select: { twoFactorEnabled: true },
-    }),
-  ])
+  const access = await loadTwoFactorAccess(user.id)
   return {
-    corporate: Boolean(member),
-    twoFactorEnabled: account?.twoFactorEnabled === true,
+    ...access,
+    twoFactorEnabled: user.twoFactorEnabled,
+    sessionVerified: user.twoFactorVerified,
   }
 }
 
@@ -99,7 +124,7 @@ export async function startTwoFactor(
   try {
     const parsed = passwordConfirmSchema.safeParse(input)
     if (!parsed.success) throw new AppError("Informe a sua senha.", "invalid")
-    await requireCorporateUser()
+    await requireTwoFactorUser()
     const result = await getAuth()
       .api.enableTwoFactor({ headers: await headers(), body: parsed.data })
       .catch(passwordError)
@@ -128,7 +153,7 @@ export async function confirmTwoFactor(
   try {
     const parsed = twoFactorCodeSchema.safeParse(input)
     if (!parsed.success) throw new AppError("Código inválido.", "invalid")
-    await requireCorporateUser()
+    await requireTwoFactorUser()
     await getAuth()
       .api.verifyTOTP({ headers: await headers(), body: parsed.data })
       .catch((error: unknown) => {
@@ -144,7 +169,8 @@ export async function confirmTwoFactor(
 }
 
 /**
- * Turns 2FA off after confirming the password.
+ * Turns 2FA off after confirming the password. Refused for profiles
+ * where 2FA is mandatory (#177).
  *
  * @param input - Current password.
  * @returns `{ success: true }` or `{ success: false, error }`.
@@ -155,7 +181,14 @@ export async function disableTwoFactor(
   try {
     const parsed = passwordConfirmSchema.safeParse(input)
     if (!parsed.success) throw new AppError("Informe a sua senha.", "invalid")
-    await requireCorporateUser()
+    const { required } = await requireTwoFactorUser()
+    // Profiles with access to orders, payments or refunds keep 2FA (#177)
+    if (required) {
+      throw new AppError(
+        "A verificação em duas etapas é obrigatória para o seu perfil e não pode ser desativada.",
+        "two_factor_required"
+      )
+    }
     await getAuth()
       .api.disableTwoFactor({ headers: await headers(), body: parsed.data })
       .catch(passwordError)

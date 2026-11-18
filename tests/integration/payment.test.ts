@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest"
 import { createHmac, randomUUID } from "node:crypto"
-import { jar } from "./next-headers-stub"
+import { resetInternalTwoFactor, signInSeedAccount } from "./internal-sign-in"
 import { deleteOrders, orderFixtures } from "./order-fixtures"
 
 try {
@@ -30,9 +30,15 @@ vi.mock("next/cache", () => ({
 vi.mock("@/features/shared/lib/rate-limit/action-limit", () => ({
   enforceActionRateLimit: vi.fn(async () => undefined),
 }))
+vi.mock(
+  "@/features/shared/lib/rate-limit/persistent-limit",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    enforcePersistentRateLimits: vi.fn(async () => undefined),
+  })
+)
 
 const { prisma } = await import("@/features/shared/lib/db/prisma")
-const { signIn } = await import("@/features/access/sign-in/action/sign-in")
 const { addToCart } = await import("@/features/shared/lib/cart/cart-actions")
 const { loadCurrentCart } =
   await import("@/features/shared/lib/cart/cart-store")
@@ -84,14 +90,14 @@ let nextProviderId = 7_000_000_000
 const issued = new Map<string, Record<string, unknown>>()
 
 /**
- * Logs in with a seed account through the real sign-in action.
+ * Logs in with a seed account through the real sign-in action. Internal
+ * accounts also turn 2FA on and verify it, as the back office requires
+ * (#177).
  *
  * @param email - Seed account e-mail.
  */
 async function login(email: string) {
-  jar.clear()
-  const result = await signIn({ email, password })
-  expect(result).toEqual({ success: true, twoFactor: false })
+  await signInSeedAccount(email, password)
 }
 
 /**
@@ -342,6 +348,7 @@ afterAll(async () => {
   await prisma.address.deleteMany({ where: { id: { in: addresses } } })
   await emptyCart(customer)
   await fixtures.cleanup()
+  await resetInternalTwoFactor()
   await prisma.$disconnect()
 })
 
@@ -539,7 +546,32 @@ describe("card payment with the Payment Brick (#54, RF35, RF36, RN13)", () => {
       token: brickCard.token,
       payment_method_id: "master",
       three_d_secure_mode: "optional",
+      // Quality fields of Mercado Pago (#228)
+      additional_info: {
+        items: [
+          {
+            id: sku.code,
+            quantity: 2,
+            category_id: expect.any(String),
+            title: expect.any(String),
+            description: expect.any(String),
+            unit_price: expect.any(Number),
+          },
+        ],
+        payer: {
+          first_name: expect.any(String),
+          address: {
+            zip_code: "70040010",
+            street_name: "Esplanada dos Ministérios",
+            street_number: "10",
+          },
+        },
+        shipments: {
+          receiver_address: { zip_code: "70040010", state_name: "DF" },
+        },
+      },
     })
+    expect(request.body.payer).toHaveProperty("first_name")
     const payment = await prisma.payment.findFirstOrThrow({
       where: { orderId: order.orderId },
     })

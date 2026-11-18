@@ -10,6 +10,10 @@ export type SessionUser = {
   name: string
   /** Login e-mail. */
   email: string
+  /** Whether the account has 2FA turned on (RF40). */
+  twoFactorEnabled: boolean
+  /** Whether this session was opened with the 2FA code (#177). */
+  twoFactorVerified: boolean
 }
 
 /**
@@ -25,5 +29,11 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await getAuth().api.getSession({ headers: requestHeaders })
   if (!session) return null
   const { id, name, email } = session.user
-  return { id, name, email }
+  return {
+    id,
+    name,
+    email,
+    twoFactorEnabled: session.user.twoFactorEnabled === true,
+    twoFactorVerified: session.session.twoFactorVerified === true,
+  }
 }

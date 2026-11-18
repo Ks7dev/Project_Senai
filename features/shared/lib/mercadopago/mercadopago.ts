@@ -84,16 +84,173 @@ export class MercadoPagoError extends Error {
 const DEFAULT_BASE_URL = "https://api.mercadopago.com"
 const DEFAULT_TIMEOUT_MS = 10_000
 
+/** Prefix of the legacy sandbox credentials (access token and public key). */
+const TEST_CREDENTIAL_PREFIX = "TEST-"
+
+/** Tag Mercado Pago puts on the test users (`GET /users/me`). */
+const TEST_USER_TAG = "test_user"
+
+/** Wait before checking a token again after a failed check. */
+const SANDBOX_RECHECK_MS = 5 * 60_000
+
+/**
+ * Access tokens confirmed as belonging to a Mercado Pago test user.
+ * New applications get `APP_USR-` test credentials from a test seller,
+ * so the prefix alone cannot tell sandbox from production (#229).
+ */
+const verifiedTestTokens = new Set<string>()
+/** Check in progress per access token. */
+const pendingSandboxChecks = new Map<string, Promise<void>>()
+/** Time of the last failed check per access token. */
+const failedSandboxChecks = new Map<string, number>()
+
+/**
+ * Whether production (non-sandbox) Mercado Pago credentials may be used.
+ * Off unless `MERCADOPAGO_ALLOW_PRODUCTION=true` is set explicitly on a
+ * production server (#7): the store runs in sandbox only.
+ *
+ * @returns True only with the explicit opt-in.
+ */
+export function mercadoPagoProductionAllowed(): boolean {
+  return (
+    process.env.MERCADOPAGO_ALLOW_PRODUCTION?.trim().toLowerCase() === "true"
+  )
+}
+
+/**
+ * Whether a sandbox account was confirmed for the configured access
+ * token: a `TEST-` token, or one checked as a test user (#229).
+ *
+ * @returns True when the access token is a sandbox one.
+ */
+function accessTokenIsSandbox(): boolean {
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  return (
+    accessToken.startsWith(TEST_CREDENTIAL_PREFIX) ||
+    verifiedTestTokens.has(accessToken)
+  )
+}
+
+/**
+ * Accepts a sandbox credential always and any other one only with
+ * `MERCADOPAGO_ALLOW_PRODUCTION=true`. Sandbox means a `TEST-`
+ * credential, or one of a test user confirmed by
+ * {@link ensureMercadoPagoSandboxChecked}: an `APP_USR-` public key
+ * follows the verified access token of the same account. A `TEST-`
+ * token alone never lets a non-`TEST-` public key through. A refused
+ * credential is logged by variable name only, never by value.
+ *
+ * @param credential - The access token or public key.
+ * @param variable - Name of the environment variable, for the log.
+ * @returns Whether the credential may be used.
+ */
+function credentialAllowed(credential: string, variable: string): boolean {
+  if (credential.startsWith(TEST_CREDENTIAL_PREFIX)) return true
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  if (verifiedTestTokens.has(accessToken)) return true
+  if (mercadoPagoProductionAllowed()) return true
+  logger.error("mercadopago production credential refused", {
+    variable,
+    hint: "use the credentials of a Mercado Pago test user or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
+  })
+  return false
+}
+
+/**
+ * Confirms, once per access token, that a non-`TEST-` token belongs to
+ * a Mercado Pago test user (`GET /users/me` tagged `test_user`), so
+ * the sandbox lock (#7) accepts the `APP_USR-` test credentials of new
+ * applications (#229). A failed or negative check keeps the token
+ * refused and is retried after a few minutes. Never throws and never
+ * logs the token.
+ *
+ * @param fetcher - Fetch implementation (replaced in tests).
+ * @returns When the check is done (or skipped).
+ */
+export async function ensureMercadoPagoSandboxChecked(
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  if (!accessToken || accessTokenIsSandbox()) return
+  if (mercadoPagoProductionAllowed()) return
+  const failedAt = failedSandboxChecks.get(accessToken) ?? 0
+  if (Date.now() - failedAt < SANDBOX_RECHECK_MS) return
+  let pending = pendingSandboxChecks.get(accessToken)
+  if (!pending) {
+    pending = checkTestUser(accessToken, fetcher).finally(() => {
+      pendingSandboxChecks.delete(accessToken)
+    })
+    pendingSandboxChecks.set(accessToken, pending)
+  }
+  await pending
+}
+
+/**
+ * Asks Mercado Pago whether the token belongs to a test user. Always
+ * the real API host, never `MERCADOPAGO_BASE_URL`: another host could
+ * answer `test_user` for a production token.
+ *
+ * @param accessToken - The access token being checked.
+ * @param fetcher - Fetch implementation.
+ */
+async function checkTestUser(
+  accessToken: string,
+  fetcher: typeof fetch
+): Promise<void> {
+  const timeout = Number(process.env.MERCADOPAGO_TIMEOUT_MS)
+  try {
+    const response = await fetcher(`${DEFAULT_BASE_URL}/users/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(
+        Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_TIMEOUT_MS
+      ),
+    })
+    if (!response.ok) {
+      failedSandboxChecks.set(accessToken, Date.now())
+      logger.warn("mercadopago sandbox check failed", {
+        status: response.status,
+      })
+      return
+    }
+    const body = (await response.json()) as { tags?: unknown }
+    if (Array.isArray(body.tags) && body.tags.includes(TEST_USER_TAG)) {
+      verifiedTestTokens.add(accessToken)
+      return
+    }
+    failedSandboxChecks.set(accessToken, Date.now())
+    logger.error("mercadopago account is not a test user", {
+      hint: "use the credentials of a Mercado Pago test user or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
+    })
+  } catch (error) {
+    failedSandboxChecks.set(accessToken, Date.now())
+    logger.warn("mercadopago sandbox check failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    })
+  }
+}
+
+/**
+ * Clears the sandbox check cache. For tests only.
+ */
+export function resetMercadoPagoSandboxCheck(): void {
+  verifiedTestTokens.clear()
+  pendingSandboxChecks.clear()
+  failedSandboxChecks.clear()
+}
+
 /**
  * Mercado Pago settings from the environment. The access token is
  * server-only (no `NEXT_PUBLIC_`); without it online payment is off and
- * the customer sees a friendly message.
+ * the customer sees a friendly message. A production token is refused
+ * (online payment stays off) unless production is explicitly allowed.
  *
- * @returns The settings, or null when the token is missing.
+ * @returns The settings, or null when the token is missing or refused.
  */
 export function mercadoPagoConfig(): MercadoPagoConfig | null {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
   if (!accessToken) return null
+  if (!credentialAllowed(accessToken, "MERCADOPAGO_ACCESS_TOKEN")) return null
   const timeout = Number(process.env.MERCADOPAGO_TIMEOUT_MS)
   return {
     baseUrl: (process.env.MERCADOPAGO_BASE_URL || DEFAULT_BASE_URL).replace(
@@ -108,12 +265,33 @@ export function mercadoPagoConfig(): MercadoPagoConfig | null {
 
 /**
  * Public key used by the Bricks in the browser (RF28, RF35). It is
- * public by design, read on the server and passed to the page.
+ * public by design, read on the server and passed to the page. Like the
+ * access token, a production key needs the explicit opt-in.
  *
- * @returns The key, or null when missing.
+ * @returns The key, or null when missing or refused.
  */
 export function mercadoPagoPublicKey(): string | null {
-  return process.env.MERCADOPAGO_PUBLIC_KEY?.trim() || null
+  const publicKey = process.env.MERCADOPAGO_PUBLIC_KEY?.trim() ?? ""
+  if (!publicKey) return null
+  return credentialAllowed(publicKey, "MERCADOPAGO_PUBLIC_KEY")
+    ? publicKey
+    : null
+}
+
+/**
+ * E-mail sent as the payer to Mercado Pago. In the sandbox, Mercado Pago
+ * refuses the fictitious `.test` addresses of the seed and the test
+ * user addresses, so `MERCADOPAGO_SANDBOX_PAYER_EMAIL` replaces the
+ * customer e-mail there (#229). With production credentials it is
+ * ignored and the customer e-mail is always sent.
+ *
+ * @param customerEmail - E-mail of the customer who owns the order.
+ * @returns The e-mail to send as `payer.email`.
+ */
+export function mercadoPagoPayerEmail(customerEmail: string): string {
+  const override = process.env.MERCADOPAGO_SANDBOX_PAYER_EMAIL?.trim() ?? ""
+  if (!override || !accessTokenIsSandbox()) return customerEmail
+  return z.email().safeParse(override).success ? override : customerEmail
 }
 
 /**
@@ -278,6 +456,7 @@ async function callMercadoPago(
   init: { method: "GET" | "POST"; body?: unknown; headers?: HeadersInit },
   fetcher: typeof fetch
 ): Promise<unknown> {
+  await ensureMercadoPagoSandboxChecked(fetcher)
   const config = mercadoPagoConfig()
   if (!config) {
     logger.warn("mercadopago not configured", { operation })
@@ -328,6 +507,46 @@ async function callMercadoPago(
   }
 }
 
+/** Address of the payer or of the delivery, in the Mercado Pago format. */
+export type PaymentAddress = {
+  /** CEP, digits only. */
+  zip_code: string
+  /** Street. */
+  street_name: string
+  /** Number, as typed (may be "S/N"). */
+  street_number: string
+}
+
+/**
+ * Quality fields of a payment (#228), used by Mercado Pago in the fraud
+ * analysis. They carry personal data and are never logged.
+ */
+export type PaymentAdditionalInfo = {
+  /** Ordered items. */
+  items: Array<{
+    id: string
+    title: string
+    description: string
+    category_id: string
+    quantity: number
+    unit_price: number
+  }>
+  /** Buyer from the account. */
+  payer: {
+    first_name?: string
+    last_name?: string
+    phone?: { area_code: string; number: string }
+    address?: PaymentAddress
+  }
+  /** Delivery address of the order. */
+  shipments?: {
+    receiver_address: PaymentAddress & {
+      city_name?: string
+      state_name?: string
+    }
+  }
+}
+
 /** Body of `POST /v1/payments`, built by the server (RF36). */
 export type CreatePaymentBody = {
   transaction_amount: number
@@ -343,6 +562,7 @@ export type CreatePaymentBody = {
   notification_url?: string
   statement_descriptor?: string
   metadata?: Record<string, string>
+  additional_info?: PaymentAdditionalInfo
 }
 
 /**

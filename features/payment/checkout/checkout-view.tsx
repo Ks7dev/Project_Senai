@@ -39,6 +39,7 @@ import {
   manualQuoteReasonMessage,
   manualQuoteResponseMessage,
 } from "@/features/shared/lib/shipping/shipping-messages"
+import { isPaymentPagePath } from "@/features/shared/lib/security/headers"
 
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -207,7 +208,11 @@ export function CheckoutView({ context }: { context: CheckoutContext }) {
         installationDate: chosenDay?.date ?? null,
       })
       if (!result.success) return setError(result.error)
-      router.push(result.order.nextUrl)
+      const { nextUrl } = result.order
+      // Full page load: the payment page CSP (nonce) comes with the
+      // document, not with a client navigation (#173)
+      if (isPaymentPagePath(nextUrl)) window.location.assign(nextUrl)
+      else router.push(nextUrl)
     })
   }
 

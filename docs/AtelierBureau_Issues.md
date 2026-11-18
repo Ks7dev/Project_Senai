@@ -2,7 +2,7 @@
 
 Repositório: `Ks7dev/Project_Senai` · Base: Levantamento de Requisitos v2.0 · Padrão: [`ARCHITECTURE.md`](../ARCHITECTURE.md), seção 7
 
-Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checklist PCI-DSS (#62), `AB-173` = #173 … `AB-182` = #182, criadas em 15/11/2026. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
+Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checklist PCI-DSS (#62), `AB-173` = #173 … `AB-182` = #182, criadas em 15/11/2026. As issues abertas depois do planejamento (#206, #208, #211, #213, #214, #217 e #220 a #223, até 18/11/2026) são acompanhadas no GitHub Project e só entram neste arquivo quando têm seção própria. O status atual de cada issue é o do GitHub Project; a coluna Status deste arquivo pode estar atrasada. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
 
 ## Como usar
 
@@ -70,104 +70,106 @@ Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checkl
 | #1 | Stack, estrutura e fluxo de trabalho definidos em `ARCHITECTURE.md`. |
 | #3 | Ícones: **Lucide** (`lucide-react`). O mapeamento dos ícones do protótipo foi movido para a #18. |
 | #5 | Valores do documento v2 confirmados: R$ 10.000 (RN01), R$ 5.000 (RN06), Pix 30 min e boleto 3 dias úteis (RN14), RMSP (RN16), limites dos Correios (RN20). O seed foi movido para a #8. |
-| #2, #4 | Em formalização pelo responsável (status Em andamento). |
+| #2, #4 | Bloqueadas: dependem de ação do responsável fora do código (registro no INPI e domínio; parecer jurídico). |
 
 ## Resumo
 
 | Issue | Título | Tipo | Área | Milestone | Etapa | Prioridade | Status |
 |---|---|---|---|---|---|---|---|
-| #1 AB-001 | Definir stack e estrutura de pastas com base nos repositórios CRM e Core | task | app | v0.1.0 | E0 | P0 | Backlog |
-| #2 AB-002 | Validar o nome Atelier Bureau (INPI e domínio) | task | app | v0.1.0 | E0 | P1 | Em andamento |
+| #1 AB-001 | Definir stack e estrutura de pastas com base nos repositórios CRM e Core | task | app | v0.1.0 | E0 | P0 | Concluído |
+| #2 AB-002 | Validar o nome Atelier Bureau (INPI e domínio) | task | app | v0.1.0 | E0 | P1 | Bloqueado |
 | #3 AB-003 | Escolher a biblioteca oficial de ícones | task | app | v0.1.0 | E0 | P1 | Concluído |
-| #4 AB-004 | Validação jurídica das políticas de troca, arrependimento e garantia | task | app | v0.1.0 | E0 | P1 | Em andamento |
+| #4 AB-004 | Validação jurídica das políticas de troca, arrependimento e garantia | task | app | v0.1.0 | E0 | P1 | Bloqueado |
 | #5 AB-005 | Confirmar os valores configuráveis das regras de negócio | task | app | v0.1.0 | E0 | P1 | Concluído |
-| #6 AB-006 | Setup do repositório: estrutura MVC, lint, formatter e templates | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #7 AB-007 | Configurar ambientes e variáveis (dev, homologação, produção) | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #8 AB-008 | Modelagem do banco de dados e migrations iniciais | feature | app | v0.1.0 | E1 | P0 | Backlog |
-| #9 AB-009 | Pipeline de CI com lint, testes e build | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #10 AB-010 | Padrão de tratamento de erros, logs e rate limiting | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #11 AB-011 | HTTPS obrigatório e headers de segurança | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #12 AB-012 | Padrão de documentação de código | task | app | v0.1.0 | E1 | P1 | Backlog |
-| #13 AB-013 | Criar os tokens do design system Warm Editorial Atelier | task | app | v0.1.0 | E1 | P0 | Backlog |
-| #14 AB-014 | Redesenhar o logo e criar o kit de marca | task | app | v0.1.0 | E1 | P1 | Backlog |
-| #15 AB-015 | Componentes base da biblioteca de UI | feature | app | v0.1.0 | E1 | P0 | Backlog |
-| #16 AB-016 | Componentes de commerce | feature | app | v0.2.0 | E2 | P1 | Backlog |
-| #17 AB-017 | Layout base: header, footer e grid responsivo | feature | app | v0.1.0 | E1 | P0 | Backlog |
-| #18 AB-018 | Corrigir as divergências do protótipo Stitch | task | app | v0.1.0 | E0 | P1 | Backlog |
-| #19 AB-019 | Prototipar as telas faltantes | task | app | v0.1.0 | E1 | P1 | Backlog |
-| #20 AB-020 | Auditoria de acessibilidade WCAG 2.1 AA | task | app | v1.0.0 | E6 | P1 | Backlog |
-| #21 AB-021 | Cadastro de produtos no back office | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #22 AB-022 | Upload de imagens com conversão para WebP | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #23 AB-023 | Categorias, subcategorias e navegação | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #24 AB-024 | Listagem de produtos (PLP) com filtros avançados | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #25 AB-025 | Busca de produtos | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #26 AB-026 | Página de produto (PDP) | feature | catálogo | v0.2.0 | E2 | P0 | Backlog |
-| #27 AB-027 | Comparador de até 4 produtos | feature | catálogo | v0.2.0 | E2 | P2 | Backlog |
-| #28 AB-028 | Inativação de produtos sem perda de histórico | feature | catálogo | v0.2.0 | E2 | P1 | Backlog |
-| #29 AB-029 | Importação de produtos via CSV | feature | catálogo | v0.2.0 | E2 | P1 | Backlog |
-| #30 AB-030 | Home editorial com carrossel editável | feature | catálogo | v0.2.0 | E2 | P1 | Backlog |
-| #31 AB-031 | SEO técnico | task | catálogo | v1.0.0 | E6 | P1 | Backlog |
-| #32 AB-032 | Cadastro e login de PF e PJ | feature | acesso | v0.2.0 | E2 | P0 | Backlog |
-| #33 AB-033 | Recuperação de senha e 2FA opcional | feature | acesso | v0.2.0 | E2 | P0 | Backlog |
-| #34 AB-034 | Conta corporativa multiusuário com consulta de CNPJ | feature | acesso | v0.2.0 | E2 | P0 | Backlog |
-| #35 AB-035 | Perfis de acesso da conta corporativa | feature | acesso | v0.2.0 | E2 | P0 | Backlog |
-| #36 AB-036 | Múltiplos endereços por conta | feature | acesso | v0.2.0 | E2 | P1 | Backlog |
-| #37 AB-037 | Área do cliente | feature | acesso | v0.2.0 | E2 | P1 | Backlog |
-| #38 AB-038 | Lista de favoritos | feature | acesso | v0.2.0 | E2 | P2 | Backlog |
-| #39 AB-039 | Consulta de endereço via ViaCEP com fallback | feature | frete | v0.3.0 | E3 | P0 | Backlog |
-| #40 AB-040 | Módulo de frete com estratégias por modalidade | feature | frete | v0.3.0 | E3 | P0 | Backlog |
-| #41 AB-041 | Integração com a API dos Correios | feature | frete | v0.3.0 | E3 | P0 | Backlog |
-| #42 AB-042 | Integração com agregador de transportadoras | feature | frete | v0.3.0 | E3 | P1 | Backlog |
-| #43 AB-043 | Entrega própria com montagem por faixa de CEP | feature | frete | v0.3.0 | E3 | P1 | Backlog |
-| #44 AB-044 | Cotação manual de frete como contingência | feature | frete | v0.3.0 | E3 | P1 | Backlog |
-| #45 AB-045 | Recotação de frete ao alterar endereço | feature | frete | v0.3.0 | E3 | P2 | Backlog |
-| #46 AB-046 | Carrinho e lista de projeto salva | feature | carrinho e cotação | v0.3.0 | E3 | P0 | Backlog |
-| #47 AB-047 | Personalização e serviços adicionais no carrinho | feature | carrinho e cotação | v0.3.0 | E3 | P1 | Backlog |
-| #48 AB-048 | Solicitação de cotação com anexos | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Backlog |
-| #49 AB-049 | Número de cotação rastreável e validade | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Backlog |
-| #50 AB-050 | Back office comercial de cotações | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Backlog |
-| #51 AB-051 | Fluxo de aprovação de pedidos | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Backlog |
-| #52 AB-052 | Tabela de preços por cliente e desconto por volume | feature | carrinho e cotação | v0.4.0 | E4 | P1 | Backlog |
-| #53 AB-053 | Agendamento de entrega e instalação | feature | carrinho e cotação | v0.3.0 | E3 | P1 | Backlog |
-| #54 AB-054 | Integração do Payment Brick do Mercado Pago | feature | pagamento | v0.3.0 | E3 | P0 | Backlog |
-| #55 AB-055 | Pix e boleto via Mercado Pago com expiração | feature | pagamento | v0.3.0 | E3 | P0 | Backlog |
-| #56 AB-056 | Parcelamento configurável | feature | pagamento | v0.3.0 | E3 | P1 | Backlog |
-| #57 AB-057 | Webhook do Mercado Pago | feature | pagamento | v0.3.0 | E3 | P0 | Backlog |
-| #58 AB-058 | Status de pagamento e payment_id | feature | pagamento | v0.3.0 | E3 | P0 | Backlog |
-| #59 AB-059 | Estornos total e parcial | feature | financeiro | v0.4.0 | E5 | P1 | Backlog |
-| #60 AB-060 | Fluxo de pagamento faturado 28/56 dias | feature | financeiro | v0.4.0 | E4 | P0 | Backlog |
-| #61 AB-061 | Aprovação de crédito corporativo | feature | financeiro | v0.4.0 | E4 | P0 | Backlog |
-| #62 AB-062 | Checklist PCI-DSS SAQ A | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
-| #63 AB-063 | Emissão de NF-e via API | feature | financeiro | v0.4.0 | E5 | P1 | Backlog |
-| #64 AB-064 | Reserva, baixa e liberação de estoque | feature | pedidos | v0.3.0 | E3 | P0 | Backlog |
-| #65 AB-065 | Ciclo de vida do pedido | feature | pedidos | v0.3.0 | E3 | P0 | Backlog |
-| #66 AB-066 | Rastreamento do pedido | feature | pedidos | v0.3.0 | E3 | P1 | Backlog |
-| #67 AB-067 | E-mails transacionais | feature | pedidos | v0.3.0 | E3 | P1 | Backlog |
-| #68 AB-068 | Chamados de garantia e assistência técnica | feature | pós-venda | v0.4.0 | E5 | P1 | Backlog |
-| #69 AB-069 | Canal com vendedor dedicado (WhatsApp) | feature | pós-venda | v0.4.0 | E5 | P1 | Backlog |
-| #70 AB-070 | Agendamento de demonstração | feature | pós-venda | v0.4.0 | E5 | P2 | Backlog |
-| #71 AB-071 | Fluxo de troca, devolução e arrependimento | feature | pós-venda | v0.4.0 | E5 | P1 | Backlog |
-| #72 AB-072 | Usuários internos e permissões | feature | acesso | v0.2.0 | E2 | P0 | Backlog |
-| #73 AB-073 | Promoções, cupons e frete cortesia | feature | back office | v0.4.0 | E5 | P1 | Backlog |
-| #74 AB-074 | Páginas institucionais editáveis | feature | back office | v0.4.0 | E5 | P1 | Backlog |
-| #75 AB-075 | LGPD: consentimento e direitos do titular | task | back office | v0.4.0 | E5 | P0 | Backlog |
-| #76 AB-076 | Log de auditoria de ações sensíveis | task | back office | v0.4.0 | E5 | P1 | Backlog |
-| #77 AB-077 | Testes automatizados e cobertura mínima | task | app | v1.0.0 | E6 | P0 | Backlog |
-| #78 AB-078 | Orçamento de performance | task | app | v1.0.0 | E6 | P1 | Backlog |
-| #79 AB-079 | Teste de carga | task | app | v1.0.0 | E6 | P2 | Backlog |
-| #80 AB-080 | Monitoramento de disponibilidade e alertas | task | app | v1.0.0 | E6 | P1 | Backlog |
-| #81 AB-081 | Backup e teste de restauração | task | app | v1.0.0 | E6 | P1 | Backlog |
-| #82 AB-082 | Deploy e checklist de lançamento | task | app | v1.0.0 | E6 | P0 | Backlog |
-| #173 AB-173 | Trocar unsafe-inline da CSP por nonce nas páginas de pagamento | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
-| #174 AB-174 | Restringir os curingas de domínio da CSP do Mercado Pago | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
-| #175 AB-175 | Rate limit nas Server Actions de pagamento e estorno | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
-| #176 AB-176 | Rodar npm audit no CI | task | app | v1.0.0 | E6 | P2 | Backlog |
-| #177 AB-177 | 2FA obrigatório para perfis internos com acesso financeiro | task | acesso | v1.0.0 | E6 | P1 | Backlog |
-| #178 AB-178 | Arquivar a AOC do Mercado Pago e a matriz de responsabilidades | task | pagamento | v1.0.0 | E6 | P1 | Backlog |
-| #179 AB-179 | Trocar as contas fictícias do seed no servidor de entrega | task | app | v1.0.0 | E6 | P1 | Backlog |
-| #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Backlog |
-| #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Backlog |
-| #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
+| #6 AB-006 | Setup do repositório: estrutura MVC, lint, formatter e templates | task | app | v0.1.0 | E1 | P0 | Concluído |
+| #7 AB-007 | Configurar ambientes e variáveis (dev, homologação, produção) | task | app | v0.1.0 | E1 | P0 | Em teste |
+| #8 AB-008 | Modelagem do banco de dados e migrations iniciais | feature | app | v0.1.0 | E1 | P0 | Concluído |
+| #9 AB-009 | Pipeline de CI com lint, testes e build | task | app | v0.1.0 | E1 | P0 | Concluído |
+| #10 AB-010 | Padrão de tratamento de erros, logs e rate limiting | task | app | v0.1.0 | E1 | P0 | Concluído |
+| #11 AB-011 | HTTPS obrigatório e headers de segurança | task | app | v0.1.0 | E1 | P0 | Concluído |
+| #12 AB-012 | Padrão de documentação de código | task | app | v0.1.0 | E1 | P1 | Concluído |
+| #13 AB-013 | Criar os tokens do design system Warm Editorial Atelier | task | app | v0.1.0 | E1 | P0 | Concluído |
+| #14 AB-014 | Redesenhar o logo e criar o kit de marca | task | app | v0.1.0 | E1 | P1 | Concluído |
+| #15 AB-015 | Componentes base da biblioteca de UI | feature | app | v0.1.0 | E1 | P0 | Concluído |
+| #16 AB-016 | Componentes de commerce | feature | app | v0.2.0 | E2 | P1 | Concluído |
+| #17 AB-017 | Layout base: header, footer e grid responsivo | feature | app | v0.1.0 | E1 | P0 | Concluído |
+| #18 AB-018 | Corrigir as divergências do protótipo Stitch | task | app | v0.1.0 | E0 | P1 | Bloqueado |
+| #19 AB-019 | Prototipar as telas faltantes | task | app | v0.1.0 | E1 | P1 | Em validação |
+| #20 AB-020 | Auditoria de acessibilidade WCAG 2.1 AA | task | app | v1.0.0 | E6 | P1 | Concluído |
+| #21 AB-021 | Cadastro de produtos no back office | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #22 AB-022 | Upload de imagens com conversão para WebP | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #23 AB-023 | Categorias, subcategorias e navegação | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #24 AB-024 | Listagem de produtos (PLP) com filtros avançados | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #25 AB-025 | Busca de produtos | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #26 AB-026 | Página de produto (PDP) | feature | catálogo | v0.2.0 | E2 | P0 | Concluído |
+| #27 AB-027 | Comparador de até 4 produtos | feature | catálogo | v0.2.0 | E2 | P2 | Concluído |
+| #28 AB-028 | Inativação de produtos sem perda de histórico | feature | catálogo | v0.2.0 | E2 | P1 | Concluído |
+| #29 AB-029 | Importação de produtos via CSV | feature | catálogo | v0.2.0 | E2 | P1 | Concluído |
+| #30 AB-030 | Home editorial com carrossel editável | feature | catálogo | v0.2.0 | E2 | P1 | Concluído |
+| #31 AB-031 | SEO técnico | task | catálogo | v1.0.0 | E6 | P1 | Concluído |
+| #32 AB-032 | Cadastro e login de PF e PJ | feature | acesso | v0.2.0 | E2 | P0 | Concluído |
+| #33 AB-033 | Recuperação de senha e 2FA opcional | feature | acesso | v0.2.0 | E2 | P0 | Concluído |
+| #34 AB-034 | Conta corporativa multiusuário com consulta de CNPJ | feature | acesso | v0.2.0 | E2 | P0 | Concluído |
+| #35 AB-035 | Perfis de acesso da conta corporativa | feature | acesso | v0.2.0 | E2 | P0 | Concluído |
+| #36 AB-036 | Múltiplos endereços por conta | feature | acesso | v0.2.0 | E2 | P1 | Concluído |
+| #37 AB-037 | Área do cliente | feature | acesso | v0.2.0 | E2 | P1 | Concluído |
+| #38 AB-038 | Lista de favoritos | feature | acesso | v0.2.0 | E2 | P2 | Concluído |
+| #39 AB-039 | Consulta de endereço via ViaCEP com fallback | feature | frete | v0.3.0 | E3 | P0 | Concluído |
+| #40 AB-040 | Módulo de frete com estratégias por modalidade | feature | frete | v0.3.0 | E3 | P0 | Concluído |
+| #41 AB-041 | Integração com a API dos Correios | feature | frete | v0.3.0 | E3 | P0 | Concluído |
+| #42 AB-042 | Integração com agregador de transportadoras | feature | frete | v0.3.0 | E3 | P1 | Concluído |
+| #43 AB-043 | Entrega própria com montagem por faixa de CEP | feature | frete | v0.3.0 | E3 | P1 | Concluído |
+| #44 AB-044 | Cotação manual de frete como contingência | feature | frete | v0.3.0 | E3 | P1 | Concluído |
+| #45 AB-045 | Recotação de frete ao alterar endereço | feature | frete | v0.3.0 | E3 | P2 | Concluído |
+| #46 AB-046 | Carrinho e lista de projeto salva | feature | carrinho e cotação | v0.3.0 | E3 | P0 | Concluído |
+| #47 AB-047 | Personalização e serviços adicionais no carrinho | feature | carrinho e cotação | v0.3.0 | E3 | P1 | Concluído |
+| #48 AB-048 | Solicitação de cotação com anexos | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Concluído |
+| #49 AB-049 | Número de cotação rastreável e validade | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Concluído |
+| #50 AB-050 | Back office comercial de cotações | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Concluído |
+| #51 AB-051 | Fluxo de aprovação de pedidos | feature | carrinho e cotação | v0.4.0 | E4 | P0 | Concluído |
+| #52 AB-052 | Tabela de preços por cliente e desconto por volume | feature | carrinho e cotação | v0.4.0 | E4 | P1 | Concluído |
+| #53 AB-053 | Agendamento de entrega e instalação | feature | carrinho e cotação | v0.3.0 | E3 | P1 | Concluído |
+| #54 AB-054 | Integração do Payment Brick do Mercado Pago | feature | pagamento | v0.3.0 | E3 | P0 | Concluído |
+| #55 AB-055 | Pix e boleto via Mercado Pago com expiração | feature | pagamento | v0.3.0 | E3 | P0 | Concluído |
+| #56 AB-056 | Parcelamento configurável | feature | pagamento | v0.3.0 | E3 | P1 | Concluído |
+| #57 AB-057 | Webhook do Mercado Pago | feature | pagamento | v0.3.0 | E3 | P0 | Concluído |
+| #58 AB-058 | Status de pagamento e payment_id | feature | pagamento | v0.3.0 | E3 | P0 | Concluído |
+| #59 AB-059 | Estornos total e parcial | feature | financeiro | v0.4.0 | E5 | P1 | Concluído |
+| #60 AB-060 | Fluxo de pagamento faturado 28/56 dias | feature | financeiro | v0.4.0 | E4 | P0 | Concluído |
+| #61 AB-061 | Aprovação de crédito corporativo | feature | financeiro | v0.4.0 | E4 | P0 | Concluído |
+| #62 AB-062 | Checklist PCI-DSS SAQ A | task | pagamento | v1.0.0 | E6 | P1 | Concluído |
+| #63 AB-063 | Emissão de NF-e via API | feature | financeiro | v0.4.0 | E5 | P1 | Concluído |
+| #64 AB-064 | Reserva, baixa e liberação de estoque | feature | pedidos | v0.3.0 | E3 | P0 | Concluído |
+| #65 AB-065 | Ciclo de vida do pedido | feature | pedidos | v0.3.0 | E3 | P0 | Concluído |
+| #66 AB-066 | Rastreamento do pedido | feature | pedidos | v0.3.0 | E3 | P1 | Concluído |
+| #67 AB-067 | E-mails transacionais | feature | pedidos | v0.3.0 | E3 | P1 | Concluído |
+| #68 AB-068 | Chamados de garantia e assistência técnica | feature | pós-venda | v0.4.0 | E5 | P1 | Concluído |
+| #69 AB-069 | Canal com vendedor dedicado (WhatsApp) | feature | pós-venda | v0.4.0 | E5 | P1 | Concluído |
+| #70 AB-070 | Agendamento de demonstração | feature | pós-venda | v0.4.0 | E5 | P2 | Concluído |
+| #71 AB-071 | Fluxo de troca, devolução e arrependimento | feature | pós-venda | v0.4.0 | E5 | P1 | Concluído |
+| #72 AB-072 | Usuários internos e permissões | feature | acesso | v0.2.0 | E2 | P0 | Concluído |
+| #73 AB-073 | Promoções, cupons e frete cortesia | feature | back office | v0.4.0 | E5 | P1 | Concluído |
+| #74 AB-074 | Páginas institucionais editáveis | feature | back office | v0.4.0 | E5 | P1 | Concluído |
+| #75 AB-075 | LGPD: consentimento e direitos do titular | task | back office | v0.4.0 | E5 | P0 | Concluído |
+| #76 AB-076 | Log de auditoria de ações sensíveis | task | back office | v0.4.0 | E5 | P1 | Concluído |
+| #77 AB-077 | Testes automatizados e cobertura mínima | task | app | v1.0.0 | E6 | P0 | Concluído |
+| #78 AB-078 | Orçamento de performance | task | app | v1.0.0 | E6 | P1 | Concluído |
+| #79 AB-079 | Teste de carga | task | app | v1.0.0 | E6 | P2 | Em revisão |
+| #80 AB-080 | Monitoramento de disponibilidade e alertas | task | app | v1.0.0 | E6 | P1 | Em teste |
+| #81 AB-081 | Backup e teste de restauração | task | app | v1.0.0 | E6 | P1 | Concluído |
+| #82 AB-082 | Deploy e checklist de lançamento | task | app | v1.0.0 | E6 | P0 | Em teste |
+| #173 AB-173 | Trocar unsafe-inline da CSP por nonce nas páginas de pagamento | task | pagamento | v1.0.0 | E6 | P1 | Concluído |
+| #174 AB-174 | Restringir os curingas de domínio da CSP do Mercado Pago | task | pagamento | v1.0.0 | E6 | P2 | Em teste |
+| #175 AB-175 | Rate limit nas Server Actions de pagamento e estorno | task | pagamento | v1.0.0 | E6 | P1 | Concluído |
+| #176 AB-176 | Rodar npm audit no CI | task | app | v1.0.0 | E6 | P2 | Concluído |
+| #177 AB-177 | 2FA obrigatório para perfis internos com acesso financeiro | task | acesso | v1.0.0 | E6 | P1 | Concluído |
+| #178 AB-178 | Arquivar a AOC do Mercado Pago e a matriz de responsabilidades | task | pagamento | v1.0.0 | E6 | P1 | Bloqueado |
+| #179 AB-179 | Trocar as contas fictícias do seed no servidor de entrega | task | app | v1.0.0 | E6 | P1 | Em teste |
+| #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Bloqueado |
+| #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Bloqueado |
+| #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Concluído |
+| #214 AB-214 | Validar CPF, telefone e força da senha no cadastro | feature | acesso | v1.0.0 | E6 | P1 | Em revisão |
+| #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em teste |
 
 ---
 
@@ -424,13 +426,16 @@ Arquivo único de tokens com a paleta aprovada (terracota ajustada para #7A5C4C,
 
 **Descrição**
 
-Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
+Novo símbolo sem leitura de botão “+” ou de farmácia e versões de uso. Logo escolhida: monograma AB com pena (ver `docs/AtelierBureau_Identidade_Visual.md`).
 
 **Critérios de aceite**
 
-- [ ] Versões horizontal, monograma, negativo e monocromática em SVG
-- [ ] Favicons 32, 180 e 512 px
-- [ ] Logo legível em 24 px de altura
+- [x] Logo oficial aprovada e decisão registrada em `docs/AtelierBureau_Identidade_Visual.md`
+- [x] Versões completa e horizontal (monograma) aplicadas no site por `components/brand/brand-logo.tsx`
+- [x] Favicons 32, 180 e 512 px
+- [x] Logo legível em 24 px de altura
+
+**Escopo alterado em 17/11/2026:** as versões em SVG (texto em curvas, negativa e monocromática) saíram desta issue, porque dependem do arquivo-fonte vetorial da arte. O site usa PNG transparente gerado da arte aprovada.
 
 ### AB-015 — Componentes base da biblioteca de UI
 
@@ -645,6 +650,28 @@ Subir o servidor local em Docker (app, MySQL, Caddy e backup), acessível pelos 
 - [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
 - [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
 - [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada
+
+### AB-217 — Otimizar o tempo de build e o tamanho da imagem
+
+**Issue:** #217  
+**Labels:** `tipo: task`, `área: app`, `performance`, `infra`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RNF10
+
+**Descrição**
+
+Ignorar a pasta `.claude/` (worktrees de agentes) no Git e no ESLint, porque o Tailwind v4 varre os arquivos fora do `.gitignore`. Ligar o cache persistente do Turbopack no build e guardar o cache do npm e do Next em cache mounts do Docker. Remover do estágio `migrate` os pacotes que o `migrate deploy` não usa. Rodar o `npm audit` num job próprio do CI. Escopo novo, a partir do levantamento de 17/11/2026: o build levava 243 s, o lint 544 s, e a imagem tinha 672 MB.
+
+**Critérios de aceite**
+
+- [ ] `next build` local sem `.next` em até 100 s e, com o cache, em até 50 s
+- [ ] `npm run lint` não varre `.claude/`
+- [ ] CSS gerado igual ao de antes (mesmo tamanho)
+- [ ] Imagem do `app` com o Prisma CLI menor, e `migrate deploy` aplicando todas as migrations num banco vazio
+- [ ] `docker compose up -d --build` sobe o `app` healthy
+- [ ] O job de audit continua falhando com alerta alto, e os demais passos do CI rodam mesmo assim
+- [ ] `npm run lint`, `npm run typecheck` e `npm test` passando
 
 ## Catálogo
 
@@ -983,6 +1010,27 @@ Perfis administrador, comercial, financeiro e estoque com permissões por módul
 
 - [ ] Cada perfil acessa só os seus módulos
 - [ ] Permissões verificadas no backend
+
+### AB-214 — Validar CPF, telefone e força da senha no cadastro
+
+**Issue:** #214  
+**Labels:** `tipo: feature`, `área: acesso`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RF39, RF40, RF09
+
+**Descrição**
+
+Máscara e limite de tamanho em CPF, CNPJ e telefone; telefone com DDD da Anatel e prefixo de celular ou fixo; senha nova com 10 a 128 caracteres, letra maiúscula, letra minúscula, número e caractere especial. Vale no cadastro, no aceite de convite e na redefinição de senha. Escopo novo: os requisitos não definiam política de senha.
+
+**Critérios de aceite**
+
+- [ ] CPF, CNPJ e telefone formatados durante a digitação, sem letras nem dígitos a mais
+- [ ] CPF com dígito verificador inválido recusado
+- [ ] Telefone com DDD inexistente, tamanho errado ou prefixo inválido recusado
+- [ ] Senha sem maiúscula, minúscula, número ou caractere especial recusada, com mensagem por regra
+- [ ] Mesmas regras no formulário e na Server Action
+- [ ] Testes de telefone, máscaras e regras de senha
 
 ## Frete
 
@@ -1458,6 +1506,8 @@ Reserva na criação do pedido, baixa na confirmação e liberação na expiraç
 **Descrição**
 
 Implementar os status e as transições permitidas do pedido.
+
+**Status implementados (12):** `AWAITING_SHIPPING_QUOTE` (Aguardando cotação de frete), `AWAITING_APPROVAL` (Aguardando aprovação), `AWAITING_PAYMENT` (Aguardando pagamento), `PAID` (Pagamento confirmado), `IN_PRODUCTION` (Em produção), `SEPARATING` (Em separação), `INVOICED` (Faturado), `SHIPPED` (Em transporte), `DELIVERED` (Entregue), `INSTALLED` (Instalado), `CANCELED` (Cancelado) e `REFUNDED` (Estornado), com as transições em `features/shared/lib/orders/order-status.ts`. O RF54 do levantamento lista 10; `AWAITING_SHIPPING_QUOTE` (cotação manual de frete, RN16) e `IN_PRODUCTION` (personalizados e sob encomenda, RN24) foram acrescentados na implementação e ainda precisam entrar no `.docx`, com NC.
 
 **Critérios de aceite**
 

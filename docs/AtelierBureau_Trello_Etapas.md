@@ -307,13 +307,16 @@ Checklist “Critérios de aceite”:
 **Etiquetas:** P1 — Importante, Design  
 **Issue:** #14 · **Área:** app · **Milestone:** v0.1.0 · **Referências:** Seção 7
 
-Novo símbolo sem leitura de botão “+” ou de farmácia, texto convertido em curvas e versões de uso.
+Novo símbolo sem leitura de botão “+” ou de farmácia e versões de uso. Logo escolhida: monograma AB com pena (ver `docs/AtelierBureau_Identidade_Visual.md`).
 
 Checklist “Critérios de aceite”:
 
-- [ ] Versões horizontal, monograma, negativo e monocromática em SVG
-- [ ] Favicons 32, 180 e 512 px
-- [ ] Logo legível em 24 px de altura
+- [x] Logo oficial aprovada e decisão registrada em `docs/AtelierBureau_Identidade_Visual.md`
+- [x] Versões completa e horizontal (monograma) aplicadas no site por `components/brand/brand-logo.tsx`
+- [x] Favicons 32, 180 e 512 px
+- [x] Logo legível em 24 px de altura
+
+**Escopo alterado em 17/11/2026:** as versões em SVG (texto em curvas, negativa e monocromática) saíram desta issue, porque dependem do arquivo-fonte vetorial da arte. O site usa PNG transparente gerado da arte aprovada.
 
 #### AB-015 — Componentes base da biblioteca de UI
 
@@ -862,6 +865,8 @@ Checklist “Critérios de aceite”:
 
 Implementar os status e as transições permitidas do pedido.
 
+Status implementados (12): `AWAITING_SHIPPING_QUOTE`, `AWAITING_APPROVAL`, `AWAITING_PAYMENT`, `PAID`, `IN_PRODUCTION`, `SEPARATING`, `INVOICED`, `SHIPPED`, `DELIVERED`, `INSTALLED`, `CANCELED` e `REFUNDED` (`features/shared/lib/orders/order-status.ts`). Os dois que não estão no RF54, `AWAITING_SHIPPING_QUOTE` (RN16) e `IN_PRODUCTION` (RN24), ainda precisam entrar no `.docx`.
+
 Checklist “Critérios de aceite”:
 
 - [ ] Transições inválidas recusadas
@@ -1173,6 +1178,7 @@ AB-179 — Trocar as contas fictícias do seed no servidor de entrega
 AB-180 — Certificado de CA pública ao publicar fora da rede local
 AB-181 — Varredura trimestral por ASV ao expor o site
 AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
+AB-217 — Otimizar o tempo de build e o tamanho da imagem
 ```
 
 ### Detalhamento dos cards
@@ -1415,3 +1421,20 @@ Checklist “Critérios de aceite”:
 
 - [ ] Política de segurança da informação versionada em `docs/`
 - [ ] Plano de resposta a incidentes de pagamento versionado em `docs/`
+
+#### AB-217 — Otimizar o tempo de build e o tamanho da imagem
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade  
+**Issue:** #217 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF10
+
+Ignorar a pasta `.claude/` (worktrees de agentes) no Git e no ESLint, porque o Tailwind v4 varre os arquivos fora do `.gitignore`. Ligar o cache persistente do Turbopack no build e guardar o cache do npm e do Next em cache mounts do Docker. Remover do estágio `migrate` os pacotes que o `migrate deploy` não usa. Rodar o `npm audit` num job próprio do CI. Escopo novo, a partir do levantamento de 17/11/2026: o build levava 243 s, o lint 544 s, e a imagem tinha 672 MB.
+
+Checklist “Critérios de aceite”:
+
+- [ ] `next build` local sem `.next` em até 100 s e, com o cache, em até 50 s
+- [ ] `npm run lint` não varre `.claude/`
+- [ ] CSS gerado igual ao de antes (mesmo tamanho)
+- [ ] Imagem do `app` com o Prisma CLI menor, e `migrate deploy` aplicando todas as migrations num banco vazio
+- [ ] `docker compose up -d --build` sobe o `app` healthy
+- [ ] O job de audit continua falhando com alerta alto, e os demais passos do CI rodam mesmo assim
+- [ ] `npm run lint`, `npm run typecheck` e `npm test` passando

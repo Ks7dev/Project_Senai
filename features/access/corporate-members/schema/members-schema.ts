@@ -3,6 +3,8 @@ import {
   isValidCpf,
   onlyDigits,
 } from "@/features/shared/lib/validation/documents"
+import { newPasswordSchema } from "@/features/shared/schema/password-schema"
+import { phoneSchema } from "@/features/shared/schema/phone-schema"
 
 const role = z.enum(["requester", "approver", "finance", "admin"])
 
@@ -36,11 +38,8 @@ export const acceptWithSignUpSchema = z
     invitationId: z.string().min(1),
     name: z.string().trim().min(3, "Informe o nome completo.").max(160),
     cpf: z.string().transform(onlyDigits).refine(isValidCpf, "CPF inválido."),
-    phone: z
-      .string()
-      .transform(onlyDigits)
-      .refine((v) => v.length === 10 || v.length === 11, "Telefone inválido."),
-    password: z.string().min(10, "Use pelo menos 10 caracteres.").max(128),
+    phone: phoneSchema,
+    password: newPasswordSchema,
     confirmPassword: z.string(),
     acceptTerms: z.literal(true, {
       error: "Aceite os termos de uso e a política de privacidade.",

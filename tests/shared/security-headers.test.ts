@@ -21,6 +21,17 @@ describe("Content-Security-Policy (#11)", () => {
     expect(production).toContain("upgrade-insecure-requests")
   })
 
+  it("lists only concrete Mercado Pago hosts, without wildcards (#174)", () => {
+    expect(production).not.toContain("*")
+    for (const host of [
+      "https://http2.mlstatic.com",
+      "https://api.mercadopago.com",
+      "https://secure-fields.mercadopago.com",
+    ]) {
+      expect(production).toContain(host)
+    }
+  })
+
   it("only allows eval in development", () => {
     expect(production).not.toContain("'unsafe-eval'")
     expect(buildContentSecurityPolicy(true)).toContain("'unsafe-eval'")
@@ -28,7 +39,7 @@ describe("Content-Security-Policy (#11)", () => {
 
   it("sends nosniff and denies framing", () => {
     const headers = Object.fromEntries(
-      securityHeaders(false).map((h) => [h.key, h.value])
+      securityHeaders().map((h) => [h.key, h.value])
     )
     expect(headers["X-Content-Type-Options"]).toBe("nosniff")
     expect(headers["X-Frame-Options"]).toBe("DENY")

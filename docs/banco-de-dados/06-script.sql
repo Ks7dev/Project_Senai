@@ -47,6 +47,7 @@ CREATE TABLE `sessions` (
     `user_agent` TEXT NULL,
     `user_id` VARCHAR(36) NOT NULL,
     `active_organization_id` VARCHAR(36) NULL,
+    `two_factor_verified` BOOLEAN NOT NULL DEFAULT false,
 
     UNIQUE INDEX `sessions_token_key`(`token`),
     INDEX `sessions_user_id_idx`(`user_id`),
@@ -785,6 +786,18 @@ CREATE TABLE `audit_logs` (
     INDEX `audit_logs_action_created_at_idx`(`action`, `created_at`),
     INDEX `audit_logs_created_at_idx`(`created_at`),
     PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `rate_limit_buckets` (
+    `key_hash` CHAR(64) NOT NULL,
+    `window_start` DATETIME(3) NOT NULL,
+    `scope` VARCHAR(32) NOT NULL,
+    `hits` INTEGER NOT NULL DEFAULT 0,
+    `expires_at` DATETIME(3) NOT NULL,
+
+    INDEX `rate_limit_buckets_expires_at_idx`(`expires_at`),
+    PRIMARY KEY (`key_hash`, `window_start`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- CreateTable

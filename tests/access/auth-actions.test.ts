@@ -20,6 +20,11 @@ vi.mock("@/features/shared/lib/brasilapi/cnpj", () => ({
   lookupCnpj: (cnpj: string) => lookupCnpj(cnpj),
 }))
 vi.mock("@/features/shared/lib/auth/auth", () => ({ getAuth: () => ({ api }) }))
+// The login limit per account has its own test (SEC-005, #220)
+vi.mock("@/features/shared/lib/rate-limit/persistent-limit", () => ({
+  enforcePersistentRateLimits: vi.fn(async () => undefined),
+  releasePersistentRateLimit: vi.fn(async () => undefined),
+}))
 const sendEmail = vi.fn()
 vi.mock("@/features/shared/lib/email/mailer", () => ({
   sendEmail: (message: unknown) => sendEmail(message),
@@ -45,8 +50,8 @@ const pf = {
   personType: "PF" as const,
   name: "Cliente Fictício",
   email: "cliente@exemplo.test",
-  password: "senha-segura-123",
-  confirmPassword: "senha-segura-123",
+  password: "Senha-segura-123",
+  confirmPassword: "Senha-segura-123",
   acceptTerms: true as const,
   cpf: "900.000.001-75",
 }
@@ -88,7 +93,7 @@ describe("signUp (RF39)", () => {
         body: expect.objectContaining({
           personType: "PF",
           document: encryptPersonal("90000000175"),
-          password: "senha-segura-123",
+          password: "Senha-segura-123",
         }),
       })
     )
@@ -166,7 +171,7 @@ describe("signIn (RF39, RF40)", () => {
   it("reports when the account requires the 2FA code", async () => {
     api.signInEmail.mockResolvedValue({ twoFactorRedirect: true })
     expect(
-      await signIn({ email: "a@b.test", password: "senha-segura-123" })
+      await signIn({ email: "a@b.test", password: "Senha-segura-123" })
     ).toEqual({ success: true, twoFactor: true })
   })
 
@@ -191,8 +196,8 @@ describe("password reset (RF40)", () => {
     expect(
       await resetPassword({
         token: "used-token",
-        password: "nova-senha-123",
-        confirmPassword: "nova-senha-123",
+        password: "Nova-senha-123",
+        confirmPassword: "Nova-senha-123",
       })
     ).toEqual({
       success: false,

@@ -14,6 +14,7 @@ import {
 const requirePermission = vi.fn()
 const transitionOrder = vi.fn()
 const createMercadoPagoRefund = vi.fn()
+const enforcePersistentRateLimits = vi.fn()
 
 /** Fake Prisma: the same object is the client and the transaction. */
 const db = {
@@ -37,6 +38,14 @@ vi.mock("@/features/shared/lib/db/permissions", () => ({
   requirePermission: (permission: string) => requirePermission(permission),
 }))
 vi.mock("@/features/shared/lib/db/prisma", () => ({ prisma: db }))
+vi.mock(
+  "@/features/shared/lib/rate-limit/persistent-limit",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    enforcePersistentRateLimits: (...args: unknown[]) =>
+      enforcePersistentRateLimits(...args),
+  })
+)
 vi.mock("@/features/shared/lib/orders/order-lifecycle", () => ({
   transitionOrder: (...args: unknown[]) => transitionOrder(...args),
 }))
@@ -517,6 +526,8 @@ describe("refund actions (#59)", () => {
     requirePermission.mockReset()
     transitionOrder.mockReset()
     createMercadoPagoRefund.mockReset()
+    enforcePersistentRateLimits.mockReset()
+    enforcePersistentRateLimits.mockResolvedValue(undefined)
     requirePermission.mockResolvedValue({
       user: { id: "finance-1", name: "Financeiro", email: "f@x.test" },
       permissions: new Set(["payment:refund", "credit:approve"]),
@@ -535,6 +546,43 @@ describe("refund actions (#59)", () => {
     kind: "FULL" as const,
     note: "Cliente desistiu da compra dentro do prazo.",
   }
+
+  it("refuses a refund request over the per-user limit before any change (#175)", async () => {
+    const { AppError } =
+      await import("@/features/shared/lib/errors/action-result")
+    const { RATE_LIMITED_MESSAGE } =
+      await import("@/features/shared/lib/rate-limit/persistent-limit")
+    enforcePersistentRateLimits.mockRejectedValue(
+      new AppError(RATE_LIMITED_MESSAGE, "rate_limited")
+    )
+
+    const result = await requestRefund(withdrawal)
+
+    expect(result).toEqual({ success: false, error: RATE_LIMITED_MESSAGE })
+    expect(enforcePersistentRateLimits).toHaveBeenCalledWith(
+      [{ scope: "refund.user", subject: "finance-1" }],
+      { userId: "finance-1", action: "requestRefund", entityId: orderId }
+    )
+    expect(db.$transaction).not.toHaveBeenCalled()
+    expect(createMercadoPagoRefund).not.toHaveBeenCalled()
+  })
+
+  it("counts a refund retry against the same per-user limit (#175)", async () => {
+    const { AppError } =
+      await import("@/features/shared/lib/errors/action-result")
+    enforcePersistentRateLimits.mockRejectedValue(
+      new AppError("limite", "rate_limited")
+    )
+
+    const result = await retryRefund({ refundId })
+
+    expect(result).toEqual({ success: false, error: "limite" })
+    expect(enforcePersistentRateLimits).toHaveBeenCalledWith(
+      [{ scope: "refund.user", subject: "finance-1" }],
+      expect.objectContaining({ action: "retryRefund", entityId: refundId })
+    )
+    expect(createMercadoPagoRefund).not.toHaveBeenCalled()
+  })
 
   it("refunds a PF withdrawal in full through Mercado Pago, audited", async () => {
     db.$queryRaw.mockResolvedValue([{ id: orderId }])

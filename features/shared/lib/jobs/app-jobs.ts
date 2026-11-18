@@ -5,6 +5,7 @@ import { processDueInvoices } from "@/features/shared/lib/nfe/nfe-service"
 import { expireUnpaidOrders } from "@/features/shared/lib/orders/order-expiration"
 import { reconcilePendingPayments } from "@/features/shared/lib/payments/payment-reconciliation"
 import { expireQuotes } from "@/features/shared/lib/quotes/quote-expiration"
+import { pruneRateLimitBuckets } from "@/features/shared/lib/rate-limit/persistent-limit"
 
 /** One minute, in milliseconds. */
 const MINUTE = 60_000
@@ -21,7 +22,8 @@ const MINUTE = 60_000
  * - marks the quotes past their validity as expired, so their prices
  *   are revalidated before an order (RN02);
  * - issues the NF-e of the confirmed orders and retries the failed ones
- *   (RF13, #63).
+ *   (RF13, #63);
+ * - deletes the rate limit windows that already ended (#175).
  */
 export const appJobs: readonly Job[] = [
   {
@@ -52,5 +54,10 @@ export const appJobs: readonly Job[] = [
     name: "issue-nfe",
     everyMs: MINUTE,
     run: () => processDueInvoices(),
+  },
+  {
+    name: "prune-rate-limits",
+    everyMs: 30 * MINUTE,
+    run: () => pruneRateLimitBuckets(),
   },
 ]

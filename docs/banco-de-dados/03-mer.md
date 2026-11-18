@@ -51,6 +51,7 @@ erDiagram
     text user_agent
     varchar_36 user_id FK
     varchar_36 active_organization_id
+    tinyint_1 two_factor_verified
   }
   accounts {
     varchar_36 id PK
@@ -724,6 +725,13 @@ erDiagram
     datetime_3 sent_at
     datetime_3 created_at
     datetime_3 updated_at
+  }
+  rate_limit_buckets {
+    char_64 key_hash PK
+    datetime_3 window_start PK
+    varchar_32 scope
+    int hits
+    datetime_3 expires_at
   }
 ```
 

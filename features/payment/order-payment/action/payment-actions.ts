@@ -4,10 +4,7 @@ import type { Prisma } from "@/generated/prisma/client"
 import {
   orderPaymentSchema,
   payOrderSchema,
-  type BoletoFormData,
-  type CardFormData,
   type PayOrderInput,
-  type PixFormData,
 } from "@/features/payment/order-payment/schema/payment-schema"
 import { getCurrentUser } from "@/features/shared/lib/auth/session"
 import { UNAUTHENTICATED_MESSAGE } from "@/features/shared/lib/db/permissions"
@@ -21,10 +18,9 @@ import { logger } from "@/features/shared/lib/logger/logger"
 import {
   createMercadoPagoPayment,
   MercadoPagoError,
+  ensureMercadoPagoSandboxChecked,
   mercadoPagoConfig,
-  mercadoPagoNotificationUrl,
   mercadoPagoPublicKey,
-  type CreatePaymentBody,
   type PaymentStatusKey,
   type ProviderPayment,
 } from "@/features/shared/lib/mercadopago/mercadopago"
@@ -34,17 +30,18 @@ import {
   PAYMENT_STATUS,
   paymentStatusMessage,
 } from "@/features/shared/lib/payments/payment-messages"
+import { buildPaymentBody } from "@/features/shared/lib/mercadopago/payment-body"
 import {
   loadPaymentDeadlines,
   paymentExpiresAt,
-  toMercadoPagoDate,
 } from "@/features/shared/lib/payments/payment-deadlines"
 import { loadInstallmentRules } from "@/features/shared/lib/payments/installment-rules"
 import { refreshPendingPayment } from "@/features/shared/lib/payments/payment-reconciliation"
 import { applyProviderPayment } from "@/features/shared/lib/payments/payment-sync"
 import { enforceActionRateLimit } from "@/features/shared/lib/rate-limit/action-limit"
+import { enforcePersistentRateLimits } from "@/features/shared/lib/rate-limit/persistent-limit"
+import { getClientIp } from "@/features/shared/lib/request/client-ip"
 import { maxInstallmentsFor } from "@/features/shared/schema/installment-schema"
-import { decryptPersonal } from "@/features/shared/lib/crypto/personal-data-cipher"
 
 /** Methods paid online through the Payment Brick (RF29). */
 const ONLINE_METHODS = ["CARD", "PIX", "BOLETO"] as const
@@ -212,7 +209,35 @@ const orderSelect = {
   status: true,
   paymentMethod: true,
   total: true,
-  user: { select: { email: true, document: true, personType: true } },
+  shippingAddress: true,
+  user: {
+    select: {
+      name: true,
+      email: true,
+      document: true,
+      phone: true,
+      personType: true,
+    },
+  },
+  items: {
+    select: {
+      skuCode: true,
+      productName: true,
+      quantity: true,
+      unitPrice: true,
+      sku: {
+        select: {
+          product: {
+            select: {
+              description: true,
+              category: { select: { slug: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { id: "asc" },
+  },
   payments: { select: paymentSelect, orderBy: { createdAt: "desc" } },
 } satisfies Prisma.OrderSelect
 
@@ -307,6 +332,7 @@ export async function getOrderPayment(input: {
     if (!parsed.success) throw new AppError("Pedido inválido.", "invalid")
     const userId = await sessionUserId()
     const order = await loadOwnOrder(prisma, parsed.data.orderId, userId)
+    await ensureMercadoPagoSandboxChecked()
     const publicKey = mercadoPagoConfig() ? mercadoPagoPublicKey() : null
     const reason = blockedReason(order)
     return {
@@ -332,86 +358,37 @@ export async function getOrderPayment(input: {
   }
 }
 
-/** Brick data of the chosen method. */
-type MethodFormData =
-  | { method: "CARD"; formData: CardFormData }
-  | { method: "PIX"; formData: PixFormData }
-  | { method: "BOLETO"; formData: BoletoFormData }
-
 /**
- * Builds the `/v1/payments` body (RF36). The amount comes from the
- * order, never from the browser. A card is only the Brick token (RF35,
- * RN19), with 3DS when the issuer asks (RF37); Pix and boleto carry the
- * configured expiration (RN14).
+ * Counts a payment attempt and refuses it over the limits (#175, PCI
+ * 8): per order and per client IP (set by the Caddy proxy, never read
+ * from the body), from the settings table. Only the buyer's own order
+ * is counted, so nobody exhausts the attempts of someone else's order.
  *
- * @param input - Order, payment row, expiration and Brick data.
- * @returns The body.
+ * @param orderId - Order id.
+ * @param userId - Session user id.
+ * @throws AppError("not_found") or AppError("rate_limited").
  */
-function paymentBody(
-  input: {
-    order: PayableOrder
-    paymentRowId: string
-    expiresAt: Date | null
-  } & MethodFormData
-): CreatePaymentBody {
-  const { order } = input
-  const notificationUrl = mercadoPagoNotificationUrl()
-  const document = {
-    type: order.user.personType === "PJ" ? "CNPJ" : "CPF",
-    number: decryptPersonal(order.user.document),
-  }
-  const common = {
-    transaction_amount: Number(order.total.toFixed(2)),
-    description: `Pedido ${order.number} — Atelier Bureau`,
-    external_reference: input.paymentRowId,
-    ...(notificationUrl ? { notification_url: notificationUrl } : {}),
-    metadata: { order_number: order.number },
-    ...(input.expiresAt
-      ? { date_of_expiration: toMercadoPagoDate(input.expiresAt) }
-      : {}),
-  }
-  if (input.method === "CARD") {
-    const { formData } = input
-    return {
-      ...common,
-      payment_method_id: formData.payment_method_id,
-      token: formData.token,
-      installments: formData.installments,
-      ...(formData.issuer_id ? { issuer_id: formData.issuer_id } : {}),
-      three_d_secure_mode: "optional",
-      statement_descriptor: "ATELIERBUREAU",
-      payer: {
-        email: order.user.email,
-        identification: formData.payer?.identification ?? document,
-      },
-    }
-  }
-  if (input.method === "PIX") {
-    return {
-      ...common,
-      payment_method_id: "pix",
-      payer: { email: order.user.email, identification: document },
-    }
-  }
-  const { payer } = input.formData
-  return {
-    ...common,
-    payment_method_id: input.formData.payment_method_id,
-    payer: {
-      email: order.user.email,
-      first_name: payer.first_name,
-      last_name: payer.last_name,
-      identification: payer.identification,
-      address: payer.address,
-    },
-  }
+async function enforcePaymentRateLimits(
+  orderId: string,
+  userId: string
+): Promise<void> {
+  const owned = await prisma.order.count({ where: { id: orderId, userId } })
+  if (owned === 0) throw new AppError("Pedido não encontrado.", "not_found")
+  await enforcePersistentRateLimits(
+    [
+      { scope: "payment.order", subject: orderId },
+      { scope: "payment.ip", subject: (await getClientIp()) ?? "unknown" },
+    ],
+    { userId, action: "payOrder", entityId: orderId }
+  )
 }
 
 /**
  * Pays an order with the Payment Brick by card, Pix or boleto (RF28,
  * RF29, RF35, RF36, RF37):
  * 1. checks the payload has no card data and validates it (RN19);
- * 2. takes the buyer from the session;
+ * 2. takes the buyer from the session and counts the attempt against
+ *    the limits per order and per IP (#175);
  * 3. locks the order, checks it waits for this payment and opens a
  *    payment row with the order total and, for Pix and boleto, the
  *    configured expiration (RN14);
@@ -438,7 +415,8 @@ export async function payOrder(
     }
     const data = parsed.data
     const userId = await sessionUserId()
-    await enforceActionRateLimit("payment", { limit: 10, windowMs: 60_000 })
+    await enforcePaymentRateLimits(data.orderId, userId)
+    await ensureMercadoPagoSandboxChecked()
     if (!mercadoPagoConfig()) {
       throw new AppError(PAYMENT_OFF_MESSAGE, "payment_off")
     }
@@ -487,7 +465,7 @@ export async function payOrder(
     let provider: ProviderPayment
     try {
       provider = await createMercadoPagoPayment(
-        paymentBody({
+        buildPaymentBody({
           order: opened.order,
           paymentRowId: opened.paymentRowId,
           expiresAt: opened.expiresAt,

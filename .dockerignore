@@ -11,3 +11,4 @@ deploy/certs
 .git
 docs
 *.zip
+.claude

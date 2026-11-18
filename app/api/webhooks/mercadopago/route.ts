@@ -5,6 +5,7 @@ import {
   verifyWebhookSignature,
 } from "@/features/shared/lib/mercadopago/mercadopago"
 import { processPaymentNotification } from "@/features/shared/lib/payments/payment-reconciliation"
+import { readLimitedText } from "@/features/shared/lib/request/read-limited-body"
 
 /** Largest notification body accepted, in bytes. */
 const MAX_BODY_BYTES = 16_384
@@ -45,11 +46,12 @@ export async function POST(request: Request): Promise<Response> {
     return reply(503, { ok: false })
   }
 
-  const text = await request.text()
-  if (text.length > MAX_BODY_BYTES) return reply(413, { ok: false })
+  // Streamed with a byte ceiling, even without Content-Length (SEC-006)
+  const raw = await readLimitedText(request, MAX_BODY_BYTES)
+  if (!raw.ok) return reply(413, { ok: false })
   let body: { type?: unknown; data?: { id?: unknown } } = {}
   try {
-    body = text ? JSON.parse(text) : {}
+    body = raw.text ? JSON.parse(raw.text) : {}
   } catch {
     return reply(400, { ok: false })
   }

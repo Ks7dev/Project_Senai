@@ -1,6 +1,6 @@
 {
   "name": "atelier-bureau",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,12 +16,15 @@
     "test:e2e": "playwright test",
     "perf:budget": "tsx scripts/performance-budget.ts",
     "perf:api": "tsx scripts/api-latency.ts",
+    "perf:load": "tsx scripts/load-test.ts",
+    "security:payment-page": "tsx scripts/check-payment-page.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:validate": "prisma validate",
-    "db:docs": "tsx scripts/db-docs/generate-db-docs.mts"
+    "db:docs": "tsx scripts/db-docs/generate-db-docs.mts",
+    "accounts:rotate-seed": "tsx scripts/rotate-seed-accounts.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -63,6 +66,14 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    },
+    "@ts-morph/common": {
+      "minimatch": "^11.0.1"
+    }
   },
   "engines": {
     "node": ">=24"
