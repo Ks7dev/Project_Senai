@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { placeOrderSchema } from "@/features/payment/checkout/schema/checkout-schema"
 import {
   containsCardData,
+  deviceIdSchema,
   payOrderSchema,
 } from "@/features/payment/order-payment/schema/payment-schema"
 import { addressLine } from "@/features/shared/lib/addresses/address-snapshot"
@@ -69,6 +70,40 @@ describe("card data never reaches the backend (#54, RN19)", () => {
         formData: withoutToken,
       }).success
     ).toBe(false)
+  })
+})
+
+describe("Mercado Pago device id (#232)", () => {
+  const pay = (deviceId: unknown) =>
+    payOrderSchema.safeParse({
+      orderId,
+      method: "PIX",
+      formData: { payment_method_id: "pix" },
+      deviceId,
+    })
+
+  it("is optional and kept when well formed", () => {
+    expect(pay(undefined).success).toBe(true)
+    const deviceId =
+      "01F2CA1F70E3F0CEC24677A4454F22E60EE14D0679A912B9BF145D135F164734"
+    expect(pay(deviceId).data?.deviceId).toBe(deviceId)
+    expect(deviceIdSchema.safeParse("armor.abc-123_x:y").success).toBe(true)
+  })
+
+  it("refuses values that could break or bloat the header", () => {
+    for (const value of [
+      "",
+      "short",
+      "a".repeat(129),
+      "abc12345\r\nX-Other: 1",
+      "abc 12345",
+      "abc123<script>",
+      12345678,
+      null,
+    ]) {
+      expect(deviceIdSchema.safeParse(value).success).toBe(false)
+      expect(pay(value).success).toBe(false)
+    }
   })
 })
 

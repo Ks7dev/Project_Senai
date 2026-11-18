@@ -1,6 +1,6 @@
 {
   "path": "/conta/pedidos/{id}/pagamento",
-  "contentSecurityPolicy": "default-src 'self'; script-src 'self' 'nonce-{nonce}' https://sdk.mercadopago.com https://http2.mlstatic.com; style-src 'self' 'unsafe-inline' https://http2.mlstatic.com; img-src 'self' data: blob: https://http2.mlstatic.com; font-src 'self' data: https://http2.mlstatic.com; connect-src 'self' https://api.mercadopago.com https://api.mercadolibre.com https://http2.mlstatic.com https://secure-fields.mercadopago.com https://api-static.mercadopago.com; frame-src 'self' https://sdk.mercadopago.com https://secure-fields.mercadopago.com https://api-static.mercadopago.com https://www.mercadopago.com.br https://www.mercadolivre.com.br; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests; report-uri /api/csp-report; report-to csp-endpoint",
+  "contentSecurityPolicy": "default-src 'self'; script-src 'self' 'nonce-{nonce}' https://sdk.mercadopago.com https://http2.mlstatic.com https://www.mercadopago.com; style-src 'self' 'unsafe-inline' https://http2.mlstatic.com; img-src 'self' data: blob: https://http2.mlstatic.com https://www.mercadolibre.com https://www.mercadolivre.com https://www.mercadopago.com.br; font-src 'self' data: https://http2.mlstatic.com; connect-src 'self' https://api.mercadopago.com https://api.mercadolibre.com https://http2.mlstatic.com https://www.mercadolibre.com https://secure-fields.mercadopago.com https://api-static.mercadopago.com; frame-src 'self' https://sdk.mercadopago.com https://secure-fields.mercadopago.com https://api-static.mercadopago.com https://www.mercadopago.com.br https://www.mercadolivre.com.br; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests; report-uri /api/csp-report; report-to csp-endpoint",
   "scripts": [
     {
       "src": "/_next/static/",
@@ -11,6 +11,11 @@
       "src": "https://sdk.mercadopago.com/js/v2",
       "match": "exact",
       "justification": "SDK do Mercado Pago, obrigatório para o Payment Brick e a tokenização do cartão (RF28, RF35)"
+    },
+    {
+      "src": "https://www.mercadopago.com/v2/security.js",
+      "match": "exact",
+      "justification": "Script de segurança do Mercado Pago (view=\"checkout\"), que gera o device_id do comprador enviado no cabeçalho X-meli-session-id para a análise antifraude (#232)"
     }
   ]
 }

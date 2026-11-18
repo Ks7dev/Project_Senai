@@ -1,6 +1,15 @@
 /** Mercado Pago JS SDK v2, loaded only on the payment page (RF28). */
 export const MERCADO_PAGO_SDK_URL = "https://sdk.mercadopago.com/js/v2"
 
+/**
+ * Mercado Pago security script (#232), loaded with `view="checkout"` on
+ * the payment page. It creates the buyer `device_id` in the global
+ * `MP_DEVICE_SESSION_ID`, sent in `X-meli-session-id` when the payment
+ * is created, which helps the fraud analysis approve more payments.
+ */
+export const MERCADO_PAGO_SECURITY_URL =
+  "https://www.mercadopago.com/v2/security.js"
+
 /** A mounted Brick. */
 export type BrickController = {
   /** Removes the Brick from the page. */
@@ -42,6 +51,8 @@ declare global {
       publicKey: string,
       options?: { locale?: string }
     ) => MercadoPagoInstance
+    /** Device id created by the security script (#232). */
+    MP_DEVICE_SESSION_ID?: unknown
   }
 }
 
@@ -54,4 +65,16 @@ declare global {
 export function createBricksBuilder(publicKey: string): BricksBuilder | null {
   if (typeof window === "undefined" || !window.MercadoPago) return null
   return new window.MercadoPago(publicKey, { locale: "pt-BR" }).bricks()
+}
+
+/**
+ * Device id created by the Mercado Pago security script (#232), if it
+ * already ran. The server validates the format again.
+ *
+ * @returns The device id, or undefined.
+ */
+export function readDeviceSessionId(): string | undefined {
+  if (typeof window === "undefined") return undefined
+  const value = window.MP_DEVICE_SESSION_ID
+  return typeof value === "string" && value ? value : undefined
 }

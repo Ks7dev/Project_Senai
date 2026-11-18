@@ -80,6 +80,10 @@ let mercadoPago: MercadoPagoScript = {
   status: "approved",
   detail: "accredited",
 }
+/** Fictitious device id of the Mercado Pago security script (#232). */
+const DEVICE_ID =
+  "TESTE0DEVICE0ID0000000000000000000000000000000000000000000000001"
+
 let mercadoPagoRequests: Array<{
   url: string
   headers: Record<string, string>
@@ -527,6 +531,7 @@ describe("card payment with the Payment Brick (#54, RF35, RF36, RN13)", () => {
       orderId: order.orderId,
       method: "CARD",
       formData: brickCard,
+      deviceId: DEVICE_ID,
     })
     expect(result).toMatchObject({
       success: true,
@@ -576,6 +581,10 @@ describe("card payment with the Payment Brick (#54, RF35, RF36, RN13)", () => {
       where: { orderId: order.orderId },
     })
     expect(request.headers["X-Idempotency-Key"]).toBe(payment.id)
+    // Device id of the security script in its header, never stored (#232)
+    expect(request.headers["X-meli-session-id"]).toBe(DEVICE_ID)
+    expect(request.body).not.toHaveProperty("deviceId")
+    expect(JSON.stringify(payment)).not.toContain(DEVICE_ID)
     expect(request.body.external_reference).toBe(payment.id)
     expect(JSON.stringify(payment)).not.toContain(brickCard.token)
     expect(payment.paymentId).toMatch(/^\d+$/)
@@ -778,6 +787,7 @@ describe("Pix and boleto with expiration (#55, RF29, RN14)", () => {
       transaction_amount: 291.8,
     })
     expect(request.body).not.toHaveProperty("token")
+    expect(request.headers).not.toHaveProperty("X-meli-session-id")
     const expiresAt = new Date(String(request.body.date_of_expiration))
     expect(expiresAt.getTime() - before).toBeGreaterThanOrEqual(
       30 * 60_000 - 5_000

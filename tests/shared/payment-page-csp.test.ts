@@ -13,6 +13,7 @@ import {
   createNonce,
   isPaymentPagePath,
   MERCADO_PAGO_CSP_HOSTS,
+  MERCADO_PAGO_DEVICE_CSP_HOSTS,
   NONCE_HEADER,
   STATIC_CSP_SOURCE,
 } from "@/features/shared/lib/security/headers"
@@ -25,6 +26,10 @@ import {
   parseCsp,
   type PaymentPageBaseline,
 } from "@/features/shared/lib/security/payment-page-monitor"
+import {
+  MERCADO_PAGO_SDK_URL,
+  MERCADO_PAGO_SECURITY_URL,
+} from "@/features/shared/lib/mercadopago/bricks"
 import {
   checkRemotePaymentPage,
   parseOptions,
@@ -114,12 +119,74 @@ describe("payment page CSP with nonce (#173)", () => {
 
 describe("Mercado Pago hosts (#174)", () => {
   it("never uses wildcard domains", () => {
-    const all = Object.values(MERCADO_PAGO_CSP_HOSTS).flat()
+    const all = [
+      ...Object.values(MERCADO_PAGO_CSP_HOSTS),
+      ...Object.values(MERCADO_PAGO_DEVICE_CSP_HOSTS),
+    ].flat()
     for (const host of all) {
       expect(host).toMatch(/^https:\/\/[a-z0-9.-]+$/)
     }
     expect(buildContentSecurityPolicy(false)).not.toContain("*")
     expect(buildPaymentContentSecurityPolicy(false, "n")).not.toContain("*")
+  })
+})
+
+describe("Mercado Pago security script (#232)", () => {
+  const payment = parseCsp(buildPaymentContentSecurityPolicy(false, "n"))
+  const statics = parseCsp(buildContentSecurityPolicy(false))
+
+  it("allows its concrete hosts only on the payment page", () => {
+    expect(payment.get("script-src")).toContain("https://www.mercadopago.com")
+    expect(payment.get("connect-src")).toEqual(
+      expect.arrayContaining([
+        "https://api.mercadopago.com",
+        "https://www.mercadolibre.com",
+      ])
+    )
+    expect(payment.get("img-src")).toEqual(
+      expect.arrayContaining([
+        "https://www.mercadolibre.com",
+        "https://www.mercadolivre.com",
+        "https://www.mercadopago.com.br",
+      ])
+    )
+    expect(payment.get("script-src")).not.toContain("'unsafe-inline'")
+    expect(statics.get("script-src")).not.toContain(
+      "https://www.mercadopago.com"
+    )
+    expect(statics.get("img-src")).not.toContain("https://www.mercadolibre.com")
+  })
+
+  it("is in the approved inventory, next to the SDK", () => {
+    const exact = approved.scripts
+      .filter((script) => script.match === "exact")
+      .map((script) => script.src)
+    expect(exact).toEqual(
+      expect.arrayContaining([MERCADO_PAGO_SDK_URL, MERCADO_PAGO_SECURITY_URL])
+    )
+    expect(MERCADO_PAGO_SECURITY_URL).toBe(
+      "https://www.mercadopago.com/v2/security.js"
+    )
+    expect(
+      checkScripts(
+        [{ src: MERCADO_PAGO_SECURITY_URL, nonce: "n1" }],
+        approved.scripts,
+        "n1"
+      )
+    ).toEqual([])
+  })
+
+  it("loads with the nonce and the checkout view on the payment page", () => {
+    const view = readFileSync(
+      join(
+        process.cwd(),
+        "features/payment/order-payment/order-payment-view.tsx"
+      ),
+      "utf8"
+    )
+    const tag = view.slice(view.indexOf("src={MERCADO_PAGO_SECURITY_URL}"))
+    expect(tag.slice(0, 200)).toContain("nonce={nonce}")
+    expect(view).toContain('{ view: "checkout" }')
   })
 })
 
