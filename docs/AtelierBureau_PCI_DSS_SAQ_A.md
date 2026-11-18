@@ -159,7 +159,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 - A página de pagamento é renderizada inteira por requisição (`instant = false` e leitura dos cabeçalhos antes de qualquer `Suspense`), porque um shell estático não teria o nonce.
 - Os links para a página de pagamento fazem carregamento completo do documento (`<a>` e `window.location.assign`), para que a CSP com nonce venha com a página, e não da página anterior.
 - As demais páginas continuam estáticas, com a CSP de `next.config.ts` (com `'unsafe-inline'`), que não se aplica à página de pagamento (`STATIC_CSP_SOURCE`).
-- Hosts liberados, sem curingas: `sdk.mercadopago.com` e `http2.mlstatic.com` (scripts); `api.mercadopago.com`, `api.mercadolibre.com` e `http2.mlstatic.com` (conexões); `secure-fields.mercadopago.com`, `api-static.mercadopago.com`, `sdk.mercadopago.com`, `www.mercadopago.com.br` e `www.mercadolivre.com.br` (iframes); `http2.mlstatic.com` (imagens, estilos e fontes). A lista saiu dos hosts referenciados pelo SDK JS v2 para o Brasil, porque o Mercado Pago não publica uma lista oficial de CSP para o Checkout Bricks.
+- Hosts liberados, sem curingas: `sdk.mercadopago.com` e `http2.mlstatic.com` (scripts); `api.mercadopago.com`, `api.mercadolibre.com`, `http2.mlstatic.com`, `secure-fields.mercadopago.com` e `api-static.mercadopago.com` (conexões); `secure-fields.mercadopago.com`, `api-static.mercadopago.com`, `sdk.mercadopago.com`, `www.mercadopago.com.br` e `www.mercadolivre.com.br` (iframes); `http2.mlstatic.com` (imagens, estilos e fontes). A lista saiu dos hosts referenciados pelo SDK JS v2 para o Brasil, porque o Mercado Pago não publica uma lista oficial de CSP para o Checkout Bricks.
 
 ### 5.2 Detecção de mudança (11.6.1)
 

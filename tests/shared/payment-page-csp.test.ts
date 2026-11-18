@@ -55,6 +55,13 @@ describe("payment page CSP with nonce (#173)", () => {
     expect(scriptSrc).not.toContain("'strict-dynamic'")
   })
 
+  it("lets the card fields reach their hosts in connect-src (#240)", () => {
+    const connectSrc = parseCsp(policy).get("connect-src") ?? []
+    expect(connectSrc).toContain("https://secure-fields.mercadopago.com")
+    expect(connectSrc).toContain("https://api-static.mercadopago.com")
+    expect(connectSrc.some((source) => source.includes("*"))).toBe(false)
+  })
+
   it("reports violations to the log route", () => {
     expect(policy).toContain("report-uri /api/csp-report")
     expect(policy).toContain("report-to csp-endpoint")
@@ -270,6 +277,84 @@ describe("CSP violation reports (#173)", () => {
     )
     expect(response.status).toBe(204)
     expect(write.mock.calls.flat().join(" ")).toContain("csp violation")
+  })
+})
+
+describe("CSP report route with real browser requests (#240)", () => {
+  const chromeBody = {
+    documentURL: "https://192.168.0.10/conta/pedidos/abc/pagamento",
+    blockedURL: "https://secure-fields.mercadopago.com/fields-manager",
+    effectiveDirective: "connect-src",
+    disposition: "enforce",
+  }
+
+  /** Streams the body in chunks, so the request has no Content-Length. */
+  function chunked(text: string, contentType: string) {
+    const bytes = new TextEncoder().encode(text)
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 20))
+        controller.enqueue(bytes.slice(20))
+        controller.close()
+      },
+    })
+    return new Request("https://loja.test/api/csp-report", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: stream,
+      duplex: "half",
+    } as RequestInit)
+  }
+
+  it("logs a Reporting API batch (application/reports+json)", async () => {
+    const write = vi.spyOn(console, "error").mockImplementation(() => {})
+    const batch = JSON.stringify([
+      {
+        age: 12,
+        type: "csp-violation",
+        url: chromeBody.documentURL,
+        user_agent: "Chrome",
+        body: chromeBody,
+      },
+    ])
+    const response = await cspReport(chunked(batch, "application/reports+json"))
+    expect(response.status).toBe(204)
+    const line = write.mock.calls.flat().join(" ")
+    expect(line).toContain("csp violation")
+    expect(line).toContain("https://secure-fields.mercadopago.com")
+    expect(line).toContain("connect-src")
+  })
+
+  it("logs a legacy report-uri body (application/csp-report)", async () => {
+    const write = vi.spyOn(console, "error").mockImplementation(() => {})
+    const legacy = JSON.stringify({
+      "csp-report": {
+        "document-uri": chromeBody.documentURL,
+        "blocked-uri": "https://api-static.mercadopago.com/x",
+        "effective-directive": "connect-src",
+        "violated-directive": "connect-src",
+        disposition: "enforce",
+      },
+    })
+    const response = await cspReport(chunked(legacy, "application/csp-report"))
+    expect(response.status).toBe(204)
+    expect(write.mock.calls.flat().join(" ")).toContain(
+      "https://api-static.mercadopago.com"
+    )
+  })
+
+  it("is not blocked by the proxy and keeps the report endpoint", () => {
+    const response = proxy(
+      new NextRequest("https://loja.test/api/csp-report", { method: "POST" })
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-security-policy")).toBeNull()
+    const page = proxy(
+      new NextRequest("https://loja.test/conta/pedidos/abc/pagamento")
+    )
+    expect(page.headers.get("reporting-endpoints")).toBe(
+      'csp-endpoint="/api/csp-report"'
+    )
   })
 })
 
