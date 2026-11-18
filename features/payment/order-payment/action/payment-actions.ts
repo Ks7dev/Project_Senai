@@ -21,6 +21,7 @@ import { logger } from "@/features/shared/lib/logger/logger"
 import {
   createMercadoPagoPayment,
   MercadoPagoError,
+  ensureMercadoPagoSandboxChecked,
   mercadoPagoConfig,
   mercadoPagoNotificationUrl,
   mercadoPagoPublicKey,
@@ -309,6 +310,7 @@ export async function getOrderPayment(input: {
     if (!parsed.success) throw new AppError("Pedido inválido.", "invalid")
     const userId = await sessionUserId()
     const order = await loadOwnOrder(prisma, parsed.data.orderId, userId)
+    await ensureMercadoPagoSandboxChecked()
     const publicKey = mercadoPagoConfig() ? mercadoPagoPublicKey() : null
     const reason = blockedReason(order)
     return {
@@ -467,6 +469,7 @@ export async function payOrder(
     const data = parsed.data
     const userId = await sessionUserId()
     await enforcePaymentRateLimits(data.orderId, userId)
+    await ensureMercadoPagoSandboxChecked()
     if (!mercadoPagoConfig()) {
       throw new AppError(PAYMENT_OFF_MESSAGE, "payment_off")
     }

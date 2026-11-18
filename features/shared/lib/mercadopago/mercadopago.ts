@@ -84,8 +84,23 @@ export class MercadoPagoError extends Error {
 const DEFAULT_BASE_URL = "https://api.mercadopago.com"
 const DEFAULT_TIMEOUT_MS = 10_000
 
-/** Prefix of the sandbox credentials (access token and public key). */
+/** Prefix of the legacy sandbox credentials (access token and public key). */
 const TEST_CREDENTIAL_PREFIX = "TEST-"
+
+/** Tag Mercado Pago puts on the test users (`GET /users/me`). */
+const TEST_USER_TAG = "test_user"
+
+/** Wait before checking a token again after a failed check. */
+const SANDBOX_RECHECK_MS = 5 * 60_000
+
+/**
+ * Access tokens confirmed as belonging to a Mercado Pago test user.
+ * New applications get `APP_USR-` test credentials from a test seller,
+ * so the prefix alone cannot tell sandbox from production (#229).
+ */
+const verifiedTestTokens = new Set<string>()
+let pendingSandboxCheck: Promise<void> | null = null
+let lastFailedSandboxCheckAt = 0
 
 /**
  * Whether production (non-sandbox) Mercado Pago credentials may be used.
@@ -101,9 +116,26 @@ export function mercadoPagoProductionAllowed(): boolean {
 }
 
 /**
- * Accepts a sandbox credential (`TEST-...`) always and any other one
- * only with `MERCADOPAGO_ALLOW_PRODUCTION=true`. A refused credential
- * is logged by variable name only, never by value.
+ * Whether a sandbox account was confirmed for the configured access
+ * token: a `TEST-` token, or one checked as a test user (#229).
+ *
+ * @returns True when the access token is a sandbox one.
+ */
+function accessTokenIsSandbox(): boolean {
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  return (
+    accessToken.startsWith(TEST_CREDENTIAL_PREFIX) ||
+    verifiedTestTokens.has(accessToken)
+  )
+}
+
+/**
+ * Accepts a sandbox credential always and any other one only with
+ * `MERCADOPAGO_ALLOW_PRODUCTION=true`. Sandbox means a `TEST-`
+ * credential, or one of a test user confirmed by
+ * {@link ensureMercadoPagoSandboxChecked}: the public key follows the
+ * access token of the same account. A refused credential is logged by
+ * variable name only, never by value.
  *
  * @param credential - The access token or public key.
  * @param variable - Name of the environment variable, for the log.
@@ -111,12 +143,92 @@ export function mercadoPagoProductionAllowed(): boolean {
  */
 function credentialAllowed(credential: string, variable: string): boolean {
   if (credential.startsWith(TEST_CREDENTIAL_PREFIX)) return true
+  if (accessTokenIsSandbox()) return true
   if (mercadoPagoProductionAllowed()) return true
   logger.error("mercadopago production credential refused", {
     variable,
-    hint: "use the sandbox credentials (TEST-) or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
+    hint: "use the credentials of a Mercado Pago test user or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
   })
   return false
+}
+
+/**
+ * Confirms, once per access token, that a non-`TEST-` token belongs to
+ * a Mercado Pago test user (`GET /users/me` tagged `test_user`), so
+ * the sandbox lock (#7) accepts the `APP_USR-` test credentials of new
+ * applications (#229). A failed or negative check keeps the token
+ * refused and is retried after a few minutes. Never throws and never
+ * logs the token.
+ *
+ * @param fetcher - Fetch implementation (replaced in tests).
+ * @returns When the check is done (or skipped).
+ */
+export async function ensureMercadoPagoSandboxChecked(
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  if (!accessToken || accessTokenIsSandbox()) return
+  if (mercadoPagoProductionAllowed()) return
+  if (Date.now() - lastFailedSandboxCheckAt < SANDBOX_RECHECK_MS) return
+  pendingSandboxCheck ??= checkTestUser(accessToken, fetcher).finally(() => {
+    pendingSandboxCheck = null
+  })
+  await pendingSandboxCheck
+}
+
+/**
+ * Asks Mercado Pago whether the token belongs to a test user.
+ *
+ * @param accessToken - The access token being checked.
+ * @param fetcher - Fetch implementation.
+ */
+async function checkTestUser(
+  accessToken: string,
+  fetcher: typeof fetch
+): Promise<void> {
+  const baseUrl = (
+    process.env.MERCADOPAGO_BASE_URL || DEFAULT_BASE_URL
+  ).replace(/\/+$/, "")
+  const timeout = Number(process.env.MERCADOPAGO_TIMEOUT_MS)
+  try {
+    const response = await fetcher(`${baseUrl}/users/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(
+        Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_TIMEOUT_MS
+      ),
+    })
+    if (!response.ok) {
+      lastFailedSandboxCheckAt = Date.now()
+      logger.warn("mercadopago sandbox check failed", {
+        status: response.status,
+      })
+      return
+    }
+    const body = (await response.json()) as { tags?: unknown }
+    if (Array.isArray(body.tags) && body.tags.includes(TEST_USER_TAG)) {
+      verifiedTestTokens.add(accessToken)
+      return
+    }
+    lastFailedSandboxCheckAt = Date.now()
+    logger.error("mercadopago account is not a test user", {
+      hint: "use the credentials of a Mercado Pago test user or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
+    })
+  } catch (error) {
+    lastFailedSandboxCheckAt = Date.now()
+    logger.warn("mercadopago sandbox check failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    })
+  }
+}
+
+/**
+ * Clears the sandbox check cache. For tests only.
+ */
+export function resetMercadoPagoSandboxCheck(): void {
+  verifiedTestTokens.clear()
+  pendingSandboxCheck = null
+  lastFailedSandboxCheckAt = 0
 }
 
 /**
@@ -320,6 +432,7 @@ async function callMercadoPago(
   init: { method: "GET" | "POST"; body?: unknown; headers?: HeadersInit },
   fetcher: typeof fetch
 ): Promise<unknown> {
+  await ensureMercadoPagoSandboxChecked(fetcher)
   const config = mercadoPagoConfig()
   if (!config) {
     logger.warn("mercadopago not configured", { operation })
