@@ -86,7 +86,7 @@ Feito por uma pessoa no servidor, com o `docker compose up -d` rodando:
 
 | Data | Responsável | Tempo até o e-mail de alerta | Observações |
 |---|---|---|---|
-| 18/11/2026 | Equipe de desenvolvimento (#80) | Não medido: `SMTP_HOST` está vazio no `.env`, então o alerta por e-mail não foi configurado e depende do SMTP real da equipe | No painel, "Loja — app e banco" ficou DOWN 2 min 52 s depois do `docker compose stop app` e voltou a UP cerca de 1 min 30 s depois do `docker compose start app`. Passos 5 e 6 (parar o `db`) não executados. Push do backup validado: o monitor "Backup diário" recebeu o heartbeat UP. |
+| 18/11/2026 | Equipe de desenvolvimento (#80) | Não medido: `SMTP_HOST` está vazio no `.env`, então o alerta por e-mail não foi configurado e depende do SMTP real da equipe | No painel, "Loja — app e banco" ficou DOWN 2 min 52 s depois do `docker compose stop app` e voltou a UP cerca de 1 min 30 s depois do `docker compose start app`. Passos 5 e 6 (parar o `db`) não executados. Push do backup: a URL foi validada com `curl` dentro do container `backup`, e o monitor "Backup diário" recebeu o heartbeat UP. O envio feito pelo próprio `backup.sh` só acontece no laço diário (`--daemon`) e fica para conferir no próximo backup automático. |
 
 ## 6. Painel de disponibilidade
 
