@@ -9,15 +9,21 @@
 	admin 127.0.0.1:2019
 }
 
-# Port 80 only answers the ACME challenge and redirects to HTTPS
-# (Caddy adds the redirect for the site below automatically).
-
-# www goes to the bare domain
-www.{$SITE_HOST} {
+# Port 80 never serves content: every request, whatever the host (the
+# bare IP included), is redirected to the HTTPS domain (no fallback to
+# HTTP, RNF06). Caddy still answers the ACME challenge on it.
+http:// {
 	redir https://{$SITE_HOST}{uri} 308
 }
 
-{$SITE_HOST} {
+# SITE_ALIAS_HOST is optional (e.g. www.<SITE_HOST>) and empty by default:
+# set it only after its DNS record points to the VPS, or Caddy keeps
+# retrying a certificate for a name that does not resolve. Any host other
+# than SITE_HOST is redirected to it.
+{$SITE_HOST} {$SITE_ALIAS_HOST} {
+	@alias not host {$SITE_HOST}
+	redir @alias https://{$SITE_HOST}{uri} 308
+
 	encode zstd gzip
 
 	header {
