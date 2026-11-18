@@ -726,5 +726,12 @@ erDiagram
     datetime_3 created_at
     datetime_3 updated_at
   }
+  rate_limit_buckets {
+    char_64 key_hash PK
+    datetime_3 window_start PK
+    varchar_32 scope
+    int hits
+    datetime_3 expires_at
+  }
 ```
 

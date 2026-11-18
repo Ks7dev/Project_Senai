@@ -9,6 +9,7 @@ Política de segurança da informação do e-commerce Atelier Bureau (issue #182
 | Versão | Data | Autor | Alteração |
 |---|---|---|---|
 | 1.0 | 17/11/2026 | Equipe Atelier Bureau | Primeira versão, para aprovação (#182) |
+| 1.1 | 18/11/2026 | Equipe Atelier Bureau | 2FA obrigatório no sistema desde a #177, rate limit das actions de pagamento e estorno (#175), TLS do MySQL e porta 3001 do painel de disponibilidade, conforme a auditoria de documentação de 18/11/2026 (#223) |
 
 | Aprovação | Nome | Data | Assinatura |
 |---|---|---|---|
@@ -45,13 +46,13 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 - **Menor privilégio:** o acesso segue os perfis internos (RF55) e os perfis da conta corporativa (RF10, RN08). Toda Server Action chama `requirePermission("<recurso>:<ação>")` antes de operar, e as consultas passam pela camada `features/shared/lib/db/`, que aplica o escopo do usuário. O id do usuário vem da sessão, nunca do request (`ARCHITECTURE.md`, seção 4). Esconder botão é só UX.
 - **Contas nominais:** cada pessoa tem o próprio usuário (`/admin/usuarios`). Contas compartilhadas são proibidas.
 - **Entrada e saída de pessoas:** o administrador atribui ao usuário interno só o perfil necessário e remove todos os perfis dele em `/admin/usuarios` no mesmo dia em que a pessoa deixa a função (o sistema ainda não tem desativação de conta; os perfis removidos ficam na auditoria como `user.roles`). Os perfis são revistos na revisão anual (seção 11).
-- **2FA:** a autenticação em dois fatores (TOTP) está disponível para todos os usuários pelo Better Auth (`twoFactor`, `features/shared/lib/auth/auth.ts`; tela em `features/access/security/`). **Regra desta política:** todo usuário interno com acesso a pedidos, pagamentos, estornos, usuários ou auditoria deve ativar o 2FA. Hoje o sistema não obriga; a obrigatoriedade técnica é a issue #177 (pendência P5).
-- **Bloqueio de tentativas:** as rotas de login e cadastro têm rate limit (`features/shared/lib/rate-limit/rate-limit.ts`). O rate limit das actions de pagamento e estorno é a issue #175 (pendência P3).
+- **2FA:** a autenticação em dois fatores (TOTP) está disponível para todos os usuários pelo Better Auth (`twoFactor`, `features/shared/lib/auth/auth.ts`; tela em `features/access/security/`). **Regra desta política:** todo usuário interno com acesso a pedidos, pagamentos, estornos, usuários ou auditoria deve ativar o 2FA. Desde a #177 (pendência P5), o sistema obriga o 2FA, ativo e verificado na sessão atual, para o usuário interno com acesso a pedidos, pagamentos ou estornos (`order:read`, `order:status:update`, `order:cancel`, `credit:approve` ou `payment:refund`, em `TWO_FACTOR_REQUIRED_PERMISSIONS`, `features/shared/lib/auth/permissions.ts`): sem ele, as telas e actions do back office levam à tela `/conta/seguranca`. Para os perfis só com acesso a usuários ou auditoria, a regra vale por esta política, sem trava no sistema.
+- **Bloqueio de tentativas:** as rotas de login e cadastro têm rate limit (`features/shared/lib/rate-limit/rate-limit.ts`). As Server Actions de pagamento e estorno têm limite próprio, gravado no banco (tabela `rate_limit_buckets`, `features/shared/lib/rate-limit/persistent-limit.ts`, #175).
 
 ### 4.2 Infraestrutura
 
-- O MySQL aceita só usuários nomeados, com host restrito à sub-rede e TLS obrigatório (`require_secure_transport=ON`). O `root` não tem acesso remoto, o app usa `atelier_app` sem DDL, as migrations usam `atelier_migrate` e o backup usa `atelier_backup` (`deploy/mysql/init/01-users.sh`).
-- A porta 3306 é publicada só em `127.0.0.1`, salvo decisão explícita (`MYSQL_PUBLISH_ADDR`). As portas 80 e 443 ficam liberadas no firewall só no perfil de rede **Privada**.
+- O MySQL aceita só usuários nomeados. O usuário `dev`, para acesso pela rede, tem host restrito à sub-rede e `REQUIRE SSL`, e o app conecta com TLS (`DATABASE_TLS=required`, `features/shared/lib/db/connection-config.ts`). A exigência de TLS pelo servidor em toda conexão é a issue #221. O `root` não tem acesso remoto, o app usa `atelier_app` sem DDL, as migrations usam `atelier_migrate` e o backup usa `atelier_backup` (`deploy/mysql/init/01-users.sh`).
+- A porta 3306 é publicada só em `127.0.0.1`, salvo decisão explícita (`MYSQL_PUBLISH_ADDR`). As portas 80, 443 e 3001 (painel de disponibilidade, que o Caddy só atende para endereços privados) ficam liberadas no firewall só no perfil de rede **Privada**.
 - O túnel do webhook (`cloudflared`) só alcança o `webhook-gate`, que repassa ao app apenas `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`).
 - O acesso ao repositório no GitHub é restrito aos membros da equipe. A `master` e a `develop` só recebem PR, sem `push --force` (`CLAUDE.md`, seção 10).
 

@@ -7,17 +7,16 @@ Padrão técnico do projeto (issue #1, RNF07): stack, organização de código, 
 | Camada | Escolha |
 |---|---|
 | Framework | **Next.js 16** (App Router) + **React 19** + **TypeScript** `strict` |
-| UI | **Tailwind CSS v4** (config em `app/globals.css`, sem `tailwind.config.js`), **shadcn/ui** (style `base-nova`, primitivas `@base-ui/react`), ícones **`lucide-react`** (decisão da #3), `framer-motion`, `next-themes` |
+| UI | **Tailwind CSS v4** (config em `app/globals.css`, sem `tailwind.config.js`), **shadcn/ui** (style `base-nova`, primitivas `@base-ui/react`), ícones **`lucide-react`** (decisão da #3) e animações por CSS (`tw-animate-css`) |
 | Formulários | `react-hook-form` + `zod` + `@hookform/resolvers/zod` |
 | Banco de dados (RNF16) | **MySQL 8** (InnoDB, `utf8mb4`), acessado só pelo **Prisma ORM**, que cuida do schema, das migrations e dos seeds |
 | Autenticação | **Better Auth** com adapter Prisma: sessão em cookie `httpOnly`, recuperação de senha, plugin de 2FA (RF40) e plugin de organizações para contas corporativas multiusuário (RF09, RF10) |
-| Arquivos | Imagens, fichas técnicas em PDF e anexos num armazenamento S3-compatível (disco local em dev). O banco guarda só a chave e os metadados do arquivo |
-| Listagens | `@tanstack/react-table` v9 + `@tanstack/react-query` v5 |
+| Arquivos | Imagens, fichas técnicas em PDF e anexos em disco local (`storage/`, volume do container `app`), pela interface de `features/shared/lib/storage/storage.ts`, servidos por `app/media/[...key]`. O banco guarda só a chave e os metadados do arquivo |
 | Imagens | `sharp` no servidor: valida, converte para WebP com até 300 KB e gera versões responsivas (RNF04) |
 | Qualidade | ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) + `tsc --noEmit` |
 | Testes (RNF07) | **Vitest**: unitários de schema, action e regras de negócio. **Playwright**: ponta a ponta do fluxo de compra |
 | Documentação de código (RNF08) | **JSDoc** em toda função exportada, cobrado por `eslint-plugin-jsdoc` |
-| Servidor | **Docker Compose** numa máquina local, que é o servidor: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06) e backup diário (RNF11). Outros dispositivos acessam pela rede local, por IP ou hostname da máquina. Detalhes na seção 5.1 |
+| Servidor | **Docker Compose** numa máquina local, que é o servidor: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06), backup diário (RNF11), painel de disponibilidade Uptime Kuma (RNF01) e, opcionalmente, o túnel do webhook do Mercado Pago. Outros dispositivos acessam pela rede local, por IP ou hostname da máquina. Detalhes na seção 5.1 |
 
 Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transparente/Bricks), ViaCEP, Correios, agregador de transportadoras, BrasilAPI (CNPJ) e emissor de NF-e.
 
@@ -27,19 +26,23 @@ Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transpa
 app/                    → só rotas; cada page.tsx renderiza a View da feature
 app/api/webhooks/*      → Route Handlers só para webhooks externos (Mercado Pago)
 app/api/csp-report      → só grava no log as violações de CSP da página de pagamento (#173)
+app/api/health          → healthcheck do container (SELECT 1 no MySQL, RNF01)
+app/media/[...key]      → arquivos do storage: imagens públicas; PDF de produto inativo só com `product:read`
+app/admin/nfe/[id]/[arquivo]       → XML ou DANFE da NF-e, só com `invoice:manage` (senão 404)
+app/admin/produtos/importar/modelo → modelo CSV da importação, só com `product:create`
 components/             → UI genérica e layout; components/ui (shadcn)
 features/<dominio>/<feature>/
   <feature>-view.tsx    → "use client": só apresentação e estado de UI
   action/               → "use server": única camada de lógica e regra de negócio
   schema/               → schemas Zod + tipos derivados (um arquivo coeso por feature)
 features/shared/        → código usado por mais de uma feature
-lib/, hooks/            → utilitários e hooks genéricos
+lib/utils.ts            → helper `cn` das classes Tailwind (shadcn/ui); hooks ficam na feature ou em `features/shared/lib/`
 emails/                 → templates de e-mail transacional (RF53)
 prisma/schema.prisma    → modelo de dados (fonte única do schema MySQL)
 prisma/migrations/      → migrations SQL versionadas, geradas pelo Prisma (uma por mudança coesa)
 prisma/seed.ts          → seed de configuração (valores das RN) e dados de desenvolvimento
 features/shared/lib/db/ → client Prisma único (server-only) e camada de acesso a dados com permissão
-docker-compose.yml      → servidor local: app, MySQL 8, Caddy e backup
+docker-compose.yml      → servidor local: proxy (Caddy), app, db (MySQL 8), backup, uptime-kuma e, no perfil `tunnel`, webhook-gate e tunnel
 Dockerfile              → imagem do app (Next.js standalone)
 deploy/                 → Caddyfile, scripts de backup/restauração e config do MySQL
 tests/                  → testes Vitest e Playwright
@@ -52,6 +55,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Nunca importe de dentro de outra feature.** Código reutilizado vai antes para `features/shared/`.
 - Schema Zod **nunca inline** em view ou action: fica sempre em `schema/`. O mesmo schema valida o client (`zodResolver`) e a Server Action.
 - `components/` só tem apresentação pura. Componente com dado ou lógica de feature fica na feature.
+- Exceção: as Server Actions usadas por várias features ficam em `features/shared/lib/` (`cart/cart-actions.ts`, `favorites/favorite-actions.ts`, `shipping/shipping-actions.ts` e `viacep/cep-actions.ts`), com as mesmas regras da seção 3.
 
 ### Mapeamento MVC (RNF07)
 
@@ -59,12 +63,12 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 |---|---|
 | Model | Tabelas MySQL modeladas em `prisma/schema.prisma` + `schema/` (Zod e tipos) |
 | View | `*-view.tsx` e componentes da feature |
-| Controller | `action/*.ts` (Server Actions) e, só para webhooks, `app/api/webhooks/*` |
+| Controller | `action/*.ts` (Server Actions); Route Handlers só para webhooks (`app/api/webhooks/*`), healthcheck, relatório de CSP e downloads de arquivo (lista acima) |
 
 ## 3. Regra de ouro: lógica só em Server Action
 
 - Regra de negócio, acesso ao banco, validação sensível e mutação ficam em `action/*.ts`. A action recebe o input, **revalida com Zod**, checa a permissão, acessa o banco pelo Prisma e retorna `{ success: true, ... } | { success: false; error: "..." }`, em vez de lançar exceção.
-- Views `"use client"` nunca acessam o banco nem decidem o que é permitido. O status do pagamento "em tempo real" (RF31) é atualizado por polling curto (`refetchInterval` do React Query), que lê uma action e para quando o status é final.
+- Views `"use client"` nunca acessam o banco nem decidem o que é permitido. O status do pagamento "em tempo real" (RF31) é atualizado por polling curto (`setInterval` de 5 s em `features/payment/order-payment/order-payment-view.tsx`), que lê uma action e para quando o status é final.
 - Operações que mexem em mais de uma tabela (pedido + reserva de estoque, aprovação, estorno) rodam numa **transação** (`prisma.$transaction`). A reserva de estoque usa `SELECT ... FOR UPDATE`, para que dois pedidos simultâneos não reservem a mesma unidade (#64).
 - Erros nunca expõem stack trace nem detalhe interno (RNF05).
 - **Integração de saída** (Mercado Pago, Correios, transportadora, NF-e, BrasilAPI, ViaCEP) fica em `features/shared/lib/<integracao>/`. É `server-only`, só roda depois da checagem de permissão, tem chave em env sem `NEXT_PUBLIC_`, timeout e fallback (RN20, RN21), e o log sai sem headers, payload ou dados de cartão.
@@ -76,13 +80,14 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
   1. A Server Action obtém o usuário da sessão (Better Auth) e chama `requirePermission("<resource>:<action>")` antes de operar.
   2. As consultas passam pela camada de acesso a dados (`features/shared/lib/db/`), que **sempre** aplica o escopo do usuário: a conta corporativa dele, os pedidos dele etc. O id do usuário vem da sessão, nunca do request.
 - O usuário de banco da aplicação tem só `SELECT`, `INSERT`, `UPDATE` e `DELETE` no schema dela, sem DDL. As migrations rodam com outro usuário, só no deploy.
-- Tabelas de RBAC: `roles`, `permissions` (`resource` + `action` únicos), `role_permissions` e `user_roles`. Permissão nova nasce numa migration ou no seed.
+- Tabelas de RBAC dos perfis internos: `roles`, `permissions` (`resource` + `action` únicos), `role_permissions` e `user_roles`. Permissão interna nova nasce numa migration ou no seed.
 - Permissões no formato `"<resource>[:<sub>]:<action>"`, em inglês.
 - Esconder botão ou menu é só UX: a checagem que vale é a da action.
 - As flags de permissão da UI são calculadas uma vez no `page.tsx` e descem por prop.
 - Dois conjuntos de perfis:
   - Internos (RF55): administrador, comercial, financeiro e estoque/logística.
-  - Da conta corporativa (RF10, RN08): solicitante, aprovador, financeiro e administrador da conta.
+  - Da conta corporativa (RF10, RN08): solicitante, aprovador, financeiro e administrador da conta. Esses perfis e as permissões deles são estáticos, definidos no código (`features/shared/lib/auth/corporate-roles.ts`), e ficam gravados como texto em `members.role`; não usam as tabelas de RBAC.
+- 2FA obrigatório (#177): o usuário interno com acesso a pedidos, pagamentos ou estornos (`TWO_FACTOR_REQUIRED_PERMISSIONS`, `features/shared/lib/auth/permissions.ts`) só usa o back office com o 2FA ativo e verificado na sessão atual (`assertTwoFactor`, `features/shared/lib/db/permissions.ts`).
 - Exclusão feita pelo usuário é **soft delete** (`deleted_at`), para não quebrar pedidos e notas antigos (RF42, LGPD). Ações sensíveis gravam log de auditoria (RNF12) na mesma transação da mudança.
 
 ## 5. Banco de dados (MySQL) e migrations
@@ -110,8 +115,10 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
 | `proxy` | `caddy:2` | **80, 443 e 3001** | HTTPS na frente do app (o 80 só redireciona para o 443, RNF06) e do painel de disponibilidade na 3001 |
 | `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
 | `db` | `mysql:8.4` | **3306**, só em `127.0.0.1` por padrão | MySQL com volume persistente `mysql-data` |
-| `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
+| `backup` | `mysql:8.4` | nenhuma | `mysqldump` diário em `./backups` (30 dias), por um laço de `deploy/backup/backup.sh --daemon` no horário `BACKUP_HOUR` (UTC) |
 | `uptime-kuma` | `louislam/uptime-kuma:1` | nenhuma (só pelo `proxy`, na 3001) | Painel de disponibilidade e alertas por e-mail (#80) |
+| `webhook-gate` | `caddy:2` | nenhuma (8080 só na rede `tunnel`) | Perfil opcional `tunnel`: repassa ao app só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`, #57) |
+| `tunnel` | `cloudflare/cloudflared` | nenhuma (conexão de saída para a Cloudflare) | Perfil opcional `tunnel`: expõe o `webhook-gate` na internet com `CLOUDFLARE_TUNNEL_TOKEN`; isolado na rede `tunnel`, só alcança o gate |
 
 - **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
 - **Firewall do Windows:** libere 80, 443 e 3001 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.

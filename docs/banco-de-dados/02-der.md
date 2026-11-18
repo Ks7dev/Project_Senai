@@ -4,7 +4,7 @@
 
 Notação de Chen: retângulos são entidades, losangos são relacionamentos e o rótulo das linhas é a cardinalidade (1, N ou 0..1 quando a participação é opcional). Entidades com borda tracejada pertencem a outro domínio e aparecem só para mostrar a ligação.
 
-O modelo tem 51 entidades, 79 relacionamentos por chave estrangeira e 7 domínios. Os atributos estão no [MER](03-mer.md) e no [dicionário de dados](04-dicionario-de-dados.md).
+O modelo tem 52 entidades, 79 relacionamentos por chave estrangeira e 7 domínios. Os atributos estão no [MER](03-mer.md) e no [dicionário de dados](04-dicionario-de-dados.md).
 
 ## Visão geral dos domínios
 
@@ -16,7 +16,7 @@ O modelo tem 51 entidades, 79 relacionamentos por chave estrangeira e 7 domínio
 | Pedidos e logística | Pedido, Item do pedido, Histórico de status, Aprovação do pedido, Envio, Região de entrega |
 | Financeiro e fiscal | Pagamento, Notificação de pagamento, Estorno, Parcela faturada, NF-e, Alteração de crédito |
 | Pós-venda e atendimento | Chamado, Evento do chamado, Anexo do chamado, Regra de vendedor, Demonstração |
-| Plataforma e auditoria | Configuração, Página institucional, Log de auditoria, E-mail |
+| Plataforma e auditoria | Configuração, Página institucional, Log de auditoria, E-mail, Limite de tentativas |
 
 ```mermaid
 flowchart LR
@@ -390,6 +390,7 @@ flowchart LR
   e_institutional_pages["Página institucional"]
   e_audit_logs["Log de auditoria"]
   e_email_outbox["E-mail"]
+  e_rate_limit_buckets["Limite de tentativas"]
   e_users["Usuário"]:::ext
   r0{"executa"}
   e_users -- "0..1" --- r0
