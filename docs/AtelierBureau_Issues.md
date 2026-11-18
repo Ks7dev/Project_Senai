@@ -168,6 +168,7 @@ Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendência
 | #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Backlog |
 | #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Backlog |
 | #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
+| #214 AB-214 | Validar CPF, telefone e força da senha no cadastro | feature | acesso | v1.0.0 | E6 | P1 | Em andamento |
 | #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em andamento |
 
 ---
@@ -1009,6 +1010,27 @@ Perfis administrador, comercial, financeiro e estoque com permissões por módul
 
 - [ ] Cada perfil acessa só os seus módulos
 - [ ] Permissões verificadas no backend
+
+### AB-214 — Validar CPF, telefone e força da senha no cadastro
+
+**Issue:** #214  
+**Labels:** `tipo: feature`, `área: acesso`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RF39, RF40, RF09
+
+**Descrição**
+
+Máscara e limite de tamanho em CPF, CNPJ e telefone; telefone com DDD da Anatel e prefixo de celular ou fixo; senha nova com 10 a 128 caracteres, letra maiúscula, letra minúscula, número e caractere especial. Vale no cadastro, no aceite de convite e na redefinição de senha. Escopo novo: os requisitos não definiam política de senha.
+
+**Critérios de aceite**
+
+- [ ] CPF, CNPJ e telefone formatados durante a digitação, sem letras nem dígitos a mais
+- [ ] CPF com dígito verificador inválido recusado
+- [ ] Telefone com DDD inexistente, tamanho errado ou prefixo inválido recusado
+- [ ] Senha sem maiúscula, minúscula, número ou caractere especial recusada, com mensagem por regra
+- [ ] Mesmas regras no formulário e na Server Action
+- [ ] Testes de telefone, máscaras e regras de senha
 
 ## Frete
 

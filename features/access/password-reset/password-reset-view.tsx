@@ -18,6 +18,7 @@ import {
   type RequestResetInput,
   type ResetPasswordInput,
 } from "@/features/access/password-reset/schema/password-reset-schema"
+import { PASSWORD_HINT } from "@/features/shared/schema/password-schema"
 
 /**
  * Form that sends the password reset link by e-mail (RF40).
@@ -128,7 +129,7 @@ export function ResetPasswordView({ token }: ResetPasswordViewProps) {
           <FormField
             id="password"
             label="Nova senha"
-            hint="Pelo menos 10 caracteres."
+            hint={PASSWORD_HINT}
             error={passwordError}
           >
             <Input
