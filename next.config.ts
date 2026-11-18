@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Product images up to 10 MB plus multipart overhead (#22)
     serverActions: { bodySizeLimit: "11mb" },
+    // Reuses the Turbopack cache in .next/cache across builds (#217)
+    turbopackFileSystemCacheForBuild: true,
   },
   partialPrefetching: true,
   turbopack: {
