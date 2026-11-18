@@ -14,6 +14,7 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | 1.3 | 17/11/2026 | Equipe Atelier Bureau | Seção 2.2 (campos seguros do Brick confirmados no código e na documentação, E3 passa a Atende), seção 8 (matriz de responsabilidades) e `docs/pci/README.md` para a AOC do Mercado Pago (#178) |
 | 1.4 | 17/11/2026 | Equipe Atelier Bureau | Bloqueio de tentativas passa a atender: rate limit nas Server Actions de pagamento e estorno (pendência P3, #175) |
 | 1.5 | 17/11/2026 | Equipe Atelier Bureau | CSP da página de pagamento com nonce, inventário de scripts com baseline versionado e detecção de mudança (#173); hosts concretos do Mercado Pago no lugar dos curingas (#174) |
+| 1.6 | 18/11/2026 | Equipe Atelier Bureau | MFA para acesso administrativo passa a atender: 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos (pendência P5 resolvida na #177), conforme a auditoria de documentação de 18/11/2026 (#223) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -118,7 +119,7 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 |---|---|---|
 | Usuários únicos no back office, sem contas compartilhadas | Atende | Usuários internos nominais com perfis (RF55, `/admin/usuarios`) |
 | Senhas com hash | Atende | Better Auth (hash, cookie `httpOnly`) |
-| MFA para acesso administrativo | Parcial | O código exige 2FA para perfis internos com acesso a pedidos, pagamentos ou estornos (#177). Falta ativá-lo nas contas usadas na entrega e validar o bloqueio e o primeiro acesso na VPS (pendência P5) |
+| MFA para acesso administrativo | Atende | 2FA (TOTP, Better Auth `twoFactor`) obrigatório para o usuário interno com qualquer das permissões `order:read`, `order:status:update`, `order:cancel`, `credit:approve` ou `payment:refund` (`TWO_FACTOR_REQUIRED_PERMISSIONS`, `features/shared/lib/auth/permissions.ts`). Toda tela e action do back office confere, no servidor, que o 2FA está ativo e foi verificado na sessão atual (`assertTwoFactor`, `features/shared/lib/db/permissions.ts`; coluna `sessions.two_factor_verified`); sem isso, o usuário é levado à tela de segurança. Testes em `tests/access/mandatory-two-factor.test.ts` (pendência P5 resolvida na #177). Na VPS, o 2FA é ativado nas contas usadas na entrega no primeiro acesso |
 | Bloqueio de tentativas | Atende | Rate limit nas rotas de login e cadastro (`features/shared/lib/rate-limit/rate-limit.ts`). As Server Actions de pagamento e estorno têm limite próprio, gravado no banco (`rate_limit_buckets`) e configurável na tabela `settings`: tentativas de pagamento por pedido e por IP, e solicitações de estorno por usuário. A recusa mostra mensagem genérica e grava log de auditoria (`features/shared/lib/rate-limit/persistent-limit.ts`, pendência P3 resolvida na #175) |
 
 ### Requisito 9 — Acesso físico
@@ -175,6 +176,8 @@ Cada pendência virou uma issue no GitHub em 15/11/2026, com os labels indicados
 
 **Situação em 17/11/2026:** P1 implementada (#173). P2 implementada no código (#174), faltando o teste do pagamento em sandbox com a CSP restrita, que precisa ser feito por uma pessoa no navegador.
 
+**Situação em 18/11/2026:** P5 implementada (#177): o 2FA é obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos (Requisito 8).
+
 | # | Pendência | Requisito | Prioridade | Labels | Issue |
 |---|---|---|---|---|---|
 | P1 | Trocar `'unsafe-inline'` de `script-src` por nonce ou hash nas páginas de pagamento, aprovar o inventário de scripts e monitorar mudanças de scripts e cabeçalhos na página de pagamento | 6.4.3, 11.6.1, E6 | P1 | `tipo: task`, `área: pagamento`, `segurança` | #173 |
@@ -228,7 +231,7 @@ Divisão dos requisitos do PCI DSS entre a Atelier Bureau e o Mercado Pago, o ú
 | 2.2.2 — Contas e configurações padrão | Servidor, MySQL, Caddy e contas do seed (pendência P7) | Infraestrutura própria | — |
 | 6.3 — Vulnerabilidades e atualizações | Dependências do site e imagens Docker (pendência P4) | SDK JS v2 e ambiente de dados do cartão | — |
 | 6.4.3 e 11.6.1 — Scripts e alterações na página de pagamento | Inventário, autorização e monitoramento dos scripts e cabeçalhos da página (seção 5, pendência P1) | Integridade do SDK e do conteúdo dos iframes servidos por ele | Conferir, a cada versão do SDK, os domínios que o Brick usa (pendência P2) |
-| 8 — Identificação e autenticação | Contas nominais e regra de 2FA no back office; ativação e teste na VPS pendentes (P5) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
+| 8 — Identificação e autenticação | Contas nominais e 2FA obrigatório no back office para os perfis com acesso a pedidos, pagamentos e estornos (#177) | Acesso ao painel e às credenciais da conta Mercado Pago | Proteger o login do painel do Mercado Pago com 2FA e guardar o access token só no `.env` |
 | 9 — Acesso físico | VPS (data center da Hostinger), máquina local de desenvolvimento e backups (sem dados de cartão) | Data centers do ambiente de cartão | — |
 | 11.3.2 — Varredura ASV | Site público, quando houver (pendência P9) | Ambiente próprio | — |
 | 12.8 — Gestão do provedor | Manter a lista de provedores, obter e conferir a AOC todo ano e acompanhar a validade | Fornecer a AOC e manter a certificação PCI DSS | Esta matriz, revisada todo ano |

@@ -132,6 +132,18 @@ export const settings: SettingSeed[] = [
       "Solicitações de estorno por usuário: máximo de solicitações na janela, em minutos (PCI 8, RNF05)",
   },
   {
+    key: RATE_LIMIT_SETTING_KEYS["auth.account"],
+    value: DEFAULT_RATE_LIMITS["auth.account"],
+    description:
+      "Tentativas de login por e-mail: máximo de tentativas na janela, em minutos, contadas antes de conferir a senha (RNF05, SEC-005)",
+  },
+  {
+    key: RATE_LIMIT_SETTING_KEYS["auth.totp"],
+    value: DEFAULT_RATE_LIMITS["auth.totp"],
+    description:
+      "Tentativas do código 2FA por desafio de login: máximo de tentativas na janela, em minutos (RF40, RNF05, SEC-005)",
+  },
+  {
     key: "invoice.issuer",
     value: {
       cnpj: "12345678000195",

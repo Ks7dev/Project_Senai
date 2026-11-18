@@ -16,7 +16,7 @@ Os valores ficam em `performance-budget.json`. O orçamento de JavaScript e CSS 
 ## Como medir
 
 1. **Orçamento de bundle (automático):** `npm run build && npm run perf:budget`. O script lê os manifestos do `.next`, soma os arquivos da primeira carga de cada rota de vitrine e falha se passar do orçamento. Roda no CI.
-2. **Latência (servidor com banco e seed, de preferência a VPS):** `npm run perf:api -- https://<domínio-ou-ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI, que ainda não tem MySQL.
+2. **Latência (servidor com banco e seed, de preferência a VPS):** `npm run perf:api -- https://<domínio-ou-ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI: o workflow `E2E` sobe um MySQL para o Playwright, mas não roda o `perf:api`.
 3. **LCP:** Lighthouse no Chrome, perfil celular com "Slow 4G", nas URLs de home, categoria, produto e busca do servidor de entrega (VPS). Registrar o resultado no PR de release.
 
 ## Otimizações aplicadas
@@ -77,4 +77,8 @@ Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outr
 ### Situação
 
 - O script, a configuração e os testes unitários (`tests/perf/load-test.test.ts`) estão prontos. A execução foi conferida contra um servidor HTTP de teste, sem o app.
-- **Pendente:** a execução real contra o app com banco e seed, no servidor de entrega, e o relatório anexado à issue #79. A máquina de desenvolvimento não tinha MySQL nem Docker disponíveis em 17/11/2026.
+- **Primeira execução real (17/11/2026):** contra a stack Docker completa (`https://localhost`, com banco e seed), a partir do próprio host. O relatório está em [`relatorios/teste-de-carga-2026-11-17.md`](relatorios/teste-de-carga-2026-11-17.md).
+  - **Resultado:** reprovado. A taxa de erro foi 0%, e o tráfego médio passou com folga: p95 de 107 ms.
+  - **Sob carga (3x):** o p95 ficou em 699 ms e o p99 em 1.405 ms, com degradação do p95 de 6,5x. Os limites são 500 ms, 1.000 ms e 2x.
+  - `npm run perf:api` passou: nenhuma rota passou de 500 ms no p95.
+- **Pendente:** investigar a latência sob carga. O container `db` usava cerca de 17% de CPU em repouso. Depois, repetir o teste a partir de outro dispositivo da rede e validar as premissas de tráfego.

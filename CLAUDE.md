@@ -10,7 +10,7 @@ E-commerce high ticket de papelaria nobre e mobiliário executivo, híbrido B2B 
 | Stack, organização de código, banco, servidores (local e VPS), Git e release | `ARCHITECTURE.md` |
 | Instalação do servidor de entrega na VPS | `docs/AtelierBureau_Deploy_VPS.md` |
 | Modelo de dados: escopo, DER, MER, dicionário, gatilhos e script SQL | `docs/banco-de-dados/` |
-| Backlog: as 82 issues com labels, milestone, prioridade e critérios | `docs/AtelierBureau_Issues.md` |
+| Backlog: as 92 issues planejadas, com labels, milestone, prioridade e critérios (as abertas depois ficam no GitHub Project) | `docs/AtelierBureau_Issues.md` |
 | Quadro do Trello: listas, prazos e cards | `docs/AtelierBureau_Trello_Etapas.md` |
 | Acompanhamento (status, prioridade, esforço e etapa) | GitHub Project "Atelier Bureau" (`github.com/users/Ks7dev/projects/1`) |
 
@@ -88,11 +88,11 @@ deploy/, docker-compose*.yml, Dockerfile → servidor (local e VPS)
 
 ## 8. Servidores (Docker Compose)
 
-- `docker compose up -d` sobe `proxy` (Caddy, 80/443), `app`, `db` (MySQL, 3306), `backup` e `uptime-kuma`. O mesmo compose roda em dois lugares:
-  - **VPS pública (entrega):** Hostinger KVM 2 com domínio próprio e Let's Encrypt, com o override `docker-compose.vps.yml` (`COMPOSE_FILE` no `.env`). Só 22, 80 e 443 abertas; MySQL e Uptime Kuma no loopback, acessíveis por túnel SSH. Detalhes em `ARCHITECTURE.md`, seção 5.2, e em `docs/AtelierBureau_Deploy_VPS.md`.
-  - **Servidor local (desenvolvimento):** outros dispositivos acessam por `https://<ip-da-máquina>`, com as portas liberadas só no perfil de rede **Privada**. Detalhes em `ARCHITECTURE.md`, seção 5.1.
-- O MySQL aceita só usuários nomeados e TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL.
-- Toda mudança de infraestrutura (compose, Dockerfile, Caddyfile) tem que funcionar com `docker compose up -d` numa máquina limpa, nos dois modos (local e com o override da VPS).
+- `docker compose up -d` sobe `proxy` (Caddy, 80/443 e 3001 do painel de disponibilidade), `app` (3000 só na rede interna), `db` (MySQL, 3306 só em `127.0.0.1` por padrão), `backup` e `uptime-kuma` (só pelo `proxy`). O mesmo compose roda em dois lugares:
+  - **VPS pública (entrega):** Hostinger KVM 2 com domínio próprio e Let's Encrypt, com o override `docker-compose.vps.yml` (`COMPOSE_FILE` no `.env`). Só 22, 80 e 443 abertas; MySQL e Uptime Kuma no loopback, acessíveis por túnel SSH, e sem usuário `dev`. Detalhes em `ARCHITECTURE.md`, seção 5.2, e em `docs/AtelierBureau_Deploy_VPS.md`.
+  - **Servidor local (desenvolvimento):** outros dispositivos acessam por `https://<ip-da-máquina>`. O perfil opcional `tunnel` (`docker compose --profile tunnel up -d`) sobe `webhook-gate` e `tunnel` (`cloudflared`), que expõem à internet só a rota do webhook. Detalhes em `ARCHITECTURE.md`, seção 5.1.
+- No servidor local, as portas (80, 443 e 3001, e a 3306 se o banco for aberto à rede) ficam liberadas só no perfil de rede **Privada**. O MySQL aceita só usuários nomeados; o acesso pela rede é pelo usuário `dev`, restrito à sub-rede e com TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL. A exigência de TLS pelo servidor em toda conexão é a #221.
+- Toda mudança de infraestrutura (compose, Dockerfile, Caddyfile) tem que funcionar com `docker compose up -d` numa máquina limpa, nos dois modos (local, testado a partir de outro dispositivo da rede, e com o override da VPS).
 - Segredos ficam só no `.env` (não versionado). Variável nova entra no `.env.example`, sem valor real.
 
 ## 9. Integrações externas

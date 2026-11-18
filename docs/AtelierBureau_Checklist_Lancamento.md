@@ -24,7 +24,7 @@ Copie o modelo (`cp .env.example .env && chmod 600 .env`) e preencha, conforme a
 - [ ] `BETTER_AUTH_SECRET` aleatório (`openssl rand -base64 32`) e `BETTER_AUTH_URL="https://<domínio>"`.
 - [ ] **`DATA_ENCRYPTION_KEY` (#75, PR #185):** `openssl rand -base64 32`, incluída **antes** do primeiro `docker compose up -d`. Sem ela o compose não sobe. **Guarde uma cópia fora do servidor** (gerenciador de senhas da equipe): sem a chave, os CPFs e telefones gravados não podem ser lidos. Ao iniciar, o app cifra as linhas antigas que estiverem em texto.
 - [ ] `SEED_PASSWORD` preenchida com uma senha forte (nunca vazia: vazia, o seed usa a senha de desenvolvimento conhecida). Ela só vale até a troca da seção 7.
-- [ ] Mercado Pago só com credenciais de **sandbox** (`TEST-...`) e `MERCADOPAGO_ALLOW_PRODUCTION="false"`.
+- [ ] Mercado Pago só com credenciais de **sandbox** (`TEST-...`) e `MERCADOPAGO_ALLOW_PRODUCTION="false"`: a trava da #7 recusa credencial que não começa com `TEST-` (`features/shared/lib/mercadopago/mercadopago.ts`).
 - [ ] Correios, transportadora e NF-e só com credenciais de homologação/sandbox, ou vazias (as regras de fallback RN20 e RN21 assumem).
 - [ ] SMTP (`SMTP_*`, `EMAIL_FROM`) de um provedor transacional (Brevo ou Resend), porta 587, com SPF, DKIM e DMARC configurados no domínio.
 - [ ] `CLOUDFLARE_TUNNEL_TOKEN` vazio: na VPS o túnel não é usado.
@@ -32,8 +32,8 @@ Copie o modelo (`cp .env.example .env && chmod 600 .env`) e preencha, conforme a
 
 ## 3. Subida e banco de dados
 
-- [ ] `docker compose up -d --build` sobe `proxy`, `app`, `db`, `backup` e `uptime-kuma`.
-- [ ] `docker compose ps`: todos os serviços como `running (healthy)`; `tunnel` e `webhook-gate` não aparecem.
+- [ ] `docker compose up -d --build` sobe `proxy`, `app`, `db`, `backup` e `uptime-kuma`. O `webhook-gate` e o `tunnel` só sobem com `docker compose --profile tunnel up -d`, no servidor local, quando o webhook do Mercado Pago for usado; na VPS eles não são usados.
+- [ ] `docker compose ps`: todos os serviços como `running (healthy)`; na VPS, `tunnel` e `webhook-gate` não aparecem.
 - [ ] **Migrations na subida:** `docker compose logs app` mostra `Applying database migrations...` seguido de `Starting Atelier Bureau...`, sem erro. O `prisma migrate deploy` roda a cada início do app.
 - [ ] **Gatilhos (#8, PR #172):** o compose passa `--log-bin-trust-function-creators=1` ao MySQL. Confira os 20 gatilhos:
 
@@ -49,7 +49,7 @@ Copie o modelo (`cp .env.example .env && chmod 600 .env`) e preencha, conforme a
 - [ ] **Portas expostas:** de uma rede de fora da VPS, `nmap <ip-da-vps>` mostra só 22, 80 e 443 abertas. Na VPS, `docker compose ps` mostra o MySQL (3306) e o Uptime Kuma (3001) só em `127.0.0.1`.
 - [ ] **Certificado (#180):** `https://<domínio>` abre num notebook e num celular, em qualquer rede, com cadeado válido do Let's Encrypt, sem instalar nenhum certificado.
 - [ ] `http://<domínio>` e `https://www.<domínio>` redirecionam para `https://<domínio>` (308).
-- [ ] Headers de segurança: `sh deploy/check-headers.sh <domínio>` sai sem erro.
+- [ ] Headers de segurança: `sh deploy/check-headers.sh <domínio> --system-ca` sai sem erro (o `--system-ca` confere o certificado Let's Encrypt pelas CAs do sistema, mesmo com o `deploy/certs/root.crt` da CA local presente).
 - [ ] Renovação do certificado: `docker compose logs proxy` não mostra erro de ACME.
 
 ## 5. MySQL

@@ -3,6 +3,10 @@ import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { nextCookies } from "better-auth/next-js"
 import { organization, twoFactor } from "better-auth/plugins"
+import {
+  checkAuthBaseUrl,
+  shouldUseSecureCookies,
+} from "@/features/shared/lib/auth/auth-transport"
 import { passwordResetLink } from "@/features/shared/lib/auth/reset-link"
 import { getPrisma } from "@/features/shared/lib/db/prisma"
 import { sendEmail } from "@/features/shared/lib/email/mailer"
@@ -28,13 +32,21 @@ async function sessionPassedTwoFactor(userId: string): Promise<boolean> {
 /**
  * Builds the Better Auth server instance: e-mail and password with
  * hashed passwords, httpOnly session cookie, optional 2FA (RF40) and
- * organizations for multi-user corporate accounts (RF09, RF10).
+ * organizations for multi-user corporate accounts (RF09, RF10). In
+ * production the cookies are always `Secure` and an http
+ * `BETTER_AUTH_URL` is logged as an error (SEC-001, #220).
  *
  * @returns The auth instance.
  */
 function createAuth() {
+  const transport = {
+    nodeEnv: process.env.NODE_ENV,
+    baseUrl: process.env.BETTER_AUTH_URL,
+  }
+  checkAuthBaseUrl(transport)
   return betterAuth({
     appName: "Atelier Bureau",
+    advanced: { useSecureCookies: shouldUseSecureCookies(transport) },
     database: prismaAdapter(getPrisma(), { provider: "mysql" }),
     emailAndPassword: {
       enabled: true,

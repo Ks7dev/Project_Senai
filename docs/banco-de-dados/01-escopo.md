@@ -30,7 +30,7 @@ O banco é a única fonte de verdade desses dados. A aplicação chega a ele só
 
 ## 3. O que o banco guarda
 
-O modelo tem 51 tabelas em 7 domínios. A lista completa, com as colunas, está no [dicionário de dados](04-dicionario-de-dados.md).
+O modelo tem 52 tabelas em 7 domínios. A lista completa, com as colunas, está no [dicionário de dados](04-dicionario-de-dados.md).
 
 | Domínio | Tabelas | Requisitos |
 |---|---|---|
@@ -40,11 +40,11 @@ O modelo tem 51 tabelas em 7 domínios. A lista completa, com as colunas, está 
 | Pedidos e logística | `orders`, `order_items`, `order_status_history`, `order_approvals`, `shipments`, `shipping_regions` | RF11, RF15, RF16, RF25, RF27, RF49, RF50, RF54, RN01, RN05, RN15, RN16, RN20 |
 | Financeiro e fiscal | `payments`, `payment_notifications`, `refunds`, `invoiced_installments`, `invoices`, `credit_limit_changes` | RF12, RF13, RF29 a RF34, RF58, RN03, RN07, RN10, RN13, RN17, RN18 |
 | Pós-venda e atendimento | `support_tickets`, `support_ticket_events`, `support_ticket_attachments`, `seller_rules`, `demo_requests` | RF17, RF18, RF19, RN11, RN12, RN22, RN24 |
-| Plataforma e auditoria | `settings`, `institutional_pages`, `audit_logs`, `email_outbox` | RF53, RF56, RF57, RNF12 |
+| Plataforma e auditoria | `settings`, `institutional_pages`, `audit_logs`, `email_outbox`, `rate_limit_buckets` | RF53, RF56, RF57, RNF05, RNF12 |
 
 ### 3.1 Configuração das regras de negócio
 
-Os valores configuráveis das regras de negócio ficam na tabela `settings`, carregados pelo `prisma/seed.ts` e editados no back office. Nenhum deles fica fixo no código. As chaves atuais são:
+Os valores configuráveis das regras de negócio ficam na tabela `settings`, carregados pelo `prisma/seed.ts`. Hoje, só `payment.installment_rules` (`/admin/parcelamento`) e `content.home` (conteúdo da home) são editáveis no back office; as demais chaves mudam pelo seed. As chaves atuais são:
 
 | Grupo | Chaves |
 |---|---|
@@ -57,6 +57,8 @@ Os valores configuráveis das regras de negócio ficam na tabela `settings`, car
 | Carrinho | `personalization.engraving` (RF51) e `cart.additional_services` (RF52) |
 | Instalação | `installation.min_business_days`, `installation.window_days`, `installation.daily_capacity`, `installation.weekdays` e `installation.blocked_dates` (RF16, RN05) |
 | Demonstração | `demo.min_business_days`, `demo.window_days`, `demo.weekdays`, `demo.time_slots`, `demo.slot_capacity` e `demo.blocked_dates` (RF19) |
+| Segurança | `security.payment_attempts_per_order`, `security.payment_attempts_per_ip` e `security.refund_requests_per_user` (rate limit das actions de pagamento e estorno, RNF05, #175) |
+| Conteúdo | `content.home` (carrossel da home, RF47). Não vem do seed: o código usa um conteúdo padrão até o administrador salvar a primeira versão |
 
 As faixas de CEP da entrega própria (RN16) e o mínimo de frete grátis por região (RN23) ficam em `shipping_regions`, que também é editável no back office.
 
@@ -66,7 +68,7 @@ As faixas de CEP da entrega própria (RN16) e o mínimo de frete grátis por reg
 |---|---|---|
 | Dados de cartão (número, CVV, validade) | Só no Mercado Pago, tokenizados no navegador | RN19, PCI-DSS SAQ A. O banco guarda só `payment_id`, status e valores |
 | Senha em texto | Em lugar nenhum | Só o hash fica em `accounts.password` (RF40) |
-| Imagens, PDFs e anexos | Armazenamento S3-compatível (disco local em dev) | O banco guarda só a chave (`storage_key`), o nome, o tipo e o tamanho |
+| Imagens, PDFs e anexos | Disco local do servidor (`storage/`, volume do container `app`), via `features/shared/lib/storage/storage.ts` | O banco guarda só a chave (`storage_key`), o nome, o tipo e o tamanho |
 | PDF do DANFE e boleto | Emissor fiscal e Mercado Pago | O banco guarda a chave de acesso, o XML e o link |
 | Segredos de integração e chave de criptografia (`DATA_ENCRYPTION_KEY`) | `.env` do servidor | Nunca no banco nem no repositório |
 | Métricas e logs de aplicação | Saída do container | O banco guarda só a auditoria de negócio (`audit_logs`) |

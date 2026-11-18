@@ -865,6 +865,8 @@ Checklist “Critérios de aceite”:
 
 Implementar os status e as transições permitidas do pedido.
 
+Status implementados (12): `AWAITING_SHIPPING_QUOTE`, `AWAITING_APPROVAL`, `AWAITING_PAYMENT`, `PAID`, `IN_PRODUCTION`, `SEPARATING`, `INVOICED`, `SHIPPED`, `DELIVERED`, `INSTALLED`, `CANCELED` e `REFUNDED` (`features/shared/lib/orders/order-status.ts`). Os dois que não estão no RF54, `AWAITING_SHIPPING_QUOTE` (RN16) e `IN_PRODUCTION` (RN24), ainda precisam entrar no `.docx`.
+
 Checklist “Critérios de aceite”:
 
 - [ ] Transições inválidas recusadas
@@ -1177,6 +1179,7 @@ AB-180 — Certificado de CA pública ao publicar fora da rede local
 AB-181 — Varredura trimestral por ASV ao expor o site
 AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
 AB-206 — Publicar a loja numa VPS com domínio próprio
+AB-217 — Otimizar o tempo de build e o tamanho da imagem
 ```
 
 ### Detalhamento dos cards
@@ -1422,7 +1425,7 @@ Checklist “Critérios de aceite”:
 
 #### AB-206 — Publicar a loja numa VPS com domínio próprio
 
-**Etiquetas:** P0 — MVP, Infra/Qualidade
+**Etiquetas:** P0 — MVP, Infra/Qualidade  
 **Issue:** #206 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF06, RNF11, RNF16, RN19
 
 Publicar a loja numa VPS (Hostinger KVM) na internet, com domínio próprio e certificado de CA pública (Let's Encrypt), sem depender de nenhuma máquina local. Mesmo Docker Compose, mais o override da VPS. Continua em sandbox e homologação, só com dados fictícios. Mudança de escopo: o RNF16 passa a aceitar a VPS como servidor de entrega. Depende de #7 e #180.
@@ -1436,3 +1439,20 @@ Checklist “Critérios de aceite”:
 - [ ] Backup diário copiado para fora da VPS (RNF11)
 - [ ] `ARCHITECTURE.md`, `CLAUDE.md`, `README.md` e os docs de `docs/` atualizados para a VPS
 - [ ] RNF16 alterado e NC registrada no documento de requisitos (`.docx`)
+
+#### AB-217 — Otimizar o tempo de build e o tamanho da imagem
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade  
+**Issue:** #217 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF10
+
+Ignorar a pasta `.claude/` (worktrees de agentes) no Git e no ESLint, porque o Tailwind v4 varre os arquivos fora do `.gitignore`. Ligar o cache persistente do Turbopack no build e guardar o cache do npm e do Next em cache mounts do Docker. Remover do estágio `migrate` os pacotes que o `migrate deploy` não usa. Rodar o `npm audit` num job próprio do CI. Escopo novo, a partir do levantamento de 17/11/2026: o build levava 243 s, o lint 544 s, e a imagem tinha 672 MB.
+
+Checklist “Critérios de aceite”:
+
+- [ ] `next build` local sem `.next` em até 100 s e, com o cache, em até 50 s
+- [ ] `npm run lint` não varre `.claude/`
+- [ ] CSS gerado igual ao de antes (mesmo tamanho)
+- [ ] Imagem do `app` com o Prisma CLI menor, e `migrate deploy` aplicando todas as migrations num banco vazio
+- [ ] `docker compose up -d --build` sobe o `app` healthy
+- [ ] O job de audit continua falhando com alerta alto, e os demais passos do CI rodam mesmo assim
+- [ ] `npm run lint`, `npm run typecheck` e `npm test` passando

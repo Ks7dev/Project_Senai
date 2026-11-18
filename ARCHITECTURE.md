@@ -7,17 +7,16 @@ Padrão técnico do projeto (issue #1, RNF07): stack, organização de código, 
 | Camada | Escolha |
 |---|---|
 | Framework | **Next.js 16** (App Router) + **React 19** + **TypeScript** `strict` |
-| UI | **Tailwind CSS v4** (config em `app/globals.css`, sem `tailwind.config.js`), **shadcn/ui** (style `base-nova`, primitivas `@base-ui/react`), ícones **`lucide-react`** (decisão da #3), `framer-motion`, `next-themes` |
+| UI | **Tailwind CSS v4** (config em `app/globals.css`, sem `tailwind.config.js`), **shadcn/ui** (style `base-nova`, primitivas `@base-ui/react`), ícones **`lucide-react`** (decisão da #3) e animações por CSS (`tw-animate-css`) |
 | Formulários | `react-hook-form` + `zod` + `@hookform/resolvers/zod` |
 | Banco de dados (RNF16) | **MySQL 8** (InnoDB, `utf8mb4`), acessado só pelo **Prisma ORM**, que cuida do schema, das migrations e dos seeds |
 | Autenticação | **Better Auth** com adapter Prisma: sessão em cookie `httpOnly`, recuperação de senha, plugin de 2FA (RF40) e plugin de organizações para contas corporativas multiusuário (RF09, RF10) |
-| Arquivos | Imagens, fichas técnicas em PDF e anexos num armazenamento S3-compatível (disco local em dev). O banco guarda só a chave e os metadados do arquivo |
-| Listagens | `@tanstack/react-table` v9 + `@tanstack/react-query` v5 |
+| Arquivos | Imagens, fichas técnicas em PDF e anexos em disco local (`storage/`, volume do container `app`), pela interface de `features/shared/lib/storage/storage.ts`, servidos por `app/media/[...key]`. O banco guarda só a chave e os metadados do arquivo |
 | Imagens | `sharp` no servidor: valida, converte para WebP com até 300 KB e gera versões responsivas (RNF04) |
 | Qualidade | ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) + `tsc --noEmit` |
 | Testes (RNF07) | **Vitest**: unitários de schema, action e regras de negócio. **Playwright**: ponta a ponta do fluxo de compra |
 | Documentação de código (RNF08) | **JSDoc** em toda função exportada, cobrado por `eslint-plugin-jsdoc` |
-| Servidor | **Docker Compose**: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06) e backup diário (RNF11). A entrega roda numa **VPS pública** (Hostinger KVM) com domínio próprio e certificado Let's Encrypt (seção 5.2, #206). O mesmo compose roda numa máquina local para desenvolvimento e testes pela rede (seção 5.1) |
+| Servidor | **Docker Compose**: app Next.js (build `standalone`), MySQL 8, proxy reverso **Caddy** com HTTPS (RNF06), backup diário (RNF11), painel de disponibilidade Uptime Kuma (RNF01) e, opcionalmente, o túnel do webhook do Mercado Pago. A entrega roda numa **VPS pública** (Hostinger KVM) com domínio próprio e certificado Let's Encrypt (seção 5.2, #206). O mesmo compose roda numa máquina local para desenvolvimento e testes pela rede, por IP ou hostname da máquina (seção 5.1) |
 
 Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transparente/Bricks), ViaCEP, Correios, agregador de transportadoras, BrasilAPI (CNPJ) e emissor de NF-e.
 
@@ -27,19 +26,23 @@ Integrações, todas em sandbox ou homologação: Mercado Pago (Checkout Transpa
 app/                    → só rotas; cada page.tsx renderiza a View da feature
 app/api/webhooks/*      → Route Handlers só para webhooks externos (Mercado Pago)
 app/api/csp-report      → só grava no log as violações de CSP da página de pagamento (#173)
+app/api/health          → healthcheck do container (SELECT 1 no MySQL, RNF01)
+app/media/[...key]      → arquivos do storage: imagens públicas; PDF de produto inativo só com `product:read`
+app/admin/nfe/[id]/[arquivo]       → XML ou DANFE da NF-e, só com `invoice:manage` (senão 404)
+app/admin/produtos/importar/modelo → modelo CSV da importação, só com `product:create`
 components/             → UI genérica e layout; components/ui (shadcn)
 features/<dominio>/<feature>/
   <feature>-view.tsx    → "use client": só apresentação e estado de UI
   action/               → "use server": única camada de lógica e regra de negócio
   schema/               → schemas Zod + tipos derivados (um arquivo coeso por feature)
 features/shared/        → código usado por mais de uma feature
-lib/, hooks/            → utilitários e hooks genéricos
+lib/utils.ts            → helper `cn` das classes Tailwind (shadcn/ui); hooks ficam na feature ou em `features/shared/lib/`
 emails/                 → templates de e-mail transacional (RF53)
 prisma/schema.prisma    → modelo de dados (fonte única do schema MySQL)
 prisma/migrations/      → migrations SQL versionadas, geradas pelo Prisma (uma por mudança coesa)
 prisma/seed.ts          → seed de configuração (valores das RN) e dados de desenvolvimento
 features/shared/lib/db/ → client Prisma único (server-only) e camada de acesso a dados com permissão
-docker-compose.yml      → servidor: app, MySQL 8, Caddy, backup e monitoramento
+docker-compose.yml      → servidor: proxy (Caddy), app, db (MySQL 8), backup, uptime-kuma e, no perfil `tunnel`, webhook-gate e tunnel
 docker-compose.vps.yml  → override da VPS pública (domínio, só 80 e 443 abertas)
 Dockerfile              → imagem do app (Next.js standalone)
 deploy/                 → Caddyfile, scripts de backup/restauração e config do MySQL
@@ -53,6 +56,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Nunca importe de dentro de outra feature.** Código reutilizado vai antes para `features/shared/`.
 - Schema Zod **nunca inline** em view ou action: fica sempre em `schema/`. O mesmo schema valida o client (`zodResolver`) e a Server Action.
 - `components/` só tem apresentação pura. Componente com dado ou lógica de feature fica na feature.
+- Exceção: as Server Actions usadas por várias features ficam em `features/shared/lib/` (`cart/cart-actions.ts`, `favorites/favorite-actions.ts`, `shipping/shipping-actions.ts` e `viacep/cep-actions.ts`), com as mesmas regras da seção 3.
 
 ### Mapeamento MVC (RNF07)
 
@@ -60,12 +64,12 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 |---|---|
 | Model | Tabelas MySQL modeladas em `prisma/schema.prisma` + `schema/` (Zod e tipos) |
 | View | `*-view.tsx` e componentes da feature |
-| Controller | `action/*.ts` (Server Actions) e, só para webhooks, `app/api/webhooks/*` |
+| Controller | `action/*.ts` (Server Actions); Route Handlers só para webhooks (`app/api/webhooks/*`), healthcheck, relatório de CSP e downloads de arquivo (lista acima) |
 
 ## 3. Regra de ouro: lógica só em Server Action
 
 - Regra de negócio, acesso ao banco, validação sensível e mutação ficam em `action/*.ts`. A action recebe o input, **revalida com Zod**, checa a permissão, acessa o banco pelo Prisma e retorna `{ success: true, ... } | { success: false; error: "..." }`, em vez de lançar exceção.
-- Views `"use client"` nunca acessam o banco nem decidem o que é permitido. O status do pagamento "em tempo real" (RF31) é atualizado por polling curto (`refetchInterval` do React Query), que lê uma action e para quando o status é final.
+- Views `"use client"` nunca acessam o banco nem decidem o que é permitido. O status do pagamento "em tempo real" (RF31) é atualizado por polling curto (`setInterval` de 5 s em `features/payment/order-payment/order-payment-view.tsx`), que lê uma action e para quando o status é final.
 - Operações que mexem em mais de uma tabela (pedido + reserva de estoque, aprovação, estorno) rodam numa **transação** (`prisma.$transaction`). A reserva de estoque usa `SELECT ... FOR UPDATE`, para que dois pedidos simultâneos não reservem a mesma unidade (#64).
 - Erros nunca expõem stack trace nem detalhe interno (RNF05).
 - **Integração de saída** (Mercado Pago, Correios, transportadora, NF-e, BrasilAPI, ViaCEP) fica em `features/shared/lib/<integracao>/`. É `server-only`, só roda depois da checagem de permissão, tem chave em env sem `NEXT_PUBLIC_`, timeout e fallback (RN20, RN21), e o log sai sem headers, payload ou dados de cartão.
@@ -77,13 +81,14 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
   1. A Server Action obtém o usuário da sessão (Better Auth) e chama `requirePermission("<resource>:<action>")` antes de operar.
   2. As consultas passam pela camada de acesso a dados (`features/shared/lib/db/`), que **sempre** aplica o escopo do usuário: a conta corporativa dele, os pedidos dele etc. O id do usuário vem da sessão, nunca do request.
 - O usuário de banco da aplicação tem só `SELECT`, `INSERT`, `UPDATE` e `DELETE` no schema dela, sem DDL. As migrations rodam com outro usuário, só no deploy.
-- Tabelas de RBAC: `roles`, `permissions` (`resource` + `action` únicos), `role_permissions` e `user_roles`. Permissão nova nasce numa migration ou no seed.
+- Tabelas de RBAC dos perfis internos: `roles`, `permissions` (`resource` + `action` únicos), `role_permissions` e `user_roles`. Permissão interna nova nasce numa migration ou no seed.
 - Permissões no formato `"<resource>[:<sub>]:<action>"`, em inglês.
 - Esconder botão ou menu é só UX: a checagem que vale é a da action.
 - As flags de permissão da UI são calculadas uma vez no `page.tsx` e descem por prop.
 - Dois conjuntos de perfis:
   - Internos (RF55): administrador, comercial, financeiro e estoque/logística.
-  - Da conta corporativa (RF10, RN08): solicitante, aprovador, financeiro e administrador da conta.
+  - Da conta corporativa (RF10, RN08): solicitante, aprovador, financeiro e administrador da conta. Esses perfis e as permissões deles são estáticos, definidos no código (`features/shared/lib/auth/corporate-roles.ts`), e ficam gravados como texto em `members.role`; não usam as tabelas de RBAC.
+- 2FA obrigatório (#177): o usuário interno com acesso a pedidos, pagamentos ou estornos (`TWO_FACTOR_REQUIRED_PERMISSIONS`, `features/shared/lib/auth/permissions.ts`) só usa o back office com o 2FA ativo e verificado na sessão atual (`assertTwoFactor`, `features/shared/lib/db/permissions.ts`).
 - Exclusão feita pelo usuário é **soft delete** (`deleted_at`), para não quebrar pedidos e notas antigos (RF42, LGPD). Ações sensíveis gravam log de auditoria (RNF12) na mesma transação da mudança.
 
 ## 5. Banco de dados (MySQL) e migrations
@@ -98,7 +103,7 @@ Domínios previstos, um por label `área: *`: `catalog`, `access`, `shipping`, `
 - **Banco sombra:** o `prisma migrate dev` recria as migrations num banco sombra. No MySQL do Docker, o usuário de migração não pode criar bancos, então o script de inicialização cria o `atelier_bureau_shadow` e o `SHADOW_DATABASE_URL` aponta para ele. Num volume criado antes dessa mudança, crie o banco e o `GRANT` à mão como `root`, dentro do container (comandos em `deploy/mysql/init/01-users.sh`).
 - **Migrations:** `npx prisma migrate dev` em dev, `npx prisma migrate deploy` no deploy, e uma por mudança coesa, versionada no PR. Nunca se altera o banco à mão em homologação ou produção. Seguem expand/contract: adiciona antes e remove só depois que a release que parou de usar o objeto chegou à `master`.
 - **Seed** (`prisma/seed.ts`): valores das regras de negócio confirmados na #5 (tabela de configuração), perfis e permissões, e dados fictícios de desenvolvimento (#8).
-- **Segurança (RNF03):** o MySQL exige TLS (`require_secure_transport=ON`) em conexões vindas da rede. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar, com AES-256-GCM e a chave `DATA_ENCRYPTION_KEY` (`features/shared/lib/crypto/personal-data-cipher.ts`). Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
+- **Segurança (RNF03):** o MySQL exige TLS (`--require-secure-transport=ON` no `docker-compose.yml`) em toda conexão TCP, e os usuários `atelier_app`, `atelier_migrate`, `atelier_backup` e `dev` são `REQUIRE SSL` (#221). O Prisma CLI só negocia TLS com `?sslaccept=accept_invalid_certs` na URL de migração; num banco criado antes da #221, aplique `sh deploy/mysql/require-tls.sh`. Dados sensíveis (documento e telefone) são criptografados na aplicação antes de gravar, com AES-256-GCM e a chave `DATA_ENCRYPTION_KEY` (`features/shared/lib/crypto/personal-data-cipher.ts`). Senha só como hash (Better Auth), e dado de cartão nunca chega ao banco (RN19).
 - **Backup (RNF11):** um container de backup roda `mysqldump` uma vez por dia, com retenção de 30 dias em `./backups`. A restauração usa `deploy/backup/restore.sh` (ou `restore.ps1` no Windows), que confere o dump, pede confirmação, faz um dump de segurança e recria o banco. Passo a passo, RTO de 4 h e roteiro de teste em [`docs/AtelierBureau_Backup_Restauracao.md`](docs/AtelierBureau_Backup_Restauracao.md) (#81).
 - **Configuração:** `DATABASE_URL` e as demais chaves vêm do `.env` (não versionado), e o `.env.example` traz o modelo.
 
@@ -111,13 +116,15 @@ Ambiente de desenvolvimento e de testes pela rede. A entrega roda na VPS (seçã
 | `proxy` | `caddy:2` | **80, 443 e 3001** | HTTPS na frente do app (o 80 só redireciona para o 443, RNF06) e do painel de disponibilidade na 3001 |
 | `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
 | `db` | `mysql:8.4` | **3306**, só em `127.0.0.1` por padrão | MySQL com volume persistente `mysql-data` |
-| `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
+| `backup` | `mysql:8.4` | nenhuma | `mysqldump` diário em `./backups` (30 dias), por um laço de `deploy/backup/backup.sh --daemon` no horário `BACKUP_HOUR` (UTC) |
 | `uptime-kuma` | `louislam/uptime-kuma:1` | nenhuma (só pelo `proxy`, na 3001) | Painel de disponibilidade e alertas por e-mail (#80) |
+| `webhook-gate` | `caddy:2` | nenhuma (8080 só na rede `tunnel`) | Perfil opcional `tunnel`: repassa ao app só `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`, #57) |
+| `tunnel` | `cloudflare/cloudflared` | nenhuma (conexão de saída para a Cloudflare) | Perfil opcional `tunnel`: expõe o `webhook-gate` na internet com `CLOUDFLARE_TUNNEL_TOKEN`; isolado na rede `tunnel`, só alcança o gate |
 
 - **Endereço:** reserve um IP fixo para a máquina no roteador (ex.: `192.168.0.50`). O site fica em `https://<ip-ou-hostname>`, e o banco em `<ip>:3306`.
 - **Firewall do Windows:** libere 80, 443 e 3001 (e 3306, se o banco for aberto à rede) **só no perfil de rede Privada**, nunca em rede Pública.
 - **HTTPS na rede local:** o Caddy usa `tls internal` e gera uma autoridade certificadora local. Instale o certificado raiz dela (exportado em `deploy/certs/root.crt` por `deploy/export-root-cert.sh` ou, no Windows, `deploy/export-root-cert.ps1`) em cada dispositivo para o navegador não mostrar aviso.
-- **Sem fallback para HTTP (RNF06):** a porta 80 só responde com redirecionamento `308` para o HTTPS, qualquer que seja o host. Um host sem certificado é recusado no handshake TLS da 443. O HSTS e os demais headers de segurança saem do Caddy, e a CSP sai do próprio app (`features/shared/lib/security/headers.ts`): estática no `next.config.ts` para as páginas comuns e com nonce por requisição, gerada no `proxy.ts`, na página de pagamento (#173). O baseline aprovado dessa página fica em `deploy/payment-page-baseline.json` e é conferido por `npm run security:payment-page -- https://<ip-do-servidor>`. Para conferir de outro dispositivo: `sh deploy/check-headers.sh <ip-do-servidor>`, que sai com erro se faltar algum header crítico.
+- **Sem fallback para HTTP (RNF06):** a porta 80 só responde com redirecionamento `308` para o HTTPS, qualquer que seja o host (na VPS, o redirecionamento vai sempre para o domínio, seção 5.2). Um host sem certificado é recusado no handshake TLS da 443. O HSTS e os demais headers de segurança saem do Caddy, e a CSP sai do próprio app (`features/shared/lib/security/headers.ts`): estática no `next.config.ts` para as páginas comuns e com nonce por requisição, gerada no `proxy.ts`, na página de pagamento (#173). O baseline aprovado dessa página fica em `deploy/payment-page-baseline.json` e é conferido por `npm run security:payment-page -- https://<ip-do-servidor>`. Para conferir de outro dispositivo: `sh deploy/check-headers.sh <ip-do-servidor>`, que sai com erro se faltar algum header crítico.
 - **Acesso ao MySQL por outros dispositivos:**
   - Só com usuários nomeados e senha forte, com host restrito à sub-rede (`'dev'@'192.168.0.%'`) e TLS obrigatório.
   - O `root` não tem acesso remoto.
@@ -141,18 +148,18 @@ A entrega roda numa VPS Linux na internet (Hostinger **KVM 2**: 2 vCPU e 8 GB de
 
 | Serviço | Porta publicada na VPS | Diferença em relação ao servidor local |
 |---|---|---|
-| `proxy` | **80 e 443**, em todas as interfaces | Usa `deploy/caddy/Caddyfile.vps`: certificado Let's Encrypt para `SITE_HOST` (o domínio), renovado pelo próprio Caddy. A 3001 não é publicada |
+| `proxy` | **80 e 443**, em todas as interfaces | Usa `deploy/caddy/Caddyfile.vps`: certificado Let's Encrypt para `SITE_HOST` (o domínio) e, se definido, para o nome alternativo `SITE_ALIAS_HOST` (ex.: `www`), renovado pelo próprio Caddy. A 3001 não é publicada |
 | `app` | nenhuma | Igual. `BETTER_AUTH_URL` é `https://<domínio>` |
-| `db` | 3306 só em `127.0.0.1` da VPS, sempre | Sem usuário de desenvolvedor (`MYSQL_DEV_PASSWORD` vazio). Acesso de fora só por túnel SSH |
+| `db` | 3306 só em `127.0.0.1` da VPS, sempre | Mesma exigência de TLS do arquivo base (`--require-secure-transport=ON`, #221). Sem usuário de desenvolvedor (`MYSQL_DEV_PASSWORD` vazio). Acesso de fora só por túnel SSH |
 | `backup` | nenhuma | Igual, mais uma cópia diária para fora da VPS (`rclone`) e snapshots da Hostinger |
 | `uptime-kuma` | 3001 só em `127.0.0.1` da VPS | Acesso só por túnel SSH (`ssh -L 3001:127.0.0.1:3001`) |
 | `tunnel`, `webhook-gate` | não sobem | O webhook do Mercado Pago chega direto em `https://<domínio>/api/webhooks/mercadopago` |
 
 - **Rede:** firewall da VPS (`ufw` e o do painel da Hostinger) com só 22, 80 e 443 abertas. O Docker publica portas por fora do `ufw`, por isso o override amarra o MySQL e o Uptime Kuma ao loopback.
 - **Acesso administrativo:** SSH só com chave, sem login do `root` nem por senha, `fail2ban` e atualizações automáticas de segurança.
-- **HTTPS (RNF06):** certificado de CA pública (#180). Os dispositivos não precisam instalar certificado raiz, e os mesmos headers de segurança da seção 5.1 continuam saindo do Caddy. A conferência é `sh deploy/check-headers.sh <domínio>`.
+- **HTTPS (RNF06):** certificado de CA pública (#180). Os dispositivos não precisam instalar certificado raiz, e os mesmos headers de segurança da seção 5.1 continuam saindo do Caddy. A porta 80 responde a qualquer host, inclusive o IP da VPS, só com redirecionamento `308` para `https://<domínio>`; o Caddy continua atendendo o desafio ACME nela. O nome alternativo (`SITE_ALIAS_HOST`) é opcional e só deve ser preenchido depois que o registro DNS dele apontar para a VPS. A conferência é `sh deploy/check-headers.sh <domínio> --system-ca`: sem a flag, o script usa o `deploy/certs/root.crt` da CA local, quando ele existe, e a checagem do certificado Let's Encrypt falha.
 - **E-mail (RF53):** SMTP de um provedor transacional (Brevo ou Resend) na porta 587, com SPF, DKIM e DMARC configurados no domínio.
-- **Seed:** a imagem do app não leva o `tsx`, então o seed roda uma vez num container Node temporário na rede do Compose, com `SEED_PASSWORD` obrigatório. As contas fictícias são trocadas ou desativadas com `npm run accounts:rotate-seed` antes da apresentação (#179).
+- **Seed:** a imagem do app não leva o `tsx`, então o seed roda uma vez num container Node temporário na rede do Compose (`deploy/vps/node-task.sh`). O script recusa rodar o seed com `SEED_PASSWORD` vazia, igual à senha pública de desenvolvimento ou com menos de 16 caracteres, e passa as URLs do banco ao container por um arquivo temporário, nunca pela linha de comando. Logo depois do seed, as contas fictícias são trocadas ou desativadas com `npm run accounts:rotate-seed` (#179); a rotação é obrigatória, não só o `--dry-run`.
 - **Continua sendo demonstração:** Mercado Pago em sandbox (`MERCADOPAGO_ALLOW_PRODUCTION=false`), integrações em homologação e só dados fictícios. O rodapé avisa que é um projeto acadêmico.
 
 ## 6. Convenções de código

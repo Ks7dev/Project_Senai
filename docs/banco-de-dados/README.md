@@ -35,4 +35,4 @@ O script cria o banco `atelier_bureau` do zero. Para testá-lo num MySQL de dese
 sed 's/`atelier_bureau`/`atelier_script`/g' docs/banco-de-dados/06-script.sql | mysql -u root -p
 ```
 
-O resultado esperado são 51 tabelas e 20 gatilhos. Depois, `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`, com o `DATABASE_URL` desse banco, deve responder *"This is an empty migration"*.
+O resultado esperado são 52 tabelas e 20 gatilhos. Depois, `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`, com o `DATABASE_URL` desse banco, deve responder *"This is an empty migration"*.

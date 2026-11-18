@@ -38,7 +38,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: mysql://atelier_app:${MYSQL_APP_PASSWORD}@db:3306/atelier_bureau
-      MIGRATION_DATABASE_URL: mysql://atelier_migrate:${MYSQL_MIGRATE_PASSWORD}@db:3306/atelier_bureau
+      # The Prisma CLI only negotiates TLS with sslaccept; the container
+      # certificate is self-signed, so the chain is not checked (#221)
+      MIGRATION_DATABASE_URL: mysql://atelier_migrate:${MYSQL_MIGRATE_PASSWORD}@db:3306/atelier_bureau?sslaccept=accept_invalid_certs
       # Key of the CPF and phone encryption at rest (RNF03)
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?set DATA_ENCRYPTION_KEY in .env}
     volumes:
@@ -85,6 +87,10 @@ services:
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+00:00
       - --tls-version=TLSv1.2,TLSv1.3
+      # TCP connections without TLS are refused (RNF16, #221). The
+      # healthcheck (mysqladmin over TCP) negotiates TLS by default, and the
+      # restore scripts use root through the socket, which is not TCP
+      - --require-secure-transport=ON
       - --max-connections=200
       # Lets the migration user (no SUPER) create the triggers with the
       # binary log on (prisma/migrations/20261115000000_database_triggers)
