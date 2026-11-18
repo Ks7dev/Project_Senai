@@ -84,7 +84,7 @@ Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outr
 ### Correção (#79)
 
 1. **Cluster de workers:** `deploy/app/cluster.mjs` sobe `APP_WORKERS` processos (padrão 4, nunca mais que as CPUs) na porta 3000. O primeiro é o coordenador: só ele roda os jobs e a criptografia de dados legados, e guarda os contadores do rate limit (RNF05), que os outros consultam por IPC. Worker que cai é reiniciado com o mesmo papel.
-2. **Cache coerente entre workers:** o `"use cache"` continua em memória em cada worker, e `deploy/app/cache-handler.mjs` repassa a invalidação de tags do back office (`revalidateTag`) aos demais, então nenhum worker continua mostrando preço ou estoque antigo.
+2. **Cache coerente entre workers:** o `"use cache"` continua em memória em cada worker, e `deploy/app/cache-handler.mjs` repassa a invalidação de tags do back office (`revalidateTag`) aos demais, que a aplicam no `"use cache"` e no manifest de tags do cache incremental (ISR), então nenhum worker continua mostrando preço ou estoque antigo.
 3. **Página de produto:** as faixas de volume só são lidas depois de `connection()`, em tempo de requisição, e o shell volta a ser gerado uma vez.
 4. **Aquecimento do teste:** o script aquece cada rota com requisições em paralelo, em algumas rodadas, para chegar a todos os workers, e não só a um.
 

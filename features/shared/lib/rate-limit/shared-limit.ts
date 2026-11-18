@@ -4,6 +4,7 @@ import {
   clusterRole,
   type ClusterRole,
 } from "@/features/shared/lib/cluster/cluster-role"
+import { logger } from "@/features/shared/lib/logger/logger"
 import {
   RateLimiter,
   type RateLimitResult,
@@ -21,8 +22,16 @@ export type IpcChannel = {
   on: (event: "message", listener: (message: unknown) => void) => unknown
 }
 
-/** How long a worker waits for the coordinator before counting alone. */
-const COORDINATOR_TIMEOUT_MS = 250
+/**
+ * How long a worker waits for the coordinator before counting alone.
+ * The coordinator also serves pages (20 to 35 ms of CPU each), so under
+ * load its answer can wait behind a few renders; one second covers that
+ * and only expires when the coordinator is really unavailable.
+ */
+const COORDINATOR_TIMEOUT_MS = 1000
+
+/** Minimum interval between two fallback warnings of one process. */
+const FALLBACK_LOG_INTERVAL_MS = 60_000
 
 type RateLimitRequest = {
   type: string
@@ -44,6 +53,7 @@ const globalForLimiter = globalThis as unknown as {
   atelierRateLimiter?: RateLimiter
   atelierRateLimitPending?: WeakMap<IpcChannel, PendingReplies>
   atelierRateLimitCoordinators?: WeakSet<IpcChannel>
+  atelierRateLimitFallbackLoggedAt?: number
 }
 
 /**
@@ -168,7 +178,16 @@ export async function checkSharedRateLimit(
     }
     channel.send(request)
   })
-  return result ?? limiter.check(key, rule)
+  if (result) return result
+  // Counted here only: the limit becomes per worker until the
+  // coordinator answers again, so make it visible (at most once a minute)
+  const now = Date.now()
+  const lastLog = globalForLimiter.atelierRateLimitFallbackLoggedAt ?? 0
+  if (now - lastLog >= FALLBACK_LOG_INTERVAL_MS) {
+    globalForLimiter.atelierRateLimitFallbackLoggedAt = now
+    logger.warn("shared rate limit unavailable, counting in this worker")
+  }
+  return limiter.check(key, rule)
 }
 
 /**

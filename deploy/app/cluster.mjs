@@ -25,7 +25,10 @@ const RESTART_DELAY_MS = 1000
 const SHUTDOWN_TIMEOUT_MS = 10_000
 
 /**
- * Writes one log line in the same JSON format as the app logger.
+ * Writes one log line in the same JSON format as the app logger. This
+ * file runs outside the Next.js bundle, before the app is loaded, so it
+ * cannot import the TypeScript logger; the console writes the structured
+ * line to the container output, the same sink the logger uses.
  *
  * @param {"info" | "warn" | "error"} level - Severity.
  * @param {string} message - Message.

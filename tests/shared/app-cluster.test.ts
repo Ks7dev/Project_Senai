@@ -11,6 +11,7 @@ import {
   clusterRole,
   runsBackgroundTasks,
 } from "@/features/shared/lib/cluster/cluster-role"
+import { logger } from "@/features/shared/lib/logger/logger"
 import { RateLimiter } from "@/features/shared/lib/rate-limit/rate-limit"
 import {
   checkSharedRateLimit,
@@ -174,6 +175,7 @@ describe("rate limit shared by the workers (RNF05, #79)", () => {
 
   it("falls back to its own counter when the coordinator is silent", async () => {
     vi.useFakeTimers()
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined)
     try {
       const worker = new FakeChannel()
       const local = new RateLimiter(() => 0)
@@ -188,7 +190,12 @@ describe("rate limit shared by the workers (RNF05, #79)", () => {
       expect(result.allowed).toBe(true)
       expect(result.remaining).toBe(1)
       expect(worker.sent).toHaveLength(1)
+      // The fallback is visible in the log
+      expect(warn).toHaveBeenCalledWith(
+        "shared rate limit unavailable, counting in this worker"
+      )
     } finally {
+      warn.mockRestore()
       vi.useRealTimers()
     }
   })
@@ -221,9 +228,12 @@ describe("cache revalidation across workers (#79)", () => {
 
   it("sends a revalidated tag to the other workers", async () => {
     const local = fakeLocal()
+    const incremental = vi.fn(async () => undefined)
     const channel = new FakeChannel()
-    const handler = createClusterCacheHandler({ local, channel })
+    const handler = createClusterCacheHandler({ local, channel, incremental })
     await handler.updateTags(["products"], { expire: 100 })
+    // Next.js itself updates the incremental cache of the sending worker
+    expect(incremental).not.toHaveBeenCalled()
     expect(local.updateTags).toHaveBeenCalledWith(["products"], {
       expire: 100,
     })
@@ -236,10 +246,37 @@ describe("cache revalidation across workers (#79)", () => {
     ])
   })
 
+  it("applies a revalidation from another worker to both caches", async () => {
+    const { tagsManifest, areTagsExpired, areTagsStale } =
+      await import("next/dist/server/lib/incremental-cache/tags-manifest.external.js")
+    const before = Date.now() - 1000
+    // The real incremental cache manifest of this process, as Next.js
+    // reads it to decide whether a prerendered shell is still valid
+    const channel = new FakeChannel()
+    createClusterCacheHandler({ local: fakeLocal(), channel })
+    channel.emit("message", {
+      type: MESSAGE_TYPES.cacheTags,
+      tags: ["test-expired"],
+    })
+    channel.emit("message", {
+      type: MESSAGE_TYPES.cacheTags,
+      tags: ["test-stale"],
+      durations: { expire: 3600 },
+    })
+    await vi.waitFor(() => {
+      expect(areTagsExpired(["test-expired"], before)).toBe(true)
+      expect(areTagsStale(["test-stale"], before)).toBe(true)
+    })
+    expect(areTagsExpired(["test-stale"], before)).toBe(false)
+    tagsManifest.delete("test-expired")
+    tagsManifest.delete("test-stale")
+  })
+
   it("applies a revalidation from another worker without sending it back", () => {
     const local = fakeLocal()
+    const incremental = vi.fn(async () => undefined)
     const channel = new FakeChannel()
-    createClusterCacheHandler({ local, channel })
+    createClusterCacheHandler({ local, channel, incremental })
     channel.emit("message", {
       type: MESSAGE_TYPES.cacheTags,
       tags: ["categories"],
@@ -247,6 +284,8 @@ describe("cache revalidation across workers (#79)", () => {
     channel.emit("message", { type: "other", tags: ["x"] })
     expect(local.updateTags).toHaveBeenCalledTimes(1)
     expect(local.updateTags).toHaveBeenCalledWith(["categories"], undefined)
+    expect(incremental).toHaveBeenCalledTimes(1)
+    expect(incremental).toHaveBeenCalledWith(["categories"], undefined)
     expect(channel.sent).toEqual([])
   })
 
