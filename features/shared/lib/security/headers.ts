@@ -9,7 +9,8 @@
  *   installments, identification types).
  * - `api.mercadolibre.com`: SDK telemetry (`/tracks`).
  * - `secure-fields.mercadopago.com` and `api-static.mercadopago.com`:
- *   iframes of the secure card fields.
+ *   iframes of the secure card fields, which the SDK also reaches by
+ *   `connect-src` (#240).
  * - `www.mercadopago.com.br`: wallet (Mercado Pago account) checkout.
  * - `www.mercadolivre.com.br`: passkey (FIDO) authentication page.
  *
@@ -25,6 +26,8 @@ export const MERCADO_PAGO_CSP_HOSTS = {
     "https://api.mercadopago.com",
     "https://api.mercadolibre.com",
     "https://http2.mlstatic.com",
+    "https://secure-fields.mercadopago.com",
+    "https://api-static.mercadopago.com",
   ],
   frame: [
     "https://sdk.mercadopago.com",
