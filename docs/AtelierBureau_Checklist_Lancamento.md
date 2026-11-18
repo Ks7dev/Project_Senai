@@ -24,14 +24,14 @@ Copie o modelo (`cp .env.example .env`) e preencha. Nenhum valor real é version
 - [ ] `BETTER_AUTH_SECRET` aleatório (`openssl rand -base64 32`) e `BETTER_AUTH_URL="https://<SITE_HOST>"`.
 - [ ] **`DATA_ENCRYPTION_KEY` (#75, PR #185):** `openssl rand -base64 32`, incluída **antes** do primeiro `docker compose up -d`. Sem ela o compose não sobe. **Guarde uma cópia fora do servidor** (gerenciador de senhas da equipe): sem a chave, os CPFs e telefones gravados não podem ser lidos. Ao iniciar, o app cifra as linhas antigas que estiverem em texto.
 - [ ] `SEED_PASSWORD` preenchida com uma senha forte (nunca vazia: vazia, o seed usa a senha de desenvolvimento conhecida). Ela só vale até a troca da seção 7.
-- [ ] Mercado Pago só com credenciais de **sandbox** (`TEST-...`) e `MERCADOPAGO_ALLOW_PRODUCTION="false"` (quando a trava da #7 estiver mesclada).
+- [ ] Mercado Pago só com credenciais de **sandbox** (`TEST-...`) e `MERCADOPAGO_ALLOW_PRODUCTION="false"`: a trava da #7 recusa credencial que não começa com `TEST-` (`features/shared/lib/mercadopago/mercadopago.ts`).
 - [ ] Correios, transportadora e NF-e só com credenciais de homologação/sandbox, ou vazias (as regras de fallback RN20 e RN21 assumem).
 - [ ] SMTP (`SMTP_*`, `EMAIL_FROM`) preenchido, se houver servidor de e-mail; senão os e-mails vão para `./storage/outbox`.
 - [ ] Conferência: `git status` não mostra o `.env` (ele está no `.gitignore`).
 
 ## 3. Subida e banco de dados
 
-- [ ] `docker compose up -d` sobe `proxy`, `app`, `db` e `backup` (e os demais serviços que o compose tiver).
+- [ ] `docker compose up -d` sobe `proxy`, `app`, `db`, `backup` e `uptime-kuma`. O `webhook-gate` e o `tunnel` só sobem com `docker compose --profile tunnel up -d`, quando o webhook do Mercado Pago for usado.
 - [ ] `docker compose ps`: todos os serviços como `running (healthy)`.
 - [ ] **Migrations na subida:** `docker compose logs app` mostra `Applying database migrations...` seguido de `Starting Atelier Bureau...`, sem erro. O `prisma migrate deploy` roda a cada início do app.
 - [ ] **Gatilhos (#8, PR #172):** o compose passa `--log-bin-trust-function-creators=1` ao MySQL. Num servidor que já existia, o `up -d` recria o container do banco e mantém os dados no volume. Confira os 20 gatilhos:

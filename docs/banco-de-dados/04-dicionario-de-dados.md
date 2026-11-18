@@ -4,7 +4,7 @@
 
 Banco **MySQL 8** (InnoDB), charset `utf8mb4` e collation `utf8mb4_0900_ai_ci` em todas as tabelas. Datas em UTC (`DATETIME(3)`) e dinheiro em `DECIMAL(12,2)`. Chaves: **PK** primária, **FK** estrangeira e **UK** única. A coluna "Nulo" diz se o campo aceita `NULL`.
 
-Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando as chaves primárias) e 20 gatilhos.
+Totais: 52 tabelas, 504 colunas, 79 chaves estrangeiras, 176 índices (contando as chaves primárias) e 20 gatilhos.
 
 ## Sumário
 
@@ -14,7 +14,7 @@ Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando 
 - **Pedidos e logística:** [`orders`](#orders), [`order_items`](#order_items), [`order_status_history`](#order_status_history), [`order_approvals`](#order_approvals), [`shipments`](#shipments), [`shipping_regions`](#shipping_regions)
 - **Financeiro e fiscal:** [`payments`](#payments), [`payment_notifications`](#payment_notifications), [`refunds`](#refunds), [`invoiced_installments`](#invoiced_installments), [`invoices`](#invoices), [`credit_limit_changes`](#credit_limit_changes)
 - **Pós-venda e atendimento:** [`support_tickets`](#support_tickets), [`support_ticket_events`](#support_ticket_events), [`support_ticket_attachments`](#support_ticket_attachments), [`seller_rules`](#seller_rules), [`demo_requests`](#demo_requests)
-- **Plataforma e auditoria:** [`settings`](#settings), [`institutional_pages`](#institutional_pages), [`audit_logs`](#audit_logs), [`email_outbox`](#email_outbox)
+- **Plataforma e auditoria:** [`settings`](#settings), [`institutional_pages`](#institutional_pages), [`audit_logs`](#audit_logs), [`email_outbox`](#email_outbox), [`rate_limit_buckets`](#rate_limit_buckets)
 
 ## Acesso, contas e perfis
 
@@ -1579,4 +1579,22 @@ Totais: 51 tabelas, 498 colunas, 79 chaves estrangeiras, 174 índices (contando 
 |---|---|---|
 | `email_outbox_created_at_idx` | INDEX | `created_at` |
 | `email_outbox_status_next_attempt_at_idx` | INDEX | `status`, `next_attempt_at` |
+
+### rate_limit_buckets
+
+**Entidade:** Limite de tentativas. Contador por janela fixa das tentativas de pagamento (por pedido e por IP) e das solicitações de estorno (por usuário), que sobrevive ao reinício do app (#175, PCI 8).
+
+| Coluna | Tipo | Nulo | Padrão | Chave | Descrição |
+|---|---|---|---|---|---|
+| `key_hash` | CHAR(64) | Não | — | PK | Hash SHA-256 do escopo com o pedido, IP ou usuário contado, sem guardar o valor em claro |
+| `window_start` | DATETIME(3) | Não | — | PK | Início da janela fixa (UTC) |
+| `scope` | VARCHAR(32) | Não | — | — | O que é limitado: payment.order, payment.ip ou refund.user |
+| `hits` | INT | Não | `0` | — | Tentativas contadas na janela, recusadas inclusive |
+| `expires_at` | DATETIME(3) | Não | — | — | Fim da janela; as linhas vencidas são apagadas por um job |
+
+**Índices**
+
+| Nome | Tipo | Colunas |
+|---|---|---|
+| `rate_limit_buckets_expires_at_idx` | INDEX | `expires_at` |
 

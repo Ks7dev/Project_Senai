@@ -15,8 +15,9 @@ import {
 } from "@/features/shared/schema/rate-limit-schema"
 
 /**
- * Generic message shown when a payment or refund is refused by the
- * rate limit (#175). It never says which limit was hit (RNF05).
+ * Generic message shown when a payment, refund or login is refused by
+ * the rate limit (#175, #220). It never says which limit was hit nor
+ * whether the account exists (RNF05).
  */
 export const RATE_LIMITED_MESSAGE =
   "Muitas tentativas em pouco tempo. Por segurança, aguarde alguns minutos e tente novamente."
@@ -167,8 +168,8 @@ export async function hitPersistentLimit(
 }
 
 /**
- * Applies the rate limits of a payment or refund Server Action (#175,
- * PCI 8, RNF05). Each check is counted in the database; the first one
+ * Applies the rate limits of a payment, refund or login Server Action
+ * (#175, #220, PCI 8, RNF05). Each check is counted in the database; the first one
  * over its limit refuses the call with a generic message. Every refusal
  * is logged; the first one of each window also writes the audit log
  * (RNF12) with the user, the IP and the scope, so a blocked attacker
@@ -210,6 +211,42 @@ export async function enforcePersistentRateLimits(
       )
     }
     throw new AppError(RATE_LIMITED_MESSAGE, "rate_limited")
+  }
+}
+
+/**
+ * Gives back one call counted by `enforcePersistentRateLimits` in the
+ * current window, so only failures add up (SEC-005, #220): a login with
+ * the right password does not use the attempts of its own e-mail. The
+ * count is taken before the check, so a burst of parallel guesses is
+ * still capped; it never goes below zero. A failure here is only logged,
+ * since it must not undo a successful login.
+ *
+ * @param check - Scope and subject counted before.
+ * @param now - Current time.
+ * @param client - Prisma client or transaction.
+ */
+export async function releasePersistentRateLimit(
+  check: RateLimitCheck,
+  now: Date = new Date(),
+  client: Pick<Prisma.TransactionClient, "rateLimitBucket" | "setting"> = prisma
+): Promise<void> {
+  try {
+    const rule = await loadRateLimit(check.scope, client)
+    const windowStart = windowStartFor(
+      now.getTime(),
+      rule.windowMinutes * MINUTE
+    )
+    await client.rateLimitBucket.updateMany({
+      where: {
+        keyHash: rateLimitKeyHash(check.scope, check.subject),
+        windowStart,
+        hits: { gt: 0 },
+      },
+      data: { hits: { decrement: 1 } },
+    })
+  } catch {
+    logger.error("rate limit release failed", { scope: check.scope })
   }
 }
 

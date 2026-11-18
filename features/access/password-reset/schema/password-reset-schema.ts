@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { newPasswordSchema } from "@/features/shared/schema/password-schema"
 
 /** Request a reset link by e-mail (RF40). */
 export const requestResetSchema = z.object({
@@ -12,10 +13,7 @@ export type RequestResetInput = z.input<typeof requestResetSchema>
 export const resetPasswordSchema = z
   .object({
     token: z.string().min(1, "Link inválido."),
-    password: z
-      .string()
-      .min(10, "Use pelo menos 10 caracteres.")
-      .max(128, "Use no máximo 128 caracteres."),
+    password: newPasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {

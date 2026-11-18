@@ -99,8 +99,10 @@ const SANDBOX_RECHECK_MS = 5 * 60_000
  * so the prefix alone cannot tell sandbox from production (#229).
  */
 const verifiedTestTokens = new Set<string>()
-let pendingSandboxCheck: Promise<void> | null = null
-let lastFailedSandboxCheckAt = 0
+/** Check in progress per access token. */
+const pendingSandboxChecks = new Map<string, Promise<void>>()
+/** Time of the last failed check per access token. */
+const failedSandboxChecks = new Map<string, number>()
 
 /**
  * Whether production (non-sandbox) Mercado Pago credentials may be used.
@@ -133,9 +135,10 @@ function accessTokenIsSandbox(): boolean {
  * Accepts a sandbox credential always and any other one only with
  * `MERCADOPAGO_ALLOW_PRODUCTION=true`. Sandbox means a `TEST-`
  * credential, or one of a test user confirmed by
- * {@link ensureMercadoPagoSandboxChecked}: the public key follows the
- * access token of the same account. A refused credential is logged by
- * variable name only, never by value.
+ * {@link ensureMercadoPagoSandboxChecked}: an `APP_USR-` public key
+ * follows the verified access token of the same account. A `TEST-`
+ * token alone never lets a non-`TEST-` public key through. A refused
+ * credential is logged by variable name only, never by value.
  *
  * @param credential - The access token or public key.
  * @param variable - Name of the environment variable, for the log.
@@ -143,7 +146,8 @@ function accessTokenIsSandbox(): boolean {
  */
 function credentialAllowed(credential: string, variable: string): boolean {
   if (credential.startsWith(TEST_CREDENTIAL_PREFIX)) return true
-  if (accessTokenIsSandbox()) return true
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
+  if (verifiedTestTokens.has(accessToken)) return true
   if (mercadoPagoProductionAllowed()) return true
   logger.error("mercadopago production credential refused", {
     variable,
@@ -169,15 +173,22 @@ export async function ensureMercadoPagoSandboxChecked(
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? ""
   if (!accessToken || accessTokenIsSandbox()) return
   if (mercadoPagoProductionAllowed()) return
-  if (Date.now() - lastFailedSandboxCheckAt < SANDBOX_RECHECK_MS) return
-  pendingSandboxCheck ??= checkTestUser(accessToken, fetcher).finally(() => {
-    pendingSandboxCheck = null
-  })
-  await pendingSandboxCheck
+  const failedAt = failedSandboxChecks.get(accessToken) ?? 0
+  if (Date.now() - failedAt < SANDBOX_RECHECK_MS) return
+  let pending = pendingSandboxChecks.get(accessToken)
+  if (!pending) {
+    pending = checkTestUser(accessToken, fetcher).finally(() => {
+      pendingSandboxChecks.delete(accessToken)
+    })
+    pendingSandboxChecks.set(accessToken, pending)
+  }
+  await pending
 }
 
 /**
- * Asks Mercado Pago whether the token belongs to a test user.
+ * Asks Mercado Pago whether the token belongs to a test user. Always
+ * the real API host, never `MERCADOPAGO_BASE_URL`: another host could
+ * answer `test_user` for a production token.
  *
  * @param accessToken - The access token being checked.
  * @param fetcher - Fetch implementation.
@@ -186,12 +197,9 @@ async function checkTestUser(
   accessToken: string,
   fetcher: typeof fetch
 ): Promise<void> {
-  const baseUrl = (
-    process.env.MERCADOPAGO_BASE_URL || DEFAULT_BASE_URL
-  ).replace(/\/+$/, "")
   const timeout = Number(process.env.MERCADOPAGO_TIMEOUT_MS)
   try {
-    const response = await fetcher(`${baseUrl}/users/me`, {
+    const response = await fetcher(`${DEFAULT_BASE_URL}/users/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
       signal: AbortSignal.timeout(
@@ -199,7 +207,7 @@ async function checkTestUser(
       ),
     })
     if (!response.ok) {
-      lastFailedSandboxCheckAt = Date.now()
+      failedSandboxChecks.set(accessToken, Date.now())
       logger.warn("mercadopago sandbox check failed", {
         status: response.status,
       })
@@ -210,12 +218,12 @@ async function checkTestUser(
       verifiedTestTokens.add(accessToken)
       return
     }
-    lastFailedSandboxCheckAt = Date.now()
+    failedSandboxChecks.set(accessToken, Date.now())
     logger.error("mercadopago account is not a test user", {
       hint: "use the credentials of a Mercado Pago test user or set MERCADOPAGO_ALLOW_PRODUCTION=true on a production server",
     })
   } catch (error) {
-    lastFailedSandboxCheckAt = Date.now()
+    failedSandboxChecks.set(accessToken, Date.now())
     logger.warn("mercadopago sandbox check failed", {
       error: error instanceof Error ? error.name : "unknown",
     })
@@ -227,8 +235,8 @@ async function checkTestUser(
  */
 export function resetMercadoPagoSandboxCheck(): void {
   verifiedTestTokens.clear()
-  pendingSandboxCheck = null
-  lastFailedSandboxCheckAt = 0
+  pendingSandboxChecks.clear()
+  failedSandboxChecks.clear()
 }
 
 /**

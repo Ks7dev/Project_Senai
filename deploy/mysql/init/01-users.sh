@@ -4,12 +4,14 @@
 set -euo pipefail
 
 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<SQL
--- App user: data only, no DDL. Reachable only from the Docker network.
-CREATE USER IF NOT EXISTS 'atelier_app'@'%' IDENTIFIED BY '${MYSQL_APP_PASSWORD}';
+-- Every user requires TLS (RNF16, #221). The host is '%' because the
+-- app reaches MySQL from the Docker network, whose subnet is not fixed.
+-- App user: data only, no DDL.
+CREATE USER IF NOT EXISTS 'atelier_app'@'%' IDENTIFIED BY '${MYSQL_APP_PASSWORD}' REQUIRE SSL;
 GRANT SELECT, INSERT, UPDATE, DELETE ON atelier_bureau.* TO 'atelier_app'@'%';
 
 -- Migration user: DDL on the app schema, used by prisma migrate deploy.
-CREATE USER IF NOT EXISTS 'atelier_migrate'@'%' IDENTIFIED BY '${MYSQL_MIGRATE_PASSWORD}';
+CREATE USER IF NOT EXISTS 'atelier_migrate'@'%' IDENTIFIED BY '${MYSQL_MIGRATE_PASSWORD}' REQUIRE SSL;
 GRANT ALL PRIVILEGES ON atelier_bureau.* TO 'atelier_migrate'@'%';
 -- Shadow database for `prisma migrate dev` (development only): the
 -- migration user cannot create databases, so it gets a fixed one.
@@ -17,7 +19,7 @@ CREATE DATABASE IF NOT EXISTS atelier_bureau_shadow CHARACTER SET utf8mb4 COLLAT
 GRANT ALL PRIVILEGES ON atelier_bureau_shadow.* TO 'atelier_migrate'@'%';
 
 -- Backup user: read-only dump.
-CREATE USER IF NOT EXISTS 'atelier_backup'@'%' IDENTIFIED BY '${MYSQL_BACKUP_PASSWORD}';
+CREATE USER IF NOT EXISTS 'atelier_backup'@'%' IDENTIFIED BY '${MYSQL_BACKUP_PASSWORD}' REQUIRE SSL;
 GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, EVENT ON atelier_bureau.* TO 'atelier_backup'@'%';
 GRANT PROCESS ON *.* TO 'atelier_backup'@'%';
 SQL
