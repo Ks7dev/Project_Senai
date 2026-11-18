@@ -99,6 +99,15 @@ Nenhuma regra de negócio mudou. Preço, estoque e permissões continuam sendo c
 | Depois, 4 workers, aquecido (melhor execução) | 44 ms | 53 ms | 79 ms | 1,20x | aprovado |
 | Depois, 4 workers, logo após reiniciar o app (2 execuções) | 48 e 97 ms | 100 e 209 ms | 135 e 293 ms | 2,08x e 2,15x | no limite |
 
+Depois da revisão do PR #219 (18/11/2026, mesma arquitetura, com a invalidação repassada também ao cache ISR), o host estava com outras sessões rodando `npm ci`, Vitest e verificações contra o mesmo servidor, e a RAM livre oscilava entre 0,2 e 2 GB:
+
+| Execução | p95 1x | p95 3x | p99 3x | Degradação | Resultado |
+|---|---|---|---|---|---|
+| [Revisão, 1ª](relatorios/teste-de-carga-2026-11-18-revisao.md) | 394 ms | 113 ms | 252 ms | 0,29x | aprovado (ruído na fase 1x) |
+| [Revisão, 2ª](relatorios/teste-de-carga-2026-11-18-revisao-2.md) | 45 ms | 337 ms | 1.129 ms | 7,49x | reprovado (ruído na fase 3x, 0,5 GB livres) |
+
+Nas duas, o ruído caiu numa fase só, e as outras fases ficaram dentro dos limites. Para a apresentação, rode com a máquina dedicada (sem outras builds ou testes) e com pelo menos 2 GB de RAM livre.
+
 Dentro do container, sem o proxy, o cluster sustentou 30 usuários com p95 41 ms e p99 60 ms (degradação 1,17x).
 
 **Limitações da medição.** O servidor de entrega é um notebook com Docker Desktop, que divide a CPU com outros containers e programas. Com a máquina ocupada ou em throttling térmico, as mesmas imagens deram resultados até 5x piores, inclusive na fase de 1x. Uma execução que coincidiu com o `docker build` de outra branch deu degradação de 5x. Rode o teste com a máquina dedicada, sem build em paralelo, depois de alguns minutos de uso normal do site: logo após `docker compose up`, cada worker ainda compila o código (JIT) e preenche o próprio cache, e a degradação fica perto de 2x.
