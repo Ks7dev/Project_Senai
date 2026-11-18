@@ -6,6 +6,10 @@
 {
 	local_certs
 	admin 127.0.0.1:2019
+	# Clients that open https://<ip> send no SNI, and behind the Docker
+	# NAT Caddy cannot see the destination IP either: without this, the
+	# handshake from other LAN devices fails (#235)
+	default_sni {$SITE_HOST}
 }
 
 # Port 80 never serves content: every request, whatever the host, is
