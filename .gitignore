@@ -36,3 +36,7 @@ next-env.d.ts
 
 # local server
 /deploy/certs/
+
+# Claude Code local data: agent worktrees are full copies of the
+# repository, and Tailwind scans every file not ignored here (#217)
+/.claude/

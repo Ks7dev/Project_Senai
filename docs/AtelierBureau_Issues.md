@@ -168,6 +168,7 @@ Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendência
 | #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Backlog |
 | #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Backlog |
 | #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Backlog |
+| #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em andamento |
 
 ---
 
@@ -648,6 +649,28 @@ Subir o servidor local em Docker (app, MySQL, Caddy e backup), acessível pelos 
 - [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
 - [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
 - [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada
+
+### AB-217 — Otimizar o tempo de build e o tamanho da imagem
+
+**Issue:** #217  
+**Labels:** `tipo: task`, `área: app`, `performance`, `infra`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6  
+**Prioridade:** P2 · **Status inicial:** Backlog  
+**Referências:** RNF10
+
+**Descrição**
+
+Ignorar a pasta `.claude/` (worktrees de agentes) no Git e no ESLint, porque o Tailwind v4 varre os arquivos fora do `.gitignore`. Ligar o cache persistente do Turbopack no build e guardar o cache do npm e do Next em cache mounts do Docker. Remover do estágio `migrate` os pacotes que o `migrate deploy` não usa. Rodar o `npm audit` num job próprio do CI. Escopo novo, a partir do levantamento de 17/11/2026: o build levava 243 s, o lint 544 s, e a imagem tinha 672 MB.
+
+**Critérios de aceite**
+
+- [ ] `next build` local sem `.next` em até 100 s e, com o cache, em até 50 s
+- [ ] `npm run lint` não varre `.claude/`
+- [ ] CSS gerado igual ao de antes (mesmo tamanho)
+- [ ] Imagem do `app` com o Prisma CLI menor, e `migrate deploy` aplicando todas as migrations num banco vazio
+- [ ] `docker compose up -d --build` sobe o `app` healthy
+- [ ] O job de audit continua falhando com alerta alto, e os demais passos do CI rodam mesmo assim
+- [ ] `npm run lint`, `npm run typecheck` e `npm test` passando
 
 ## Catálogo
 
