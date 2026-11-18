@@ -95,9 +95,10 @@ Nenhuma regra de negócio mudou. Preço, estoque e permissões continuam sendo c
 | Execução | p95 1x | p95 3x | p99 3x | Degradação | Resultado |
 |---|---|---|---|---|---|
 | Antes, 1 processo | 63 ms | 866 ms | 1.449 ms | 13,75x | reprovado |
-| Depois, 4 workers, aquecido | 44 ms | 53 ms | 79 ms | 1,20x | aprovado |
+| Depois, 4 workers, aquecido (relatório oficial) | 83 ms | 107 ms | 165 ms | 1,29x | aprovado |
+| Depois, 4 workers, aquecido (melhor execução) | 44 ms | 53 ms | 79 ms | 1,20x | aprovado |
 | Depois, 4 workers, logo após reiniciar o app (2 execuções) | 48 e 97 ms | 100 e 209 ms | 135 e 293 ms | 2,08x e 2,15x | no limite |
 
 Dentro do container, sem o proxy, o cluster sustentou 30 usuários com p95 41 ms e p99 60 ms (degradação 1,17x).
 
-**Limitações da medição.** O servidor de entrega é um notebook com Docker Desktop, que divide a CPU com outros containers e programas. Com a máquina ocupada ou em throttling térmico, as mesmas imagens deram resultados até 5x piores, inclusive na fase de 1x. Rode o teste com a máquina dedicada, depois de alguns minutos de uso normal do site: logo após `docker compose up`, cada worker ainda compila o código (JIT) e preenche o próprio cache, e a degradação fica perto de 2x.
+**Limitações da medição.** O servidor de entrega é um notebook com Docker Desktop, que divide a CPU com outros containers e programas. Com a máquina ocupada ou em throttling térmico, as mesmas imagens deram resultados até 5x piores, inclusive na fase de 1x. Uma execução que coincidiu com o `docker build` de outra branch deu degradação de 5x. Rode o teste com a máquina dedicada, sem build em paralelo, depois de alguns minutos de uso normal do site: logo após `docker compose up`, cada worker ainda compila o código (JIT) e preenche o próprio cache, e a degradação fica perto de 2x.
