@@ -18,13 +18,16 @@ export const rateLimitSettingSchema = z.object({
 export type RateLimitSetting = z.infer<typeof rateLimitSettingSchema>
 
 /** What is being limited: the action and who or what is counted. */
-export type RateLimitScope = "payment.order" | "payment.ip" | "refund.user"
+export type RateLimitScope =
+  "payment.order" | "payment.ip" | "refund.user" | "auth.account" | "auth.totp"
 
 /** Settings key of each rate limit scope. */
 export const RATE_LIMIT_SETTING_KEYS: Record<RateLimitScope, string> = {
   "payment.order": "security.payment_attempts_per_order",
   "payment.ip": "security.payment_attempts_per_ip",
   "refund.user": "security.refund_requests_per_user",
+  "auth.account": "security.sign_in_attempts_per_account",
+  "auth.totp": "security.two_factor_attempts_per_challenge",
 }
 
 /**
@@ -36,4 +39,6 @@ export const DEFAULT_RATE_LIMITS: Record<RateLimitScope, RateLimitSetting> = {
   "payment.order": { limit: 5, windowMinutes: 60 },
   "payment.ip": { limit: 20, windowMinutes: 60 },
   "refund.user": { limit: 10, windowMinutes: 60 },
+  "auth.account": { limit: 10, windowMinutes: 15 },
+  "auth.totp": { limit: 5, windowMinutes: 15 },
 }

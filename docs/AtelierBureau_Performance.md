@@ -16,7 +16,7 @@ Os valores ficam em `performance-budget.json`. O orçamento de JavaScript e CSS 
 ## Como medir
 
 1. **Orçamento de bundle (automático):** `npm run build && npm run perf:budget`. O script lê os manifestos do `.next`, soma os arquivos da primeira carga de cada rota de vitrine e falha se passar do orçamento. Roda no CI.
-2. **Latência (servidor local, com banco e seed):** `npm run perf:api -- https://<ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI, que ainda não tem MySQL.
+2. **Latência (servidor local, com banco e seed):** `npm run perf:api -- https://<ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI: o workflow `E2E` sobe um MySQL para o Playwright, mas não roda o `perf:api`.
 3. **LCP:** Lighthouse no Chrome, perfil celular com "Slow 4G", nas URLs de home, categoria, produto e busca do servidor local. Registrar o resultado no PR de release.
 
 ## Otimizações aplicadas
@@ -72,7 +72,7 @@ Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outr
 ### Situação
 
 - O script, a configuração e os testes unitários (`tests/perf/load-test.test.ts`) estão prontos.
-- **Primeira execução real (17/11/2026):** reprovada. Sem erros, mas sob 3x o p95 foi 699 ms, o p99 1.405 ms e a degradação do p95 6,5x. A repetição antes da correção ([`relatorios/teste-de-carga-2026-11-17.md`](relatorios/teste-de-carga-2026-11-17.md)) deu p95 866 ms, p99 1.449 ms e degradação 13,75x.
+- **Primeira execução real (17/11/2026):** reprovada ([`relatorios/teste-de-carga-2026-11-17.md`](relatorios/teste-de-carga-2026-11-17.md)). Sem erros, mas sob 3x o p95 foi 699 ms, o p99 1.405 ms e a degradação do p95 6,5x. A repetição antes da correção ([`relatorios/teste-de-carga-2026-11-17-repeticao.md`](relatorios/teste-de-carga-2026-11-17-repeticao.md)) deu p95 866 ms, p99 1.449 ms e degradação 13,75x. `npm run perf:api` passou.
 - **Depois da correção (18/11/2026):** aprovada ([`relatorios/teste-de-carga-2026-11-18.md`](relatorios/teste-de-carga-2026-11-18.md)).
 
 ### Causa da latência sob carga (#79)

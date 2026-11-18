@@ -6,6 +6,14 @@ set -e
 echo "Applying database migrations..."
 (cd ./migrate && node ./node_modules/prisma/build/index.js migrate deploy)
 
-# Cluster of APP_WORKERS processes sharing port 3000 (#79, RNF02)
+# The server never needs these secrets at runtime: drop them so a code
+# execution or a /proc/self/environ read in the app cannot reach the DDL
+# user, MySQL root, backup, tunnel or seed credentials (SEC-003, #220).
+unset MIGRATION_DATABASE_URL SHADOW_DATABASE_URL \
+  MYSQL_ROOT_PASSWORD MYSQL_APP_PASSWORD MYSQL_MIGRATE_PASSWORD \
+  MYSQL_BACKUP_PASSWORD MYSQL_DEV_PASSWORD \
+  CLOUDFLARE_TUNNEL_TOKEN SEED_PASSWORD
+
 echo "Starting Atelier Bureau..."
+# Cluster of APP_WORKERS processes sharing port 3000 (#79, RNF02)
 exec node deploy/app/cluster.mjs

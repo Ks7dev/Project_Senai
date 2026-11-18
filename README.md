@@ -32,6 +32,12 @@ O site abre em `http://localhost:3000`.
 | `npm run db:migrate` | Cria e aplica migrations em desenvolvimento |
 | `npm run db:deploy` | Aplica as migrations pendentes (servidor) |
 | `npm run db:seed` | Carrega configurações, catálogo e contas fictícias |
+| `npm run db:validate` | Valida o `prisma/schema.prisma` (`prisma validate`) |
+| `npm run db:docs` | Gera o DER, o MER, o dicionário de dados e o script SQL de `docs/banco-de-dados/` a partir de um banco já migrado |
+| `npm run perf:budget` | Confere o JavaScript de primeiro carregamento de cada rota contra o `performance-budget.json` (depois do build; roda no CI) |
+| `npm run perf:api` | Mede a latência (mediana e p95) das rotas contra um app rodando (RNF10) |
+| `npm run perf:load` | Teste de carga da vitrine contra um app rodando (RNF02) |
+| `npm run security:payment-page` | Confere a CSP e os scripts da página de pagamento contra o `deploy/payment-page-baseline.json` (#173) |
 | `npm run accounts:rotate-seed` | Troca (ou desativa, com `--disable`) a senha das contas fictícias do seed no servidor de entrega; `--dry-run` só mostra o que mudaria (#179) |
 
 ## Servidor local (Docker)
@@ -70,9 +76,21 @@ A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam
    sh deploy/check-headers.sh <ip-do-servidor>
    ```
 
-6. No Firewall do Windows, libere as portas 80 e 443 só no perfil de rede **Privada**. O MySQL (3306) fica só nesta máquina; para abri-lo à rede, defina `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env` e libere a 3306 também no perfil Privado.
+6. No Firewall do Windows, libere as portas 80, 443 e 3001 (painel de disponibilidade) só no perfil de rede **Privada**. O MySQL (3306) fica só nesta máquina; para abri-lo à rede, defina `MYSQL_PUBLISH_ADDR=0.0.0.0` no `.env` e libere a 3306 também no perfil Privado.
 
-Serviços: `proxy` (Caddy, portas 80 e 443), `app` (Next.js, só na rede interna), `db` (MySQL 8.4, porta 3306 em `127.0.0.1`) e `backup` (`mysqldump` diário em `./backups`, 30 dias de retenção).
+Serviços do `docker-compose.yml`:
+
+| Serviço | Porta publicada | Papel |
+|---|---|---|
+| `proxy` | 80, 443 e 3001 | Caddy: HTTPS do site (o 80 só redireciona) e do painel de disponibilidade na 3001, só para endereços da rede local |
+| `app` | nenhuma (3000 só na rede interna) | Next.js |
+| `db` | 3306, só em `127.0.0.1` por padrão (`MYSQL_PUBLISH_ADDR`) | MySQL 8.4 |
+| `backup` | nenhuma | `mysqldump` diário em `./backups`, 30 dias de retenção |
+| `uptime-kuma` | nenhuma (só pelo `proxy`, na 3001) | Painel de disponibilidade e alertas (RNF01, #80) |
+| `webhook-gate` | nenhuma | Perfil opcional `tunnel`: repassa ao app só `POST /api/webhooks/mercadopago` |
+| `tunnel` | nenhuma (conexão de saída) | Perfil opcional `tunnel`: túnel `cloudflared` que expõe só o `webhook-gate` na internet (`CLOUDFLARE_TUNNEL_TOKEN`) |
+
+O `webhook-gate` e o `tunnel` só sobem com `docker compose --profile tunnel up -d` (`ARCHITECTURE.md`, seção 5.1).
 
 As contas de teste estão em `prisma/seed-data.ts`, e a senha delas é a do `SEED_PASSWORD`. No servidor de entrega, troque ou desative essas contas antes da apresentação, conforme o [checklist de lançamento](docs/AtelierBureau_Checklist_Lancamento.md).
 

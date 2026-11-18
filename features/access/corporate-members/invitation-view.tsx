@@ -20,6 +20,9 @@ import {
   acceptWithSignUpSchema,
   type AcceptWithSignUpInput,
 } from "@/features/access/corporate-members/schema/members-schema"
+import { maskCpf, maskPhone } from "@/features/shared/lib/validation/documents"
+import { withMask } from "@/features/shared/lib/validation/input-mask"
+import { PASSWORD_HINT } from "@/features/shared/schema/password-schema"
 import { CORPORATE_ROLES } from "@/features/shared/lib/auth/corporate-roles"
 
 /**
@@ -118,8 +121,11 @@ export function InvitationView({ invitation }: { invitation: Invitation }) {
               <Input
                 id="cpf"
                 inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                maxLength={14}
                 {...fieldAria("cpf", errors.cpf?.message)}
-                {...form.register("cpf")}
+                {...withMask(form.register("cpf"), maskCpf)}
               />
             </FormField>
             <FormField
@@ -130,15 +136,18 @@ export function InvitationView({ invitation }: { invitation: Invitation }) {
               <Input
                 id="phone"
                 type="tel"
-                autoComplete="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder="(00) 00000-0000"
+                maxLength={15}
                 {...fieldAria("phone", errors.phone?.message)}
-                {...form.register("phone")}
+                {...withMask(form.register("phone"), maskPhone)}
               />
             </FormField>
             <FormField
               id="password"
               label="Senha"
-              hint="Pelo menos 10 caracteres."
+              hint={PASSWORD_HINT}
               error={errors.password?.message}
             >
               <Input

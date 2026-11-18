@@ -5,6 +5,7 @@ import {
   findMercadoPagoPaymentByReference,
   getMercadoPagoPayment,
   MercadoPagoError,
+  ensureMercadoPagoSandboxChecked,
   mercadoPagoConfig,
   type ProviderPayment,
 } from "@/features/shared/lib/mercadopago/mercadopago"
@@ -147,6 +148,7 @@ export async function refreshPendingPayment(
   paymentRowId: string,
   options: { now?: Date; fetcher?: typeof fetch } = {}
 ): Promise<PaymentSyncResult | null> {
+  await ensureMercadoPagoSandboxChecked(options.fetcher)
   if (!mercadoPagoConfig()) return null
   const payment = await prisma.payment.findFirst({
     where: { id: paymentRowId, status: "PENDING" },
@@ -175,6 +177,7 @@ export async function refreshPendingPayment(
 export async function reconcilePendingPayments(
   options: { now?: Date; expiredOnly?: boolean; fetcher?: typeof fetch } = {}
 ): Promise<number> {
+  await ensureMercadoPagoSandboxChecked(options.fetcher)
   if (!mercadoPagoConfig()) return 0
   const now = options.now ?? new Date()
   const pending = await prisma.payment.findMany({

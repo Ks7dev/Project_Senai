@@ -1,4 +1,4 @@
-/** Largest CSP report body accepted, in characters (#173). */
+/** Largest CSP report body accepted, in bytes and characters (#173). */
 export const CSP_REPORT_MAX_LENGTH = 16_384
 
 /** Most violations logged from a single report request. */
