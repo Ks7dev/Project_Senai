@@ -82,7 +82,7 @@ Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checkl
 | #4 AB-004 | Validação jurídica das políticas de troca, arrependimento e garantia | task | app | v0.1.0 | E0 | P1 | Bloqueado |
 | #5 AB-005 | Confirmar os valores configuráveis das regras de negócio | task | app | v0.1.0 | E0 | P1 | Concluído |
 | #6 AB-006 | Setup do repositório: estrutura MVC, lint, formatter e templates | task | app | v0.1.0 | E1 | P0 | Concluído |
-| #7 AB-007 | Configurar ambientes e variáveis (dev, homologação, produção) | task | app | v0.1.0 | E1 | P0 | Bloqueado |
+| #7 AB-007 | Configurar ambientes e variáveis (dev, homologação, produção) | task | app | v0.1.0 | E1 | P0 | Em teste |
 | #8 AB-008 | Modelagem do banco de dados e migrations iniciais | feature | app | v0.1.0 | E1 | P0 | Concluído |
 | #9 AB-009 | Pipeline de CI com lint, testes e build | task | app | v0.1.0 | E1 | P0 | Concluído |
 | #10 AB-010 | Padrão de tratamento de erros, logs e rate limiting | task | app | v0.1.0 | E1 | P0 | Concluído |
@@ -154,12 +154,12 @@ Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checkl
 | #76 AB-076 | Log de auditoria de ações sensíveis | task | back office | v0.4.0 | E5 | P1 | Concluído |
 | #77 AB-077 | Testes automatizados e cobertura mínima | task | app | v1.0.0 | E6 | P0 | Concluído |
 | #78 AB-078 | Orçamento de performance | task | app | v1.0.0 | E6 | P1 | Concluído |
-| #79 AB-079 | Teste de carga | task | app | v1.0.0 | E6 | P2 | Em teste |
+| #79 AB-079 | Teste de carga | task | app | v1.0.0 | E6 | P2 | Em revisão |
 | #80 AB-080 | Monitoramento de disponibilidade e alertas | task | app | v1.0.0 | E6 | P1 | Em teste |
 | #81 AB-081 | Backup e teste de restauração | task | app | v1.0.0 | E6 | P1 | Concluído |
 | #82 AB-082 | Deploy e checklist de lançamento | task | app | v1.0.0 | E6 | P0 | Em teste |
 | #173 AB-173 | Trocar unsafe-inline da CSP por nonce nas páginas de pagamento | task | pagamento | v1.0.0 | E6 | P1 | Concluído |
-| #174 AB-174 | Restringir os curingas de domínio da CSP do Mercado Pago | task | pagamento | v1.0.0 | E6 | P2 | Bloqueado |
+| #174 AB-174 | Restringir os curingas de domínio da CSP do Mercado Pago | task | pagamento | v1.0.0 | E6 | P2 | Em teste |
 | #175 AB-175 | Rate limit nas Server Actions de pagamento e estorno | task | pagamento | v1.0.0 | E6 | P1 | Concluído |
 | #176 AB-176 | Rodar npm audit no CI | task | app | v1.0.0 | E6 | P2 | Concluído |
 | #177 AB-177 | 2FA obrigatório para perfis internos com acesso financeiro | task | acesso | v1.0.0 | E6 | P1 | Concluído |
@@ -168,6 +168,7 @@ Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checkl
 | #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Concluído |
+| #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em teste |
 
 ---
 
