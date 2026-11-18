@@ -1176,6 +1176,7 @@ AB-179 — Trocar as contas fictícias do seed no servidor de entrega
 AB-180 — Certificado de CA pública ao publicar fora da rede local
 AB-181 — Varredura trimestral por ASV ao expor o site
 AB-182 — Política de segurança e plano de resposta a incidentes de pagamento
+AB-217 — Otimizar o tempo de build e o tamanho da imagem
 ```
 
 ### Detalhamento dos cards
@@ -1418,3 +1419,20 @@ Checklist “Critérios de aceite”:
 
 - [ ] Política de segurança da informação versionada em `docs/`
 - [ ] Plano de resposta a incidentes de pagamento versionado em `docs/`
+
+#### AB-217 — Otimizar o tempo de build e o tamanho da imagem
+
+**Etiquetas:** P2 — Desejável, Infra/Qualidade  
+**Issue:** #217 · **Área:** app · **Milestone:** v1.0.0 · **Referências:** RNF10
+
+Ignorar a pasta `.claude/` (worktrees de agentes) no Git e no ESLint, porque o Tailwind v4 varre os arquivos fora do `.gitignore`. Ligar o cache persistente do Turbopack no build e guardar o cache do npm e do Next em cache mounts do Docker. Remover do estágio `migrate` os pacotes que o `migrate deploy` não usa. Rodar o `npm audit` num job próprio do CI. Escopo novo, a partir do levantamento de 17/11/2026: o build levava 243 s, o lint 544 s, e a imagem tinha 672 MB.
+
+Checklist “Critérios de aceite”:
+
+- [ ] `next build` local sem `.next` em até 100 s e, com o cache, em até 50 s
+- [ ] `npm run lint` não varre `.claude/`
+- [ ] CSS gerado igual ao de antes (mesmo tamanho)
+- [ ] Imagem do `app` com o Prisma CLI menor, e `migrate deploy` aplicando todas as migrations num banco vazio
+- [ ] `docker compose up -d --build` sobe o `app` healthy
+- [ ] O job de audit continua falhando com alerta alto, e os demais passos do CI rodam mesmo assim
+- [ ] `npm run lint`, `npm run typecheck` e `npm test` passando
