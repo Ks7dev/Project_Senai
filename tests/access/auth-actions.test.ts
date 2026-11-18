@@ -20,6 +20,11 @@ vi.mock("@/features/shared/lib/brasilapi/cnpj", () => ({
   lookupCnpj: (cnpj: string) => lookupCnpj(cnpj),
 }))
 vi.mock("@/features/shared/lib/auth/auth", () => ({ getAuth: () => ({ api }) }))
+// The login limit per account has its own test (SEC-005, #220)
+vi.mock("@/features/shared/lib/rate-limit/persistent-limit", () => ({
+  enforcePersistentRateLimits: vi.fn(async () => undefined),
+  releasePersistentRateLimit: vi.fn(async () => undefined),
+}))
 const sendEmail = vi.fn()
 vi.mock("@/features/shared/lib/email/mailer", () => ({
   sendEmail: (message: unknown) => sendEmail(message),
