@@ -546,7 +546,32 @@ describe("card payment with the Payment Brick (#54, RF35, RF36, RN13)", () => {
       token: brickCard.token,
       payment_method_id: "master",
       three_d_secure_mode: "optional",
+      // Quality fields of Mercado Pago (#228)
+      additional_info: {
+        items: [
+          {
+            id: sku.code,
+            quantity: 2,
+            category_id: expect.any(String),
+            title: expect.any(String),
+            description: expect.any(String),
+            unit_price: expect.any(Number),
+          },
+        ],
+        payer: {
+          first_name: expect.any(String),
+          address: {
+            zip_code: "70040010",
+            street_name: "Esplanada dos Ministérios",
+            street_number: "10",
+          },
+        },
+        shipments: {
+          receiver_address: { zip_code: "70040010", state_name: "DF" },
+        },
+      },
     })
+    expect(request.body.payer).toHaveProperty("first_name")
     const payment = await prisma.payment.findFirstOrThrow({
       where: { orderId: order.orderId },
     })

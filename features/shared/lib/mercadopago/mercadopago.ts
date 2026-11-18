@@ -499,6 +499,46 @@ async function callMercadoPago(
   }
 }
 
+/** Address of the payer or of the delivery, in the Mercado Pago format. */
+export type PaymentAddress = {
+  /** CEP, digits only. */
+  zip_code: string
+  /** Street. */
+  street_name: string
+  /** Number, as typed (may be "S/N"). */
+  street_number: string
+}
+
+/**
+ * Quality fields of a payment (#228), used by Mercado Pago in the fraud
+ * analysis. They carry personal data and are never logged.
+ */
+export type PaymentAdditionalInfo = {
+  /** Ordered items. */
+  items: Array<{
+    id: string
+    title: string
+    description: string
+    category_id: string
+    quantity: number
+    unit_price: number
+  }>
+  /** Buyer from the account. */
+  payer: {
+    first_name?: string
+    last_name?: string
+    phone?: { area_code: string; number: string }
+    address?: PaymentAddress
+  }
+  /** Delivery address of the order. */
+  shipments?: {
+    receiver_address: PaymentAddress & {
+      city_name?: string
+      state_name?: string
+    }
+  }
+}
+
 /** Body of `POST /v1/payments`, built by the server (RF36). */
 export type CreatePaymentBody = {
   transaction_amount: number
@@ -514,6 +554,7 @@ export type CreatePaymentBody = {
   notification_url?: string
   statement_descriptor?: string
   metadata?: Record<string, string>
+  additional_info?: PaymentAdditionalInfo
 }
 
 /**
