@@ -87,8 +87,9 @@ services:
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+00:00
       - --tls-version=TLSv1.2,TLSv1.3
-      # TCP connections without TLS are refused (RNF16, #221); the
-      # socket inside the container (healthcheck, restore) is not TCP
+      # TCP connections without TLS are refused (RNF16, #221). The
+      # healthcheck (mysqladmin over TCP) negotiates TLS by default, and the
+      # restore scripts use root through the socket, which is not TCP
       - --require-secure-transport=ON
       - --max-connections=200
       # Lets the migration user (no SUPER) create the triggers with the
