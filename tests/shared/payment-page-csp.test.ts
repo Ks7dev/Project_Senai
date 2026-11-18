@@ -84,8 +84,8 @@ describe("payment page CSP with nonce (#173)", () => {
     expect(regex.test("/conta/pedidos/abc/pagamento")).toBe(false)
   })
 
-  it("sets the CSP and the nonce in the proxy, only on the payment page", () => {
-    const response = proxy(
+  it("sets the CSP and the nonce in the proxy, only on the payment page", async () => {
+    const response = await proxy(
       new NextRequest("https://loja.test/conta/pedidos/abc/pagamento", {
         headers: { [NONCE_HEADER]: "forged" },
       })
@@ -99,7 +99,7 @@ describe("payment page CSP with nonce (#173)", () => {
       'csp-endpoint="/api/csp-report"'
     )
 
-    const other = proxy(new NextRequest("https://loja.test/carrinho"))
+    const other = await proxy(new NextRequest("https://loja.test/carrinho"))
     expect(other.headers.get("content-security-policy")).toBeNull()
     expect(other.headers.get(`x-middleware-request-${NONCE_HEADER}`)).toBeNull()
   })

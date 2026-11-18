@@ -124,6 +124,45 @@ export function summarizePhase(
   }
 }
 
+/** Parallel requests per path in the warm-up. */
+const WARM_UP_CONCURRENCY = 8
+
+/** Rounds of the warm-up. */
+const WARM_UP_ROUNDS = 3
+
+/**
+ * Warms the caches, as a returning visitor would find them. The app
+ * runs as a cluster of workers, each one with its own cache (#79), and
+ * the proxy spreads parallel connections among them, so every path is
+ * requested in parallel, a few rounds, to reach all the workers.
+ * Failures are ignored: the phases measure them.
+ *
+ * @param options - Server, paths and timeout.
+ * @returns The number of requests made.
+ */
+export async function warmUp(options: {
+  baseUrl: string
+  paths: LoadPath[]
+  timeoutMs: number
+}): Promise<number> {
+  let requests = 0
+  for (let round = 0; round < WARM_UP_ROUNDS; round++) {
+    for (const { path } of options.paths) {
+      await Promise.all(
+        Array.from({ length: WARM_UP_CONCURRENCY }, () => {
+          requests++
+          return fetch(`${options.baseUrl}${path}`, {
+            signal: AbortSignal.timeout(options.timeoutMs),
+          })
+            .then((response) => response.arrayBuffer())
+            .catch(() => undefined)
+        })
+      )
+    }
+  }
+  return requests
+}
+
 /**
  * Runs `users` virtual users against the server for `durationMs`. Each
  * user requests a weighted random path, reads the full body and waits
@@ -345,14 +384,11 @@ export async function main(args: string[]): Promise<number> {
     })
     return summarizePhase(samples, users, config.durationSeconds)
   }
-  // Warm up the caches once, as a returning visitor would find them
-  for (const { path } of config.paths) {
-    await fetch(`${config.baseUrl}${path}`, {
-      signal: AbortSignal.timeout(config.timeoutMs),
-    })
-      .then((response) => response.arrayBuffer())
-      .catch(() => undefined)
-  }
+  await warmUp({
+    baseUrl: config.baseUrl,
+    paths: config.paths,
+    timeoutMs: config.timeoutMs,
+  })
   process.stdout.write(`baseline: ${config.baselineUsers} users...\n`)
   const baseline = await phase(config.baselineUsers)
   const loadUsers = Math.round(config.baselineUsers * config.multiplier)

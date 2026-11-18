@@ -33,7 +33,7 @@ describe("app entrypoint (SEC-003, #220)", () => {
   it("unsets every secret after the migration and before the server", () => {
     const migrate = script.indexOf("migrate deploy")
     const unset = script.indexOf("unset ")
-    const server = script.indexOf("exec node server.js")
+    const server = script.indexOf("exec node deploy/app/cluster.mjs")
     expect(migrate).toBeGreaterThan(-1)
     expect(unset).toBeGreaterThan(migrate)
     expect(server).toBeGreaterThan(unset)
@@ -73,7 +73,7 @@ describe("app entrypoint (SEC-003, #220)", () => {
           fakeNode,
           [
             "#!/bin/sh",
-            'if [ "$1" = "server.js" ]; then env | cut -d= -f1; exit 0; fi',
+            'if [ "$1" = "deploy/app/cluster.mjs" ]; then env | cut -d= -f1; exit 0; fi',
             '[ -n "$MIGRATION_DATABASE_URL" ] || exit 9',
             "exit 0",
             "",
