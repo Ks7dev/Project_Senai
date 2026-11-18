@@ -19,6 +19,7 @@ import {
   volumeDiscounts,
 } from "./seed-data"
 import { institutionalPages } from "./seed-institutional-pages"
+import { seedMedia } from "./seed-media"
 
 try {
   process.loadEnvFile()
@@ -161,6 +162,8 @@ async function main() {
       })
     }
   }
+
+  await seedMedia(prisma)
 
   const passwordHash = await hashPassword(seedPassword)
   const userIds = new Map<string, string>()
