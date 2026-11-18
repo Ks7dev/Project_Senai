@@ -1,3 +1,4 @@
+import path from "node:path"
 import type { NextConfig } from "next"
 import {
   buildContentSecurityPolicy,
@@ -12,6 +13,16 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   cacheComponents: true,
+  // The app runs as a cluster of workers (#79); this handler sends the
+  // tag revalidations of one worker to the others. Production only: the
+  // dev server is a single process.
+  ...(isDev
+    ? {}
+    : {
+        cacheHandlers: {
+          default: path.resolve(process.cwd(), "deploy/app/cache-handler.mjs"),
+        },
+      }),
   experimental: {
     // Product images up to 10 MB plus multipart overhead (#22)
     serverActions: { bodySizeLimit: "11mb" },

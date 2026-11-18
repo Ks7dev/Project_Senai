@@ -108,7 +108,7 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
 | Serviço | Imagem | Porta publicada na rede | Papel |
 |---|---|---|---|
 | `proxy` | `caddy:2` | **80, 443 e 3001** | HTTPS na frente do app (o 80 só redireciona para o 443, RNF06) e do painel de disponibilidade na 3001 |
-| `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js. Roda `prisma migrate deploy` ao iniciar |
+| `app` | build do `Dockerfile` | nenhuma (só na rede interna) | Next.js em cluster de workers (`APP_WORKERS`, padrão 4). Roda `prisma migrate deploy` ao iniciar |
 | `db` | `mysql:8.4` | **3306**, só em `127.0.0.1` por padrão | MySQL com volume persistente `mysql-data` |
 | `backup` | `mysql:8.4` + cron | nenhuma | `mysqldump` diário em `./backups` (30 dias) |
 | `uptime-kuma` | `louislam/uptime-kuma:1` | nenhuma (só pelo `proxy`, na 3001) | Painel de disponibilidade e alertas por e-mail (#80) |
@@ -131,6 +131,7 @@ A máquina com o projeto é o servidor. Um único `docker compose up -d` sobe tu
   - **Trava de sandbox (#7):** credenciais do Mercado Pago que não começam com `TEST-` são recusadas (o pagamento online fica indisponível e o log diz o motivo, sem o valor), a menos que `MERCADOPAGO_ALLOW_PRODUCTION=true`. Em dev, homologação e no servidor de entrega, fica `false`.
   - A rota valida a assinatura `x-signature`, é idempotente pelo `x-request-id` (tabela `payment_notifications`), relê o pagamento em `GET /v1/payments/{id}` e só confirma o pedido com `approved` (RN13).
   - Se o webhook não chegar, a reconciliação (job a cada 5 minutos e antes de expirar Pix e boleto) consulta `GET /v1/payments/{id}`, ou busca pelo `external_reference` quando a criação ficou sem resposta.
+- **Cluster de workers (RNF02, #79):** a renderização das páginas usa CPU, e um processo Node.js usa um núcleo só. O container do app roda `deploy/app/cluster.mjs`, que sobe `APP_WORKERS` processos (padrão 4, nunca mais que as CPUs) na mesma porta 3000. O primeiro worker é o **coordenador**: só ele roda os jobs (RN14, RF53) e a criptografia de dados legados (RNF03), e guarda os contadores do rate limit, que os outros workers consultam por IPC (`features/shared/lib/rate-limit/shared-limit.ts`). O cache `"use cache"` continua em memória em cada worker, e o handler `deploy/app/cache-handler.mjs` repassa a invalidação de tags do back office aos demais workers. Worker que cai é reiniciado com o mesmo papel. Os shells estáticos (ISR) só têm tags implícitas de rota; o `revalidatePath` de páginas do back office invalida o shell só no worker que atendeu, o que não afeta dados, porque essas páginas são dinâmicas.
 - **Disponibilidade (RNF01):** todos os containers têm `restart: unless-stopped` e healthcheck. O `GET /api/health` roda `SELECT 1` no MySQL e responde 503 sem detalhe se o banco cair. O Uptime Kuma (`https://<ip>:3001`, só para endereços da rede local) guarda o histórico de disponibilidade e manda e-mail em queda. Monitores, alerta e roteiro de teste em [`docs/AtelierBureau_Monitoramento.md`](docs/AtelierBureau_Monitoramento.md) (#80).
 - **Dados fictícios:** o servidor roda em sandbox/homologação. Não há dados reais de clientes nem de pagamento.
 

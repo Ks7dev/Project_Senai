@@ -1,5 +1,6 @@
 import "server-only"
 import { cacheLife, cacheTag } from "next/cache"
+import { connection } from "next/server"
 import { CATEGORIES_CACHE_TAG } from "@/features/shared/lib/catalog/category-cache"
 import { PRODUCTS_CACHE_TAG } from "@/features/shared/lib/catalog/product-cache"
 import { prisma } from "@/features/shared/lib/db/prisma"
@@ -140,6 +141,10 @@ export async function loadProductPageForCustomer(
 ): Promise<CustomerProductPageData | null> {
   const product = await loadProductPage(slug)
   if (!product) return null
+  // Request time only: the volume tiers are read from the database
+  // without cache, which must not happen while the shell is prerendered
+  // (it failed the prerender on every request, #79)
+  await connection()
   const [pricing, volumeTiers] = await Promise.all([
     loadCurrentCustomerPricing(),
     loadVolumeTiers(product.category.slug),

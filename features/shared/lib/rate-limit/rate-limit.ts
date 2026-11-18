@@ -18,8 +18,9 @@ export type RateLimitResult = {
 
 /**
  * In-memory sliding window rate limiter. The app runs as a single
- * container on the local server (ARCHITECTURE.md 5.1), so process
- * memory is enough; a shared store would be needed with replicas.
+ * container on the local server (ARCHITECTURE.md 5.1); inside it, the
+ * workers of the app cluster share one set of counters held by the
+ * coordinator worker (`shared-limit.ts`, #79).
  */
 export class RateLimiter {
   private readonly hits = new Map<string, number[]>()

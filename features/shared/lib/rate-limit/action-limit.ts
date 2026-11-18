@@ -2,13 +2,9 @@ import "server-only"
 import { headers } from "next/headers"
 import { AppError } from "@/features/shared/lib/errors/action-result"
 import { logger } from "@/features/shared/lib/logger/logger"
-import {
-  RateLimiter,
-  type RateLimitRule,
-} from "@/features/shared/lib/rate-limit/rate-limit"
+import type { RateLimitRule } from "@/features/shared/lib/rate-limit/rate-limit"
+import { checkSharedRateLimit } from "@/features/shared/lib/rate-limit/shared-limit"
 import { clientIpFromHeaders } from "@/features/shared/lib/request/client-ip"
-
-const limiter = new RateLimiter()
 
 /** Message shown when a public action is called too often (RNF05). */
 export const TOO_MANY_REQUESTS_MESSAGE =
@@ -18,7 +14,8 @@ export const TOO_MANY_REQUESTS_MESSAGE =
  * Rate limits a public Server Action that calls an external service
  * (ViaCEP, shipping APIs), keyed by the client IP set by the Caddy
  * proxy. Server Actions post to the page URL, so the proxy limiter
- * does not cover them.
+ * does not cover them. The counters are shared by every worker of the
+ * app cluster (#79).
  *
  * @param name - Action group, e.g. "cep".
  * @param rule - Limit and window.
@@ -30,7 +27,7 @@ export async function enforceActionRateLimit(
 ): Promise<void> {
   const requestHeaders = await headers()
   const ip = clientIpFromHeaders(requestHeaders) ?? "unknown"
-  const result = limiter.check(`action:${name}:${ip}`, rule)
+  const result = await checkSharedRateLimit(`action:${name}:${ip}`, rule)
   if (!result.allowed) {
     logger.warn("action rate limit exceeded", { group: name })
     throw new AppError(TOO_MANY_REQUESTS_MESSAGE, "rate_limited")
