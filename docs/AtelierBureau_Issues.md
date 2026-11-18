@@ -2,7 +2,7 @@
 
 Repositório: `Ks7dev/Project_Senai` · Base: Levantamento de Requisitos v2.0 · Padrão: [`ARCHITECTURE.md`](../ARCHITECTURE.md), seção 7
 
-Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checklist PCI-DSS (#62), `AB-173` = #173 … `AB-182` = #182, criadas em 15/11/2026. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
+Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checklist PCI-DSS (#62), `AB-173` = #173 … `AB-182` = #182, criadas em 15/11/2026. As issues abertas depois do planejamento (#206, #208, #211, #213, #214, #217 e #220 a #223, até 18/11/2026) são acompanhadas no GitHub Project e só entram neste arquivo quando têm seção própria. O status atual de cada issue é o do GitHub Project; a coluna Status deste arquivo pode estar atrasada. Os códigos entre parênteses (RF, RN, RNF) referenciam o documento de requisitos.
 
 ## Como usar
 
@@ -168,6 +168,7 @@ Total: 92 issues: `AB-001` = #1 … `AB-082` = #82 e as 10 pendências do checkl
 | #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Concluído |
+| #214 AB-214 | Validar CPF, telefone e força da senha no cadastro | feature | acesso | v1.0.0 | E6 | P1 | Em revisão |
 | #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em teste |
 
 ---
@@ -1010,6 +1011,27 @@ Perfis administrador, comercial, financeiro e estoque com permissões por módul
 - [ ] Cada perfil acessa só os seus módulos
 - [ ] Permissões verificadas no backend
 
+### AB-214 — Validar CPF, telefone e força da senha no cadastro
+
+**Issue:** #214  
+**Labels:** `tipo: feature`, `área: acesso`, `segurança`  
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6  
+**Prioridade:** P1 · **Status inicial:** Backlog  
+**Referências:** RF39, RF40, RF09
+
+**Descrição**
+
+Máscara e limite de tamanho em CPF, CNPJ e telefone; telefone com DDD da Anatel e prefixo de celular ou fixo; senha nova com 10 a 128 caracteres, letra maiúscula, letra minúscula, número e caractere especial. Vale no cadastro, no aceite de convite e na redefinição de senha. Escopo novo: os requisitos não definiam política de senha.
+
+**Critérios de aceite**
+
+- [ ] CPF, CNPJ e telefone formatados durante a digitação, sem letras nem dígitos a mais
+- [ ] CPF com dígito verificador inválido recusado
+- [ ] Telefone com DDD inexistente, tamanho errado ou prefixo inválido recusado
+- [ ] Senha sem maiúscula, minúscula, número ou caractere especial recusada, com mensagem por regra
+- [ ] Mesmas regras no formulário e na Server Action
+- [ ] Testes de telefone, máscaras e regras de senha
+
 ## Frete
 
 ### AB-039 — Consulta de endereço via ViaCEP com fallback
@@ -1484,6 +1506,8 @@ Reserva na criação do pedido, baixa na confirmação e liberação na expiraç
 **Descrição**
 
 Implementar os status e as transições permitidas do pedido.
+
+**Status implementados (12):** `AWAITING_SHIPPING_QUOTE` (Aguardando cotação de frete), `AWAITING_APPROVAL` (Aguardando aprovação), `AWAITING_PAYMENT` (Aguardando pagamento), `PAID` (Pagamento confirmado), `IN_PRODUCTION` (Em produção), `SEPARATING` (Em separação), `INVOICED` (Faturado), `SHIPPED` (Em transporte), `DELIVERED` (Entregue), `INSTALLED` (Instalado), `CANCELED` (Cancelado) e `REFUNDED` (Estornado), com as transições em `features/shared/lib/orders/order-status.ts`. O RF54 do levantamento lista 10; `AWAITING_SHIPPING_QUOTE` (cotação manual de frete, RN16) e `IN_PRODUCTION` (personalizados e sob encomenda, RN24) foram acrescentados na implementação e ainda precisam entrar no `.docx`, com NC.
 
 **Critérios de aceite**
 

@@ -865,6 +865,8 @@ Checklist “Critérios de aceite”:
 
 Implementar os status e as transições permitidas do pedido.
 
+Status implementados (12): `AWAITING_SHIPPING_QUOTE`, `AWAITING_APPROVAL`, `AWAITING_PAYMENT`, `PAID`, `IN_PRODUCTION`, `SEPARATING`, `INVOICED`, `SHIPPED`, `DELIVERED`, `INSTALLED`, `CANCELED` e `REFUNDED` (`features/shared/lib/orders/order-status.ts`). Os dois que não estão no RF54, `AWAITING_SHIPPING_QUOTE` (RN16) e `IN_PRODUCTION` (RN24), ainda precisam entrar no `.docx`.
+
 Checklist “Critérios de aceite”:
 
 - [ ] Transições inválidas recusadas

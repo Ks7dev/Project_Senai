@@ -16,7 +16,7 @@ Os valores ficam em `performance-budget.json`. O orçamento de JavaScript e CSS 
 ## Como medir
 
 1. **Orçamento de bundle (automático):** `npm run build && npm run perf:budget`. O script lê os manifestos do `.next`, soma os arquivos da primeira carga de cada rota de vitrine e falha se passar do orçamento. Roda no CI.
-2. **Latência (servidor local, com banco e seed):** `npm run perf:api -- https://<ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI, que ainda não tem MySQL.
+2. **Latência (servidor local, com banco e seed):** `npm run perf:api -- https://<ip-do-servidor> 100`. Faz 100 requisições por caminho, com 10 clientes em paralelo, depois de aquecer o cache, e falha se algum p95 passar de 500 ms ou houver erro. Os caminhos ficam em `apiPaths` no `performance-budget.json`. Não roda no CI: o workflow `E2E` sobe um MySQL para o Playwright, mas não roda o `perf:api`.
 3. **LCP:** Lighthouse no Chrome, perfil celular com "Slow 4G", nas URLs de home, categoria, produto e busca do servidor local. Registrar o resultado no PR de release.
 
 ## Otimizações aplicadas
