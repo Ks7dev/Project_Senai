@@ -157,3 +157,22 @@ describe("sandbox payer e-mail (#229)", () => {
     expect(mercadoPagoPayerEmail("a@b.com.br")).toBe("a@b.com.br")
   })
 })
+
+describe("public key with a TEST- token (#229 review)", () => {
+  it("still refuses a production public key next to a TEST- token", () => {
+    vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "TEST-1234")
+    vi.stubEnv("MERCADOPAGO_PUBLIC_KEY", "APP_USR-production-public-key")
+    expect(mercadoPagoConfig()?.accessToken).toBe("TEST-1234")
+    expect(mercadoPagoPublicKey()).toBeNull()
+  })
+
+  it("checks the real API host even with MERCADOPAGO_BASE_URL set", async () => {
+    vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "APP_USR-111-test-user-token")
+    vi.stubEnv("MERCADOPAGO_BASE_URL", "https://evil.example")
+    const fetcher = usersMe(["test_user"])
+    await ensureMercadoPagoSandboxChecked(fetcher)
+    expect((fetcher.mock.calls[0] as [string])[0]).toBe(
+      "https://api.mercadopago.com/users/me"
+    )
+  })
+})
