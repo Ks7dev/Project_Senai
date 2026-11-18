@@ -1,0 +1,39 @@
+# Atelier Bureau — public VPS override (docs/AtelierBureau_Deploy_VPS.md)
+# Applied on top of docker-compose.yml. On the VPS, set in .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.vps.yml
+# so a plain `docker compose up -d` loads both files.
+#
+# Differences from the LAN server:
+# - Caddy gets a Let's Encrypt certificate for SITE_HOST (a real domain)
+#   and, if set, SITE_ALIAS_HOST
+# - MySQL keeps the TLS requirement of the base file (--require-secure-
+#   transport=ON, #221); only its published port changes
+# - only 80 and 443 are published; the uptime panel and MySQL listen on
+#   the VPS loopback only and are reached through an SSH tunnel
+# - the Cloudflare tunnel is not needed: the webhook hits the domain
+
+services:
+  proxy:
+    ports: !override
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_HOST: ${SITE_HOST:?set SITE_HOST to the public domain in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      # Optional second name redirected to SITE_HOST (e.g. www.<SITE_HOST>);
+      # empty unless its DNS record already points to the VPS
+      SITE_ALIAS_HOST: ${SITE_ALIAS_HOST:-}
+    volumes: !override
+      - ./deploy/caddy/Caddyfile.vps:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # VPS loopback only: ssh -L 3001:127.0.0.1:3001 <user>@<vps>
+  uptime-kuma:
+    ports:
+      - "127.0.0.1:3001:3001"
+
+  db:
+    # Never public on the VPS, whatever MYSQL_PUBLISH_ADDR says
+    ports: !override
+      - "127.0.0.1:3306:3306"

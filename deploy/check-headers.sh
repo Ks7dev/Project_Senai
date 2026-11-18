@@ -1,22 +1,42 @@
 #!/bin/sh
-# Checks the HTTPS setup of the local server (issue #11, RNF06): port 80
-# only redirects to 443 and every HTTPS response carries the security
-# headers. Run from any device of the network after installing the root
-# certificate (deploy/certs/root.crt):
+# Checks the HTTPS setup of the server (issue #11, RNF06): port 80 only
+# redirects to 443 and every HTTPS response carries the security headers.
+#
+# Local server: run from any device of the network after installing the
+# root certificate. When deploy/certs/root.crt exists, it is used as the
+# CA by default:
 #
 #   sh deploy/check-headers.sh 192.168.0.50
+#
+# Public VPS (Let's Encrypt): pass --system-ca to trust the system CAs
+# instead of the local root certificate (the same happens with
+# CHECK_HEADERS_CA=system in the environment):
+#
+#   sh deploy/check-headers.sh loja.exemplo.com.br --system-ca
 #
 # Without the certificate installed, pass --insecure as the second
 # argument. Exits with 1 when a critical header is missing.
 set -u
 
 HOST="${1:-localhost}"
-CURL_TLS=""
-if [ "${2:-}" = "--insecure" ]; then
-  CURL_TLS="--insecure"
-elif [ -f "$(dirname "$0")/certs/root.crt" ]; then
-  CURL_TLS="--cacert $(dirname "$0")/certs/root.crt"
+TLS_MODE="${2:-}"
+if [ -z "$TLS_MODE" ] && [ "${CHECK_HEADERS_CA:-}" = "system" ]; then
+  TLS_MODE="--system-ca"
 fi
+CURL_TLS=""
+case "$TLS_MODE" in
+  --insecure) CURL_TLS="--insecure" ;;
+  --system-ca) CURL_TLS="" ;;
+  "")
+    if [ -f "$(dirname "$0")/certs/root.crt" ]; then
+      CURL_TLS="--cacert $(dirname "$0")/certs/root.crt"
+    fi
+    ;;
+  *)
+    echo "usage: sh deploy/check-headers.sh <host> [--system-ca | --insecure]" >&2
+    exit 2
+    ;;
+esac
 
 failures=0
 

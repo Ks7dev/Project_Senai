@@ -7,7 +7,8 @@ E-commerce high ticket de papelaria nobre e mobiliário executivo, híbrido B2B 
 | Assunto | Arquivo |
 |---|---|
 | Requisitos (RF, RN, RNF, personas, matriz RN x RF) | `docs/AtelierBureau_Levantamento_Requisitos_v2.docx` |
-| Stack, organização de código, banco, servidor local, Git e release | `ARCHITECTURE.md` |
+| Stack, organização de código, banco, servidores (local e VPS), Git e release | `ARCHITECTURE.md` |
+| Instalação do servidor de entrega na VPS | `docs/AtelierBureau_Deploy_VPS.md` |
 | Modelo de dados: escopo, DER, MER, dicionário, gatilhos e script SQL | `docs/banco-de-dados/` |
 | Backlog: as 92 issues planejadas, com labels, milestone, prioridade e critérios (as abertas depois ficam no GitHub Project) | `docs/AtelierBureau_Issues.md` |
 | Quadro do Trello: listas, prazos e cards | `docs/AtelierBureau_Trello_Etapas.md` |
@@ -17,7 +18,7 @@ Antes de implementar uma issue, leia os requisitos que ela referencia (RF, RN ou
 
 ## 2. Prazo e escopo
 
-- Entrega final **em 14/11/2026, com o projeto rodando** no servidor local. Um milestone por dia: v0.1.0 (10/11), v0.2.0 (11/11), v0.3.0 (12/11), v0.4.0 (13/11) e v1.0.0 (14/11).
+- Entrega final **em 14/11/2026, com o projeto rodando** na VPS pública (#206). Um milestone por dia: v0.1.0 (10/11), v0.2.0 (11/11), v0.3.0 (12/11), v0.4.0 (13/11) e v1.0.0 (14/11).
 - A ordem de trabalho é: milestone do dia, depois prioridade (P0 → P1 → P2), depois dependência (#1 → #6 → #7 → #8 → resto).
 - Se o dia apertar, P2 e P1 saem do milestone antes de P0, e a decisão é registrada na issue. Nunca entra código pela metade.
 
@@ -47,7 +48,7 @@ features/shared/             → código usado por mais de uma feature
 features/shared/lib/db/      → client Prisma único e camada de acesso com permissão
 components/                  → UI genérica (apresentação pura)
 prisma/                      → schema.prisma, migrations/, seed.ts
-deploy/, docker-compose.yml, Dockerfile → servidor local
+deploy/, docker-compose*.yml, Dockerfile → servidor (local e VPS)
 ```
 
 - **Nunca importe de dentro de outra feature.** O código compartilhado vai para `features/shared/`.
@@ -71,7 +72,7 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 ## 7. Banco de dados (MySQL 8 + Prisma)
 
 - `prisma/schema.prisma` é a fonte da verdade. Tabelas e colunas em inglês e `snake_case`, via `@@map`/`@map`.
-- **Mudança de schema só por migration** (`npx prisma migrate dev --name <slug>`), versionada no mesmo PR. **É proibido alterar o banco à mão**, por cliente SQL ou `db push`, no servidor local de entrega.
+- **Mudança de schema só por migration** (`npx prisma migrate dev --name <slug>`), versionada no mesmo PR. **É proibido alterar o banco à mão**, por cliente SQL ou `db push`, no servidor de entrega (VPS).
 - As migrations seguem expand/contract: adicionar antes e remover só depois que nada mais usa o objeto.
 - Tipos:
   - Dinheiro em `DECIMAL(12,2)`, nunca `Float`.
@@ -85,18 +86,20 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 - Depois de mudar o schema: `npx prisma validate`, `npx prisma migrate dev`, `npm run db:docs` (com descrição de toda coluna nova em `scripts/db-docs/descriptions.ts`) e testes.
 - Gatilhos só por migration. Eles recusam operações inválidas e nunca gravam dados; a regra continua na Server Action.
 
-## 8. Servidor local (Docker, acessível pela rede)
+## 8. Servidores (Docker Compose)
 
-- `docker compose up -d` sobe `proxy` (Caddy, 80/443 e 3001 do painel de disponibilidade), `app` (3000 só na rede interna), `db` (MySQL, 3306 só em `127.0.0.1` por padrão), `backup` e `uptime-kuma` (só pelo `proxy`). O perfil opcional `tunnel` (`docker compose --profile tunnel up -d`) sobe `webhook-gate` e `tunnel` (`cloudflared`), que expõem à internet só a rota do webhook. Outros dispositivos acessam por `https://<ip-da-máquina>`. Detalhes em `ARCHITECTURE.md`, seção 5.1.
-- As portas (80, 443 e 3001, e a 3306 se o banco for aberto à rede) ficam liberadas só no perfil de rede **Privada**. O MySQL aceita só usuários nomeados; o acesso pela rede é pelo usuário `dev`, restrito à sub-rede e com TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL. A exigência de TLS pelo servidor em toda conexão é a #221.
-- Toda mudança de infraestrutura (compose, Dockerfile, Caddyfile) tem que funcionar com `docker compose up -d` numa máquina limpa e é testada a partir de outro dispositivo da rede.
+- `docker compose up -d` sobe `proxy` (Caddy, 80/443 e 3001 do painel de disponibilidade), `app` (3000 só na rede interna), `db` (MySQL, 3306 só em `127.0.0.1` por padrão), `backup` e `uptime-kuma` (só pelo `proxy`). O mesmo compose roda em dois lugares:
+  - **VPS pública (entrega):** Hostinger KVM 2 com domínio próprio e Let's Encrypt, com o override `docker-compose.vps.yml` (`COMPOSE_FILE` no `.env`). Só 22, 80 e 443 abertas; MySQL e Uptime Kuma no loopback, acessíveis por túnel SSH, e sem usuário `dev`. Detalhes em `ARCHITECTURE.md`, seção 5.2, e em `docs/AtelierBureau_Deploy_VPS.md`.
+  - **Servidor local (desenvolvimento):** outros dispositivos acessam por `https://<ip-da-máquina>`. O perfil opcional `tunnel` (`docker compose --profile tunnel up -d`) sobe `webhook-gate` e `tunnel` (`cloudflared`), que expõem à internet só a rota do webhook. Detalhes em `ARCHITECTURE.md`, seção 5.1.
+- No servidor local, as portas (80, 443 e 3001, e a 3306 se o banco for aberto à rede) ficam liberadas só no perfil de rede **Privada**. O MySQL aceita só usuários nomeados; o acesso pela rede é pelo usuário `dev`, restrito à sub-rede e com TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL. A exigência de TLS pelo servidor em toda conexão é a #221.
+- Toda mudança de infraestrutura (compose, Dockerfile, Caddyfile) tem que funcionar com `docker compose up -d` numa máquina limpa, nos dois modos (local, testado a partir de outro dispositivo da rede, e com o override da VPS).
 - Segredos ficam só no `.env` (não versionado). Variável nova entra no `.env.example`, sem valor real.
 
 ## 9. Integrações externas
 
 - Mercado Pago, ViaCEP, Correios, transportadora, BrasilAPI e NF-e ficam em `features/shared/lib/<integracao>/`, como `server-only`. Toda chamada tem timeout, fallback (RN20, RN21) e log sem headers, payload ou dados pessoais.
 - Tudo roda em **sandbox ou homologação**, com dados fictícios identificados como tal.
-- **Webhook do Mercado Pago:** valida a assinatura, é idempotente e confirma o pedido só com `approved` (RN13). Ele chega ao servidor por um túnel (`cloudflared`) restrito à rota do webhook, e uma reconciliação por `GET /v1/payments/{id}` cobre o webhook que não chegar.
+- **Webhook do Mercado Pago:** valida a assinatura, é idempotente e confirma o pedido só com `approved` (RN13). Na VPS ele chega direto pelo domínio; no servidor local, por um túnel (`cloudflared`) restrito à rota do webhook, e uma reconciliação por `GET /v1/payments/{id}` cobre o webhook que não chegar.
 
 ## 10. Fluxo Git
 
@@ -110,7 +113,7 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 
 - Toda issue tem **um** `tipo: *`, **um** `área: *` e os labels de preocupação que couberem (`segurança`, `banco`, `performance`, `infra`, `observabilidade`, `testes`, `documentação`, `escopo a validar` e `accessibility`). Não há épicos nem sub-issues.
 - Milestone = versão. Prioridade, esforço, etapa e status são campos do GitHub Project, não labels.
-- **Status**, igual no Project e no Trello: Backlog → Em andamento (branch criada) → Em revisão (PR aberto, CI verde) → Em teste (PR aprovado, testes passando no servidor local) → Em validação (critérios conferidos com o RF, RN ou RNF) → Concluído (PR mesclado, critérios marcados). O impedido vai para **Bloqueado**, com o motivo comentado.
+- **Status**, igual no Project e no Trello: Backlog → Em andamento (branch criada) → Em revisão (PR aberto, CI verde) → Em teste (PR aprovado, testes passando no servidor) → Em validação (critérios conferidos com o RF, RN ou RNF) → Concluído (PR mesclado, critérios marcados). O impedido vai para **Bloqueado**, com o motivo comentado.
 - **Escopo novo ou alterado:**
   1. Atualizar a issue no GitHub.
   2. Refletir a mudança em `docs/AtelierBureau_Issues.md` e `docs/AtelierBureau_Trello_Etapas.md`.
@@ -124,4 +127,4 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 3. Os testes cobrem a regra de negócio da issue. Fluxos críticos (frete, estoque, pagamento, aprovação) têm teste de integração (RNF07).
 4. A UI é responsiva nos três breakpoints, navegável por teclado, com contraste AA e textos alternativos (RNF13, RNF15).
 5. Não há segredo, `console.log` de depuração nem código comentado sem uso.
-6. Se mudou o schema, a migration está incluída. Se mudou a infraestrutura, o `docker compose up -d` foi testado do zero.
+6. Se mudou o schema, a migration está incluída. Se mudou a infraestrutura, o `docker compose up -d` foi testado do zero, local e com o override da VPS.

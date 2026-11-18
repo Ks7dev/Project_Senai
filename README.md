@@ -42,7 +42,7 @@ O site abre em `http://localhost:3000`.
 
 ## Servidor local (Docker)
 
-A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam por `https://<ip-da-máquina>` (detalhes em `ARCHITECTURE.md`, seção 5.1).
+Para desenvolvimento e testes pela rede. A máquina com o projeto é o servidor, e os outros dispositivos da rede acessam por `https://<ip-da-máquina>` (detalhes em `ARCHITECTURE.md`, seção 5.1). A entrega roda na VPS (seção abaixo).
 
 1. Instale o Docker Desktop e reserve um IP fixo para a máquina no roteador.
 2. Copie `.env.example` para `.env` e preencha `SITE_HOST`, as senhas do MySQL, o `BETTER_AUTH_SECRET` e a `DATA_ENCRYPTION_KEY` (`openssl rand -base64 32`). Guarde uma cópia da `DATA_ENCRYPTION_KEY` fora do servidor: sem ela, os CPFs e telefones gravados não podem ser lidos.
@@ -93,6 +93,10 @@ Serviços do `docker-compose.yml`:
 O `webhook-gate` e o `tunnel` só sobem com `docker compose --profile tunnel up -d` (`ARCHITECTURE.md`, seção 5.1).
 
 As contas de teste estão em `prisma/seed-data.ts`, e a senha delas é a do `SEED_PASSWORD`. No servidor de entrega, troque ou desative essas contas antes da apresentação, conforme o [checklist de lançamento](docs/AtelierBureau_Checklist_Lancamento.md).
+
+## Servidor de entrega (VPS)
+
+A entrega roda numa VPS pública (Hostinger KVM 2, Ubuntu 24.04) com domínio próprio e HTTPS do Let's Encrypt, com o mesmo Docker Compose e o override `docker-compose.vps.yml` (detalhes em `ARCHITECTURE.md`, seção 5.2). O passo a passo completo, do DNS ao backup fora da VPS, está em [`docs/AtelierBureau_Deploy_VPS.md`](docs/AtelierBureau_Deploy_VPS.md).
 
 ## Versão
 

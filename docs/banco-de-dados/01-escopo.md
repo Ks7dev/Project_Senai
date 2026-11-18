@@ -91,7 +91,7 @@ As faixas de CEP da entrega própria (RN16) e o mínimo de frete grátis por reg
 | `atelier_app` | `SELECT`, `INSERT`, `UPDATE` e `DELETE` no schema `atelier_bureau` | Aplicação. Não tem DDL e não passa por cima dos gatilhos |
 | `atelier_migrate` | Todos no schema e no banco sombra | `prisma migrate deploy` ao subir o container e `prisma migrate dev` em desenvolvimento |
 | `atelier_backup` | Leitura, `SHOW VIEW`, `TRIGGER`, `LOCK TABLES` e `EVENT` | Dump diário (RNF11) |
-| `dev` (opcional) | DML, só da sub-rede e com TLS | Acesso de desenvolvedor pela rede local |
+| `dev` (opcional) | DML, só da sub-rede e com TLS | Acesso de desenvolvedor pela rede local, só no servidor local. Não existe na VPS de entrega, onde o banco só é alcançado por túnel SSH |
 | `root` | Total, sem acesso remoto | Administração dentro do container |
 
 Os usuários são criados por `deploy/mysql/init/01-users.sh` no primeiro start do volume. O MySQL roda com `log_bin_trust_function_creators=1` para que o `atelier_migrate`, que não tem `SUPER`, consiga criar os gatilhos com o binlog ligado.

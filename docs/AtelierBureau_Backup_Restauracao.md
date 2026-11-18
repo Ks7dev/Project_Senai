@@ -1,6 +1,6 @@
 # Backup e restauração — Atelier Bureau
 
-Issue #81 · RNF11 (backup diário, retenção de 30 dias e restauração testada) e RNF16 (servidor local). Complementa a seção 5.1 do `ARCHITECTURE.md`.
+Issue #81 · RNF11 (backup diário, retenção de 30 dias e restauração testada) e RNF16 (servidor). Complementa as seções 5.1 (servidor local) e 5.2 (VPS de entrega, #206) do `ARCHITECTURE.md`.
 
 **Objetivo de tempo de recuperação (RTO): 4 horas**, contadas da decisão de restaurar até a loja voltar a atender pela rede.
 
@@ -8,7 +8,8 @@ Issue #81 · RNF11 (backup diário, retenção de 30 dias e restauração testad
 
 - O container `backup` (`deploy/backup/backup.sh --daemon`) roda `mysqldump` uma vez por dia, na hora UTC de `BACKUP_HOUR` (padrão `03`, meia-noite em Brasília).
 - O dump inclui tabelas, dados, gatilhos e rotinas do banco `atelier_bureau`, com `--single-transaction` (sem travar a loja).
-- Os arquivos ficam em `./backups/atelier_bureau-AAAAMMDD-HHMMSS.sql.gz`, na máquina servidora. Os mais velhos que `BACKUP_RETENTION_DAYS` (padrão 30) são apagados.
+- Os arquivos ficam em `./backups/atelier_bureau-AAAAMMDD-HHMMSS.sql.gz`, no servidor (na VPS, `~/atelier-bureau/backups`). Os mais velhos que `BACKUP_RETENTION_DAYS` (padrão 30) são apagados.
+- **Na VPS, o backup também sai do servidor:** uma cópia diária com `rclone` para outro armazenamento (Google Drive, OneDrive ou S3), agendada no `crontab` uma hora depois do dump, e os backups automáticos e snapshots da Hostinger. Configuração na seção 10 do [guia de deploy](AtelierBureau_Deploy_VPS.md).
 - **O que não está no dump:** os usuários do MySQL e as permissões (recriados pelo `deploy/mysql/init/01-users.sh` num volume novo), os arquivos enviados em `./storage` e a `DATA_ENCRYPTION_KEY`.
 
 ### Backup manual (a qualquer hora)
@@ -37,7 +38,7 @@ O backup só em `./backups` não protege contra a perda da máquina. Uma vez por
 
 ### 3.1 Servidor funcionando, banco com problema
 
-1. Na pasta do projeto, na máquina servidora, com `docker compose up -d` rodando:
+1. Na pasta do projeto, no servidor (na VPS, por SSH), com `docker compose up -d` rodando:
 
    ```sh
    sh deploy/backup/restore.sh latest
@@ -58,17 +59,19 @@ O backup só em `./backups` não protege contra a perda da máquina. Uma vez por
 4. Ao final, o script mostra o tempo gasto. Registre-o na tabela da seção 5.
 5. Confira:
    - `docker compose ps`: `app` e `db` como `healthy`;
-   - `https://<SITE_HOST>/api/health` responde `{"status":"ok",...}`;
+   - `https://<SITE_HOST>/api/health` (na VPS, o domínio) responde `{"status":"ok",...}`;
    - entre com uma conta de teste e abra **Minha conta → Pedidos** e o backoffice de pedidos.
 
-### 3.2 Máquina perdida (servidor novo)
+### 3.2 Servidor perdido (servidor novo)
 
-1. Instale o Docker Desktop e o Git, e clone o repositório na branch `master`.
-2. Restaure o `.env` guardado fora do servidor (mesma `DATA_ENCRYPTION_KEY` e mesmas senhas do MySQL). Ajuste `SITE_HOST` e `LAN_SUBNET` se o IP mudou.
-3. Copie os dumps para `./backups` e os arquivos para `./storage`.
+Na VPS, o caminho mais rápido é restaurar o último snapshot da Hostinger e seguir a seção 3.1 com o dump mais recente. Sem snapshot:
+
+1. Prepare o servidor novo: na VPS, seções 3 a 5 do [guia de deploy](AtelierBureau_Deploy_VPS.md); na máquina local, Docker Desktop e Git. Clone o repositório na branch `master`.
+2. Restaure o `.env` guardado fora do servidor (mesma `DATA_ENCRYPTION_KEY` e mesmas senhas do MySQL). Na VPS, aponte o DNS do domínio para o IP novo; na máquina local, ajuste `SITE_HOST` e `LAN_SUBNET` se o IP mudou.
+3. Copie os dumps (na VPS, do destino do `rclone`) para `./backups` e os arquivos para `./storage`.
 4. `docker compose up -d` e espere tudo ficar `healthy` (o app cria o banco vazio com as migrations).
 5. Siga a seção 3.1 a partir do passo 1.
-6. Refaça o que é da máquina: firewall no perfil Privado, certificado raiz nos dispositivos (`deploy/export-root-cert.ps1`) e o painel de monitoramento.
+6. Refaça o que é do servidor: na VPS, firewall, cópia do `rclone` e painel de monitoramento; na máquina local, firewall no perfil Privado, certificado raiz nos dispositivos (`deploy/export-root-cert.ps1`) e painel de monitoramento.
 
 ### Estimativa do RTO
 

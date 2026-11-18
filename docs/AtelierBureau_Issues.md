@@ -71,6 +71,7 @@ Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendência
 | #3 | Ícones: **Lucide** (`lucide-react`). O mapeamento dos ícones do protótipo foi movido para a #18. |
 | #5 | Valores do documento v2 confirmados: R$ 10.000 (RN01), R$ 5.000 (RN06), Pix 30 min e boleto 3 dias úteis (RN14), RMSP (RN16), limites dos Correios (RN20). O seed foi movido para a #8. |
 | #2, #4 | Bloqueadas: dependem de ação do responsável fora do código (registro no INPI e domínio; parecer jurídico). |
+| #206, #82, #180 | **17/11/2026:** o servidor de entrega passa a ser uma VPS pública (Hostinger KVM 2) com domínio próprio e certificado Let's Encrypt, com o mesmo Docker Compose e o override `docker-compose.vps.yml`. O servidor local continua para desenvolvimento. RNF16 alterado (NC registrada no documento de requisitos); critérios da #82 atualizados; a decisão pedida na #180 está tomada. |
 
 ## Resumo
 
@@ -168,6 +169,7 @@ Total: 92 issues planejadas: `AB-001` = #1 … `AB-082` = #82 e as 10 pendência
 | #180 AB-180 | Certificado de CA pública ao publicar fora da rede local | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #181 AB-181 | Varredura trimestral por ASV ao expor o site | task | app | v1.0.0 | E6 | P2 | Bloqueado |
 | #182 AB-182 | Política de segurança e plano de resposta a incidentes de pagamento | task | pagamento | v1.0.0 | E6 | P2 | Concluído |
+| #206 AB-206 | Publicar a loja numa VPS com domínio próprio | task | app | v1.0.0 | E6 | P0 | Bloqueado |
 | #214 AB-214 | Validar CPF, telefone e força da senha no cadastro | feature | acesso | v1.0.0 | E6 | P1 | Em revisão |
 | #217 AB-217 | Otimizar o tempo de build e o tamanho da imagem | task | app | v1.0.0 | E6 | P2 | Em teste |
 
@@ -640,16 +642,38 @@ Backup diário com retenção de 30 dias e restauração testada.
 
 **Descrição**
 
-Subir o servidor local em Docker (app, MySQL, Caddy e backup), acessível pelos dispositivos da rede, e executar o checklist final.
+Subir o servidor de entrega na VPS pública (Docker: app, MySQL, Caddy, backup e monitoramento), com domínio próprio, e executar o checklist final. Escopo alterado em 17/11/2026 pela #206: antes, o servidor de entrega era local, acessível pelos dispositivos da rede.
 
 **Critérios de aceite**
 
-- [ ] Site acessível via HTTPS por outro dispositivo da rede (IP fixo da máquina servidora)
+- [ ] Site acessível via HTTPS pelo domínio, de qualquer rede, com certificado de CA pública
 - [ ] Checklist de lançamento concluído
 - [ ] Apresentação final preparada
-- [ ] `docker compose up -d` sobe o servidor local e `prisma migrate deploy` roda ao iniciar o app
-- [ ] MySQL acessível pela rede só com usuário nomeado, restrito à sub-rede e com TLS; `root` sem acesso remoto
-- [ ] Portas 80, 443 e 3306 liberadas no firewall só no perfil de rede Privada
+- [ ] `docker compose up -d` sobe o servidor na VPS e `prisma migrate deploy` roda ao iniciar o app
+- [ ] MySQL só no loopback da VPS, com usuários nomeados e TLS; `root` sem acesso remoto
+- [ ] Só as portas 22, 80 e 443 abertas no firewall da VPS
+
+### AB-206 — Publicar a loja numa VPS com domínio próprio
+
+**Issue:** #206
+**Labels:** `tipo: task`, `área: app`, `infra`, `segurança`, `documentação`
+**Milestone:** v1.0.0 · **Etapa:** Etapa 6 — Qualidade, Segurança e Lançamento
+**Prioridade:** P0 · **Status inicial:** Backlog
+**Referências:** RNF06, RNF11, RNF16, RN19 (dependências: #7, #180)
+
+**Descrição**
+
+Publicar a loja numa VPS (Hostinger KVM) na internet, com domínio próprio e certificado de CA pública (Let's Encrypt), para que ela não dependa de nenhuma máquina local. A stack continua a mesma: o `docker-compose.yml` do servidor local, mais um override para a VPS. Continua sendo ambiente de demonstração: Mercado Pago em sandbox, integrações em homologação e só dados fictícios. **Mudança de escopo:** o RNF16 passa a aceitar uma VPS que rode o mesmo Docker Compose como servidor de entrega.
+
+**Critérios de aceite**
+
+- [ ] `docker-compose.vps.yml` publica só as portas 80 e 443; MySQL e Uptime Kuma ficam no loopback da VPS, acessíveis por túnel SSH
+- [ ] `deploy/caddy/Caddyfile.vps` com certificado Let's Encrypt para o domínio e os mesmos headers de segurança (RNF06)
+- [ ] Webhook do Mercado Pago chega direto pelo domínio, sem o túnel `cloudflared`
+- [ ] Guia de instalação em `docs/AtelierBureau_Deploy_VPS.md`: contratação, DNS, endurecimento da VPS, `.env`, seed, monitoramento, backup fora da VPS e atualização
+- [ ] Backup diário copiado para fora da VPS (RNF11)
+- [ ] `ARCHITECTURE.md`, `CLAUDE.md`, `README.md` e os docs de `docs/` atualizados para a VPS
+- [ ] RNF16 alterado e NC registrada no documento de requisitos (`.docx`)
 
 ### AB-217 — Otimizar o tempo de build e o tamanho da imagem
 

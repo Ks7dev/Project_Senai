@@ -115,3 +115,41 @@ describe("local server configuration (#7, #11)", () => {
     expect(users).toMatch(/'dev'@'\$\{LAN_SUBNET\}'.*REQUIRE SSL/)
   })
 })
+
+describe("public VPS configuration (#206)", () => {
+  const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8")
+  const caddy = read("deploy/caddy/Caddyfile.vps")
+  const override = read("docker-compose.vps.yml")
+  const nodeTask = read("deploy/vps/node-task.sh")
+
+  it("redirects port 80 to the HTTPS domain for every host (RNF06)", () => {
+    const httpSite = caddy.match(/^http:\/\/ \{\n([\s\S]*?)^\}/m)
+    expect(httpSite).not.toBeNull()
+    expect(httpSite![1].trim()).toBe("redir https://{$SITE_HOST}{uri} 308")
+    expect(caddy).toMatch(/Strict-Transport-Security "max-age=31536000/)
+    expect(caddy).toContain("-Server")
+  })
+
+  it("only adds the alias host when it is configured", () => {
+    expect(caddy).not.toMatch(/^www\./m)
+    expect(caddy).toContain("{$SITE_HOST} {$SITE_ALIAS_HOST} {")
+    expect(override).toContain("SITE_ALIAS_HOST: ${SITE_ALIAS_HOST:-}")
+  })
+
+  it("keeps MySQL and the uptime panel on the loopback", () => {
+    expect(override).toContain('"127.0.0.1:3306:3306"')
+    expect(override).toContain('"127.0.0.1:3001:3001"')
+    expect(override).not.toMatch(/"3001:3001"/)
+  })
+
+  it("refuses to seed without a strong SEED_PASSWORD", () => {
+    expect(nodeTask).toContain('"${SEED_PASSWORD:?')
+    expect(nodeTask).toContain('"${#SEED_PASSWORD}" -lt 16')
+    expect(nodeTask).toContain("atelier-demo-2026")
+  })
+
+  it("keeps the database passwords off the docker command line", () => {
+    expect(nodeTask).not.toMatch(/^\s*-e /m)
+    expect(nodeTask).toContain("sslaccept=accept_invalid_certs")
+  })
+})

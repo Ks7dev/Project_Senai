@@ -81,7 +81,7 @@ Ações por cenário, na ordem. Registre cada ação com horário e autor.
 
 1. Suspender o acesso do usuário interno envolvido: remover os perfis dele em `/admin/usuarios` e redefinir a senha, o que encerra as sessões abertas.
 2. Segurar a expedição dos pedidos suspeitos e conferir cada `payment_id` no painel do Mercado Pago.
-3. Desligar o túnel do webhook, se a origem for o webhook (`docker compose --profile tunnel stop tunnel`); a reconciliação por `GET /v1/payments/{id}` continua confirmando os pagamentos legítimos.
+3. Cortar o webhook, se a origem for ele: na VPS, desativar o webhook no painel do Mercado Pago; no servidor local, desligar o túnel (`docker compose --profile tunnel stop tunnel`); a reconciliação por `GET /v1/payments/{id}` continua confirmando os pagamentos legítimos.
 
 **Servidor ou banco comprometido:**
 
@@ -123,7 +123,7 @@ Para cada arquivo, registre data, hora (UTC), quem coletou e o hash SHA-256 (`sh
 1. Corrigir a causa por PR revisado, com teste que reproduza o problema.
 2. Se o banco foi alterado, restaurar o backup anterior ao incidente (`ARCHITECTURE.md`, seção 5; procedimento da issue #81) e reconciliar os pagamentos do período com o Mercado Pago (`GET /v1/payments/{id}`).
 3. Conferir os cabeçalhos (`deploy/check-headers.sh`), o inventário de scripts da página de pagamento e as credenciais novas.
-4. Religar o site e o túnel, monitorando os logs e a auditoria com atenção redobrada por 7 dias.
+4. Religar o site e o webhook (painel do Mercado Pago na VPS, túnel no servidor local), monitorando os logs e a auditoria com atenção redobrada por 7 dias.
 5. O coordenador declara o incidente encerrado e registra a data.
 
 ### 9.2 Lições aprendidas
@@ -148,7 +148,8 @@ Preencher antes da aprovação e revisar a cada seis meses. Não registrar senha
 | Encarregado de dados (DPO) | _a preencher_ | _a preencher_ | _a preencher_ |  |
 | Professor orientador (SENAI) | _a preencher_ | _a preencher_ | _a preencher_ |  |
 | Mercado Pago — suporte e segurança | — | _a preencher_ | _a preencher_ | Canal de suporte do painel de desenvolvedores da conta |
-| Cloudflare — suporte | — | — | _a preencher_ | Painel da conta (túnel) |
+| Hostinger — suporte | — | — | _a preencher_ | Painel da conta (VPS, snapshots, firewall) |
+| Cloudflare — suporte | — | — | _a preencher_ | Painel da conta (túnel, só no servidor local) |
 | ANPD — comunicação de incidente | — | — | — | Formulário em `gov.br/anpd` (conferir o endereço vigente) |
 
 ## 11. Teste anual
