@@ -15,4 +15,5 @@ unset MIGRATION_DATABASE_URL SHADOW_DATABASE_URL \
   CLOUDFLARE_TUNNEL_TOKEN SEED_PASSWORD
 
 echo "Starting Atelier Bureau..."
-exec node server.js
+# Cluster of APP_WORKERS processes sharing port 3000 (#79, RNF02)
+exec node deploy/app/cluster.mjs

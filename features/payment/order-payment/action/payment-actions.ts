@@ -393,13 +393,14 @@ async function enforcePaymentRateLimits(
  *    payment row with the order total and, for Pix and boleto, the
  *    configured expiration (RN14);
  * 4. creates the payment in Mercado Pago with the row id as the
- *    idempotency key and external reference;
+ *    idempotency key and external reference, and the buyer device id
+ *    in `X-meli-session-id` when the page sent one (#232);
  * 5. applies the answer: payment_id, status and, only when approved,
  *    the order confirmation (RN13).
  * When Mercado Pago does not answer, the attempt stays pending and the
  * webhook or the reconciliation settles it.
  *
- * @param input - Order, method and Brick form data.
+ * @param input - Order, method, Brick form data and device id.
  * @returns `{ success: true, attempt }` or `{ success: false, error }`.
  */
 export async function payOrder(
@@ -464,14 +465,15 @@ export async function payOrder(
 
     let provider: ProviderPayment
     try {
+      const { deviceId, ...methodData } = data
       provider = await createMercadoPagoPayment(
         buildPaymentBody({
           order: opened.order,
           paymentRowId: opened.paymentRowId,
           expiresAt: opened.expiresAt,
-          ...data,
+          ...methodData,
         }),
-        opened.paymentRowId
+        { idempotencyKey: opened.paymentRowId, deviceId }
       )
     } catch (error) {
       if (!(error instanceof MercadoPagoError)) throw error

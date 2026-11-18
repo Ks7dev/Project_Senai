@@ -200,7 +200,7 @@ describe("Mercado Pago API calls (#54)", () => {
     )
     const payment = await createMercadoPagoPayment(
       body,
-      "row-id",
+      { idempotencyKey: "row-id" },
       fetcher as unknown as typeof fetch
     )
     expect(payment.status).toBe("approved")
@@ -216,19 +216,49 @@ describe("Mercado Pago API calls (#54)", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
+  it("sends the device id in X-meli-session-id only when present (#232)", async () => {
+    const created = () =>
+      new Response(JSON.stringify(approved), { status: 201 })
+    const fetcher = vi.fn(async () => created())
+    await createMercadoPagoPayment(
+      body,
+      { idempotencyKey: "row-id", deviceId: "A1B2C3D4E5F60718" },
+      fetcher as unknown as typeof fetch
+    )
+    await createMercadoPagoPayment(
+      body,
+      { idempotencyKey: "row-id" },
+      fetcher as unknown as typeof fetch
+    )
+    const [withDevice, without] = fetcher.mock.calls.map(
+      (call) =>
+        (call as unknown as [string, RequestInit])[1].headers as Record<
+          string,
+          string
+        >
+    )
+    expect(withDevice["X-meli-session-id"]).toBe("A1B2C3D4E5F60718")
+    expect(withDevice["X-Idempotency-Key"]).toBe("row-id")
+    expect(without).not.toHaveProperty("X-meli-session-id")
+  })
+
   it("tells a refusal from an unknown outcome", async () => {
     const refused = vi.fn(async () => new Response("{}", { status: 400 }))
     await expect(
       createMercadoPagoPayment(
         body,
-        "row-id",
+        { idempotencyKey: "row-id" },
         refused as unknown as typeof fetch
       )
     ).rejects.toMatchObject({ kind: "refused", status: 400 })
 
     const down = vi.fn(async () => new Response("{}", { status: 502 }))
     await expect(
-      createMercadoPagoPayment(body, "row-id", down as unknown as typeof fetch)
+      createMercadoPagoPayment(
+        body,
+        { idempotencyKey: "row-id" },
+        down as unknown as typeof fetch
+      )
     ).rejects.toMatchObject({ kind: "unavailable" })
 
     const timeout = vi.fn(async () => {
@@ -237,7 +267,7 @@ describe("Mercado Pago API calls (#54)", () => {
     await expect(
       createMercadoPagoPayment(
         body,
-        "row-id",
+        { idempotencyKey: "row-id" },
         timeout as unknown as typeof fetch
       )
     ).rejects.toMatchObject({ kind: "unavailable" })
@@ -253,7 +283,7 @@ describe("Mercado Pago API calls (#54)", () => {
     )
     await createMercadoPagoPayment(
       body,
-      "row-id",
+      { idempotencyKey: "row-id" },
       refused as unknown as typeof fetch
     ).catch(() => undefined)
     const logged = errors.mock.calls.flat().join(" ")
@@ -261,6 +291,17 @@ describe("Mercado Pago API calls (#54)", () => {
     expect(logged).not.toContain("TEST-token-secreto")
     expect(logged).not.toContain("tok_teste")
     expect(logged).not.toContain("comprador@teste.test")
+
+    // The device id is never logged either (#232)
+    errors.mockClear()
+    await createMercadoPagoPayment(
+      body,
+      { idempotencyKey: "row-id", deviceId: "DEVICE-ID-SECRETO-123" },
+      refused as unknown as typeof fetch
+    ).catch(() => undefined)
+    expect(errors.mock.calls.flat().join(" ")).not.toContain(
+      "DEVICE-ID-SECRETO"
+    )
   })
 
   it("is not configured without the token", async () => {

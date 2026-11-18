@@ -13,6 +13,7 @@ import {
   createNonce,
   isPaymentPagePath,
   MERCADO_PAGO_CSP_HOSTS,
+  MERCADO_PAGO_DEVICE_CSP_HOSTS,
   NONCE_HEADER,
   STATIC_CSP_SOURCE,
 } from "@/features/shared/lib/security/headers"
@@ -25,6 +26,10 @@ import {
   parseCsp,
   type PaymentPageBaseline,
 } from "@/features/shared/lib/security/payment-page-monitor"
+import {
+  MERCADO_PAGO_SDK_URL,
+  MERCADO_PAGO_SECURITY_URL,
+} from "@/features/shared/lib/mercadopago/bricks"
 import {
   checkRemotePaymentPage,
   parseOptions,
@@ -53,6 +58,13 @@ describe("payment page CSP with nonce (#173)", () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'")
     expect(scriptSrc).not.toContain("'unsafe-eval'")
     expect(scriptSrc).not.toContain("'strict-dynamic'")
+  })
+
+  it("lets the card fields reach their hosts in connect-src (#240)", () => {
+    const connectSrc = parseCsp(policy).get("connect-src") ?? []
+    expect(connectSrc).toContain("https://secure-fields.mercadopago.com")
+    expect(connectSrc).toContain("https://api-static.mercadopago.com")
+    expect(connectSrc.some((source) => source.includes("*"))).toBe(false)
   })
 
   it("reports violations to the log route", () => {
@@ -84,8 +96,8 @@ describe("payment page CSP with nonce (#173)", () => {
     expect(regex.test("/conta/pedidos/abc/pagamento")).toBe(false)
   })
 
-  it("sets the CSP and the nonce in the proxy, only on the payment page", () => {
-    const response = proxy(
+  it("sets the CSP and the nonce in the proxy, only on the payment page", async () => {
+    const response = await proxy(
       new NextRequest("https://loja.test/conta/pedidos/abc/pagamento", {
         headers: { [NONCE_HEADER]: "forged" },
       })
@@ -99,7 +111,7 @@ describe("payment page CSP with nonce (#173)", () => {
       'csp-endpoint="/api/csp-report"'
     )
 
-    const other = proxy(new NextRequest("https://loja.test/carrinho"))
+    const other = await proxy(new NextRequest("https://loja.test/carrinho"))
     expect(other.headers.get("content-security-policy")).toBeNull()
     expect(other.headers.get(`x-middleware-request-${NONCE_HEADER}`)).toBeNull()
   })
@@ -107,12 +119,74 @@ describe("payment page CSP with nonce (#173)", () => {
 
 describe("Mercado Pago hosts (#174)", () => {
   it("never uses wildcard domains", () => {
-    const all = Object.values(MERCADO_PAGO_CSP_HOSTS).flat()
+    const all = [
+      ...Object.values(MERCADO_PAGO_CSP_HOSTS),
+      ...Object.values(MERCADO_PAGO_DEVICE_CSP_HOSTS),
+    ].flat()
     for (const host of all) {
       expect(host).toMatch(/^https:\/\/[a-z0-9.-]+$/)
     }
     expect(buildContentSecurityPolicy(false)).not.toContain("*")
     expect(buildPaymentContentSecurityPolicy(false, "n")).not.toContain("*")
+  })
+})
+
+describe("Mercado Pago security script (#232)", () => {
+  const payment = parseCsp(buildPaymentContentSecurityPolicy(false, "n"))
+  const statics = parseCsp(buildContentSecurityPolicy(false))
+
+  it("allows its concrete hosts only on the payment page", () => {
+    expect(payment.get("script-src")).toContain("https://www.mercadopago.com")
+    expect(payment.get("connect-src")).toEqual(
+      expect.arrayContaining([
+        "https://api.mercadopago.com",
+        "https://www.mercadolibre.com",
+      ])
+    )
+    expect(payment.get("img-src")).toEqual(
+      expect.arrayContaining([
+        "https://www.mercadolibre.com",
+        "https://www.mercadolivre.com",
+        "https://www.mercadopago.com.br",
+      ])
+    )
+    expect(payment.get("script-src")).not.toContain("'unsafe-inline'")
+    expect(statics.get("script-src")).not.toContain(
+      "https://www.mercadopago.com"
+    )
+    expect(statics.get("img-src")).not.toContain("https://www.mercadolibre.com")
+  })
+
+  it("is in the approved inventory, next to the SDK", () => {
+    const exact = approved.scripts
+      .filter((script) => script.match === "exact")
+      .map((script) => script.src)
+    expect(exact).toEqual(
+      expect.arrayContaining([MERCADO_PAGO_SDK_URL, MERCADO_PAGO_SECURITY_URL])
+    )
+    expect(MERCADO_PAGO_SECURITY_URL).toBe(
+      "https://www.mercadopago.com/v2/security.js"
+    )
+    expect(
+      checkScripts(
+        [{ src: MERCADO_PAGO_SECURITY_URL, nonce: "n1" }],
+        approved.scripts,
+        "n1"
+      )
+    ).toEqual([])
+  })
+
+  it("loads with the nonce and the checkout view on the payment page", () => {
+    const view = readFileSync(
+      join(
+        process.cwd(),
+        "features/payment/order-payment/order-payment-view.tsx"
+      ),
+      "utf8"
+    )
+    const tag = view.slice(view.indexOf("src={MERCADO_PAGO_SECURITY_URL}"))
+    expect(tag.slice(0, 200)).toContain("nonce={nonce}")
+    expect(view).toContain('{ view: "checkout" }')
   })
 })
 
@@ -270,6 +344,84 @@ describe("CSP violation reports (#173)", () => {
     )
     expect(response.status).toBe(204)
     expect(write.mock.calls.flat().join(" ")).toContain("csp violation")
+  })
+})
+
+describe("CSP report route with real browser requests (#240)", () => {
+  const chromeBody = {
+    documentURL: "https://192.168.0.10/conta/pedidos/abc/pagamento",
+    blockedURL: "https://secure-fields.mercadopago.com/fields-manager",
+    effectiveDirective: "connect-src",
+    disposition: "enforce",
+  }
+
+  /** Streams the body in chunks, so the request has no Content-Length. */
+  function chunked(text: string, contentType: string) {
+    const bytes = new TextEncoder().encode(text)
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 20))
+        controller.enqueue(bytes.slice(20))
+        controller.close()
+      },
+    })
+    return new Request("https://loja.test/api/csp-report", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: stream,
+      duplex: "half",
+    } as RequestInit)
+  }
+
+  it("logs a Reporting API batch (application/reports+json)", async () => {
+    const write = vi.spyOn(console, "error").mockImplementation(() => {})
+    const batch = JSON.stringify([
+      {
+        age: 12,
+        type: "csp-violation",
+        url: chromeBody.documentURL,
+        user_agent: "Chrome",
+        body: chromeBody,
+      },
+    ])
+    const response = await cspReport(chunked(batch, "application/reports+json"))
+    expect(response.status).toBe(204)
+    const line = write.mock.calls.flat().join(" ")
+    expect(line).toContain("csp violation")
+    expect(line).toContain("https://secure-fields.mercadopago.com")
+    expect(line).toContain("connect-src")
+  })
+
+  it("logs a legacy report-uri body (application/csp-report)", async () => {
+    const write = vi.spyOn(console, "error").mockImplementation(() => {})
+    const legacy = JSON.stringify({
+      "csp-report": {
+        "document-uri": chromeBody.documentURL,
+        "blocked-uri": "https://api-static.mercadopago.com/x",
+        "effective-directive": "connect-src",
+        "violated-directive": "connect-src",
+        disposition: "enforce",
+      },
+    })
+    const response = await cspReport(chunked(legacy, "application/csp-report"))
+    expect(response.status).toBe(204)
+    expect(write.mock.calls.flat().join(" ")).toContain(
+      "https://api-static.mercadopago.com"
+    )
+  })
+
+  it("is not blocked by the proxy and keeps the report endpoint", async () => {
+    const response = await proxy(
+      new NextRequest("https://loja.test/api/csp-report", { method: "POST" })
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-security-policy")).toBeNull()
+    const page = await proxy(
+      new NextRequest("https://loja.test/conta/pedidos/abc/pagamento")
+    )
+    expect(page.headers.get("reporting-endpoints")).toBe(
+      'csp-endpoint="/api/csp-report"'
+    )
   })
 })
 

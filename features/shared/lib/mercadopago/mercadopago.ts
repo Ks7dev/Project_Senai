@@ -565,19 +565,31 @@ export type CreatePaymentBody = {
   additional_info?: PaymentAdditionalInfo
 }
 
+/** Request options of {@link createMercadoPagoPayment}. */
+export type CreatePaymentOptions = {
+  /** Our payment row id, so a retry never charges twice. */
+  idempotencyKey: string
+  /**
+   * Buyer device id from the Mercado Pago security script (#232),
+   * already validated. Sent in `X-meli-session-id`, never logged.
+   */
+  deviceId?: string
+}
+
 /**
  * Creates a payment in `/v1/payments` (RF36) with an idempotency key,
- * so a retry of the same attempt never charges twice.
+ * so a retry of the same attempt never charges twice, and the buyer
+ * device id in `X-meli-session-id` when the page got one (#232).
  *
  * @param body - Payment body; the card is only the Brick token (RF35).
- * @param idempotencyKey - Our payment row id.
+ * @param options - Idempotency key and device id.
  * @param fetcher - Fetch implementation (replaced in tests).
  * @returns The created payment.
  * @throws MercadoPagoError.
  */
 export async function createMercadoPagoPayment(
   body: CreatePaymentBody,
-  idempotencyKey: string,
+  options: CreatePaymentOptions,
   fetcher: typeof fetch = fetch
 ): Promise<ProviderPayment> {
   const raw = await callMercadoPago(
@@ -586,7 +598,10 @@ export async function createMercadoPagoPayment(
     {
       method: "POST",
       body,
-      headers: { "X-Idempotency-Key": idempotencyKey },
+      headers: {
+        "X-Idempotency-Key": options.idempotencyKey,
+        ...(options.deviceId ? { "X-meli-session-id": options.deviceId } : {}),
+      },
     },
     fetcher
   )
