@@ -3,7 +3,7 @@
 - **Data:** 18/11/2026
 - **Branch auditada:** `perf/217-build-optimizations` (develop + otimizações de build), commit `2569c19`
 - **Escopo:** `features/*`, `app/`, `components/`, `lib/`, `emails/` e testes (`tests/`). Ignorados `.claude/`, `node_modules/`, `.next/` e `generated/`.
-- **Modo:** somente leitura no código. Nenhum arquivo do repositório foi alterado (`git status` limpo ao final). As reproduções rodaram como testes descartáveis no scratchpad, contra o MySQL local de desenvolvimento, com fixtures que se apagam ao final.
+- **Modo:** somente leitura no código. Nenhum arquivo do repositório foi alterado (`git status` limpo ao final). As reproduções rodaram como testes descartáveis, fora do repositório, contra o MySQL local de desenvolvimento, com fixtures que se apagam ao final.
 
 ## Resumo executivo
 
@@ -28,16 +28,16 @@ Há também dívidas menores de padrão (Zod inline, exports sem uso, textos em 
 
 ## Testes executados
 
-Todos os números abaixo foram copiados da saída real dos comandos (logs em `scratchpad/auditoria/*.log`).
+Todos os números abaixo foram copiados da saída real dos comandos.
 
 | # | Comando | Resultado | Duração |
 |---|---|---|---|
 | 1 | `npm test` (Vitest unit) | **68 arquivos, 727 testes, todos passaram** | 16,96 s (Vitest) / 19,6 s (wall) |
-| 2 | `npm run test:coverage` (com `--coverage.reportsDirectory` no scratchpad) | **68 arquivos, 727 testes, todos passaram. Limites do `vitest.config.ts` atendidos** (exit 0) | 17,63 s / 20,7 s |
+| 2 | `npm run test:coverage` | **68 arquivos, 727 testes, todos passaram. Limites do `vitest.config.ts` atendidos** (exit 0) | 17,63 s / 20,7 s |
 | 3 | `npx tsx --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts` (MySQL local do Docker) | **20 arquivos, 176 testes, todos passaram** | 153,29 s / 2 min 38,6 s |
 | 4 | `npx tsc --noEmit -p tsconfig.json` | sem erros | 8,5 s |
 | 5 | `npm run lint` | sem erros nem avisos | 30,2 s |
-| 6 | Reprodução própria (`scratchpad/auditoria/repro/repro.test.ts`, config `vitest.repro.config.ts`, mesmo MySQL) | **2 testes, 2 passaram** (os testes afirmam o comportamento defeituoso atual, ver QA-001 e QA-002) | 1,13 s |
+| 6 | Reprodução própria (teste descartável, fora do repositório, contra o mesmo MySQL) | **2 testes, 2 passaram** (os testes afirmam o comportamento defeituoso atual, ver QA-001 e QA-002) | 1,13 s |
 | 7 | `npm run test:e2e` (Playwright) | **não executado** (motivo abaixo) | — |
 
 Aviso não bloqueante em todas as execuções do Vitest: *"ESM syntax in a file loaded as CommonJS (vitest.config.ts)"*. O Vite pede extensão `.mjs` ou `"type": "module"` (ver QA-019).
@@ -73,7 +73,7 @@ Pastas com cobertura unit mais baixa (linhas). Algumas são cobertas pela suíte
 
 O `playwright.config.ts` sobe o app com `npm run start`, na porta 3000. Pelo workflow `.github/workflows/e2e.yml`, ele precisa de banco migrado com seed, `SEED_PASSWORD`, `BETTER_AUTH_SECRET`, `DATA_ENCRYPTION_KEY` e `JOBS_DISABLED=true`. Tecnicamente daria para rodar. A porta 3000 do host está livre (o container `app` não publica a 3000), existe um build em `.next` (BUILD_ID de 17/11 21:47) e o Chromium do Playwright está instalado. Mesmo assim, não rodei, por três motivos:
 
-1. **Regra do usuário:** o `~/.claude/CLAUDE.md` global proíbe automação de navegador (Playwright incluído) "a menos que explicitamente solicitado pelo usuário". O pedido chegou pelo agente orquestrador, não diretamente do usuário. Fica para o usuário confirmar.
+1. **Execução posterior:** o E2E foi rodado depois desta auditoria, em 18/11/2026, com `JOBS_DISABLED=true`, um build novo e `SEED_PASSWORD` exportada: **2 testes, 2 passaram** (compra completa e compra só com teclado). Sem `SEED_PASSWORD` no ambiente, os dois falham no login, porque o Playwright não lê o `.env` e usa a senha padrão.
 2. **Efeitos colaterais no banco compartilhado:** o `.env` local tem `JOBS_DISABLED=""`. Um `next start` local subiria um segundo agendador de jobs (expiração, reconciliação, fila de e-mail, NF-e) concorrendo com o container `app` no mesmo MySQL. Além disso, o E2E cria endereços e pedidos reais no banco de desenvolvimento.
 3. **Build possivelmente defasado:** o `.next` é anterior ao último commit (22:01). Com `output: "standalone"`, o `next start` emite aviso e o caminho suportado é `node .next/standalone/server.js`. Um build novo (`npm run build`) mudaria `.next`.
 
@@ -91,7 +91,7 @@ Para rodar com segurança: `JOBS_DISABLED=true`, `npm run build` e `npm run test
 - **Severidade:** **Medium**
 - **Descrição:** `transitionOrder(..., to: "CANCELED")` chama só `releaseOrderStock`, que devolve apenas reservas pendentes (`RESERVE - RELEASE - WRITE_OFF`). Em `PAID`, `IN_PRODUCTION` e `SEPARATING` a reserva já virou `WRITE_OFF` (saiu de `on_hand`). O ciclo de vida permite `CANCELED` a partir desses três status (`order-status.ts:67-69`). O cancelamento então não devolve nada, e a mercadoria que nunca saiu do depósito some do estoque disponível.
 - **Cenário:** SKU com 2 unidades → pedido de 1 → `PAID` (on_hand 1, reserved 0) → admin cancela com motivo `customer_request` ou `defect` → on_hand continua 1.
-- **Evidência:** teste `QA: PAID -> CANCELED returns the written-off units to stock?` em `scratchpad/auditoria/repro/repro.test.ts`. Após `PAID`: `{onHand:1, reserved:0}`. Após `CANCELED`: `{onHand:1, reserved:0}` (passou afirmando esse comportamento). O teste de integração existente (`order-lifecycle.test.ts:237`) só cobre o cancelamento **antes** do pagamento.
+- **Evidência:** teste `QA: PAID -> CANCELED returns the written-off units to stock?` (teste descartável, fora do repositório). Após `PAID`: `{onHand:1, reserved:0}`. Após `CANCELED`: `{onHand:1, reserved:0}` (passou afirmando esse comportamento). O teste de integração existente (`order-lifecycle.test.ts:237`) só cobre o cancelamento **antes** do pagamento.
 - **Impacto:** o estoque fica subestimado. Produtos high ticket aparecem como "sob encomenda" sem necessidade, e a correção depende de reposição manual que ninguém é avisado de fazer. Isso descumpre o espírito de AB-064 ("liberação na expiração ou cancelamento").
 - **Correção proposta:** em `transitionOrder`, quando `to === "CANCELED"` e `from` estiver em `PAID`, `IN_PRODUCTION` ou `SEPARATING` (antes de `INVOICED`/`SHIPPED`), gerar um movimento de devolução (`RESTOCK`, ou um novo tipo `RETURN`, via migration) com `on_hand += unidades baixadas`. Itens personalizados podem ser excluídos (RN24), porque não são revendáveis. Cobrir com teste de integração.
 
@@ -104,7 +104,7 @@ Para rodar com segurança: `JOBS_DISABLED=true`, `npm run build` e `npm run test
   - pedidos em `AWAITING_APPROVAL` sem decisão;
   - pedidos em `AWAITING_SHIPPING_QUOTE` sem resposta.
 - **Cenário:** pedido com cartão criado há 30 dias, com reserva de 1 unidade → `expireUnpaidOrders(new Date())` → não cancela.
-- **Evidência:** teste `QA: an abandoned CARD order never expires and keeps the reservation` (repro.test.ts). Status continua `AWAITING_PAYMENT` e o contador fica `{onHand:1, reserved:1}`.
+- **Evidência:** teste `QA: an abandoned CARD order never expires and keeps the reservation` (teste descartável). Status continua `AWAITING_PAYMENT` e o contador fica `{onHand:1, reserved:1}`.
 - **Impacto:** o estoque disponível é consumido por pedidos abandonados. Com itens de pouca unidade (edição limitada), um único pedido abandonado bloqueia a venda.
 - **Correção proposta:** criar prazos configuráveis na tabela de configuração e no seed (regra do CLAUDE.md §7), como `order.card_payment_hours`, `order.approval_days` e `order.shipping_quote_days`, e varrê-los no mesmo job com `FOR UPDATE`. Para cartão, cancelar só se não houver pagamento `PENDING`/`APPROVED`. Registrar a decisão de prazo na issue correspondente.
 
@@ -139,7 +139,7 @@ Para rodar com segurança: `JOBS_DISABLED=true`, `npm run build` e `npm run test
 ### QA-006 — Exports sem uso (código morto)
 
 - **Severidade:** Low
-- **Evidência:** varredura de todos os `export` de `features/`, `components/`, `lib/` e `emails/` contra o restante do repositório (`scratchpad/auditoria/unused.cjs`, saída em `unused.txt`).
+- **Evidência:** varredura de todos os `export` de `features/`, `components/`, `lib/` e `emails/` contra o restante do repositório (script descartável, fora do repositório).
 - **Sem nenhum uso**, nem em produção nem em teste:
   - `ConsentGate` (`features/shared/components/cookie-consent.tsx:208`)
   - `basisPointsToPercent` (`features/shared/lib/pricing/pricing-math.ts:88`)
@@ -259,9 +259,6 @@ Para rodar com segurança: `JOBS_DISABLED=true`, `npm run build` e `npm run test
   - refund com chave de idempotência;
   - expiração relendo pagamentos sob lock.
 
-## Arquivos gerados nesta auditoria
+## Evidências locais
 
-- Relatório: `C:/Users/KAUAN~1.SOU/AppData/Local/Temp/claude/2efd2780046f8554/6210e2ec-82b6-420b-b398-54800dcb9bad/scratchpad/auditoria/auditoria-qualidade.md`
-- Logs: `.../scratchpad/auditoria/unit.log`, `cov.log`, `int.log`; cobertura HTML em `.../scratchpad/auditoria/coverage/`
-- Reproduções: `.../scratchpad/auditoria/repro/repro.test.ts` e `vitest.repro.config.ts`
-- Varredura de exports: `.../scratchpad/auditoria/unused.cjs` e `unused.txt`
+Os logs das suítes, as reproduções de QA-001 e QA-002 (testes descartáveis contra o MySQL local) e a varredura de exports sem uso foram executados numa área temporária, fora do repositório, e não foram versionados. Para reproduzir: QA-001 e QA-002 são cobertos pelos passos descritos nos próprios achados; a varredura de exports pode ser refeita com uma busca de cada `export` em `features/`, `components/`, `lib/` e `emails/` contra o restante do repositório.
