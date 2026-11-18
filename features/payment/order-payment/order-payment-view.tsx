@@ -14,9 +14,12 @@ import {
   type PaymentStatusSnapshot,
   type PaymentView,
 } from "@/features/payment/order-payment/action/payment-actions"
+import { deviceIdSchema } from "@/features/payment/order-payment/schema/payment-schema"
 import {
   createBricksBuilder,
   MERCADO_PAGO_SDK_URL,
+  MERCADO_PAGO_SECURITY_URL,
+  readDeviceSessionId,
   type BrickController,
   type BrickSubmit,
 } from "@/features/shared/lib/mercadopago/bricks"
@@ -25,6 +28,12 @@ import { PAYMENT_STATUS } from "@/features/shared/lib/payments/payment-messages"
 
 /** Interval of the live status check while a payment is pending (RF31). */
 const POLL_MS = 5_000
+
+/**
+ * Section the Mercado Pago security script reports (#232). Passed by
+ * spread because `view` is not a typed attribute of `<script>`.
+ */
+const SECURITY_SCRIPT_ATTRIBUTES = { view: "checkout" }
 
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -227,8 +236,9 @@ function PendingInstructions({ payment }: { payment: PaymentView }) {
 /**
  * Payment of an order with the Mercado Pago Payment Brick (RF28, RF35,
  * RF36, RF37). The card is typed in the Brick, which tokenizes it in
- * the browser: only the token goes to the Server Action (RN19). When the
- * issuer asks for 3DS, the Status Screen Brick runs the challenge.
+ * the browser: only the token goes to the Server Action (RN19), with the
+ * device id of the Mercado Pago security script (#232). When the issuer
+ * asks for 3DS, the Status Screen Brick runs the challenge.
  * Presentation only: the amount and the rules are checked on the server.
  *
  * @param props - The order payment context.
@@ -297,10 +307,14 @@ export function OrderPaymentView({
   const submit = useCallback(
     async ({ formData }: BrickSubmit) => {
       setError(undefined)
+      // The device id only helps the fraud analysis: an odd value is
+      // dropped instead of blocking the payment (#232)
+      const deviceId = deviceIdSchema.safeParse(readDeviceSessionId())
       const result = await payOrder({
         orderId,
         method,
         formData,
+        deviceId: deviceId.success ? deviceId.data : undefined,
       } as never)
       if (!result.success) {
         setError(result.error)
@@ -401,6 +415,14 @@ export function OrderPaymentView({
           strategy="afterInteractive"
           nonce={nonce}
           onReady={() => setSdkReady(true)}
+        />
+      )}
+      {context.canPay && (
+        <Script
+          src={MERCADO_PAGO_SECURITY_URL}
+          strategy="afterInteractive"
+          nonce={nonce}
+          {...SECURITY_SCRIPT_ATTRIBUTES}
         />
       )}
 

@@ -35,6 +35,30 @@ export const MERCADO_PAGO_CSP_HOSTS = {
   ],
 } as const
 
+/**
+ * Concrete hosts of the Mercado Pago security script (#232), which
+ * creates the buyer `device_id` sent in `X-meli-session-id`. Allowed
+ * only on the payment page, the one page that loads the script. Taken
+ * from `https://www.mercadopago.com/v2/security.js` and the profiling
+ * script it receives (with the CSP nonce) from the device session API:
+ *
+ * - `www.mercadopago.com`: the security script itself.
+ * - `api.mercadopago.com`: the device session API (`/v1/device_sessions`),
+ *   already allowed for the Brick.
+ * - `www.mercadolibre.com`: profiling pixels and the `etid` request.
+ * - `www.mercadolivre.com` and `www.mercadopago.com.br`: profiling pixel
+ *   of Brazil, chosen by the domain of the store.
+ */
+export const MERCADO_PAGO_DEVICE_CSP_HOSTS = {
+  script: ["https://www.mercadopago.com"],
+  img: [
+    "https://www.mercadolibre.com",
+    "https://www.mercadolivre.com",
+    "https://www.mercadopago.com.br",
+  ],
+  connect: ["https://www.mercadolibre.com"],
+} as const
+
 /** Request header carrying the CSP nonce set by the proxy (#173). */
 export const NONCE_HEADER = "x-nonce"
 
@@ -143,7 +167,8 @@ export function buildContentSecurityPolicy(isDev: boolean): string {
  * Builds the Content-Security-Policy of the payment page (#173, PCI
  * 6.4.3 and 11.6.1): `script-src` without `'unsafe-inline'`, allowing
  * inline scripts only with the per request nonce, and violations
- * reported to {@link CSP_REPORT_PATH}.
+ * reported to {@link CSP_REPORT_PATH}. It also allows the Mercado Pago
+ * security script that creates the `device_id` (#232).
  *
  * @param isDev - Development mode allows `eval` for hot reload.
  * @param nonce - Nonce of the request.
@@ -153,15 +178,22 @@ export function buildPaymentContentSecurityPolicy(
   isDev: boolean,
   nonce: string
 ): string {
-  const policy = serialize(
-    baseDirectives([
-      "'self'",
-      `'nonce-${nonce}'`,
-      ...(isDev ? ["'unsafe-eval'"] : []),
-      ...MERCADO_PAGO_CSP_HOSTS.script,
-    ]),
-    isDev
-  )
+  const directives = baseDirectives([
+    "'self'",
+    `'nonce-${nonce}'`,
+    ...(isDev ? ["'unsafe-eval'"] : []),
+    ...MERCADO_PAGO_CSP_HOSTS.script,
+    ...MERCADO_PAGO_DEVICE_CSP_HOSTS.script,
+  ])
+  directives["img-src"] = [
+    ...directives["img-src"],
+    ...MERCADO_PAGO_DEVICE_CSP_HOSTS.img,
+  ]
+  directives["connect-src"] = [
+    ...directives["connect-src"],
+    ...MERCADO_PAGO_DEVICE_CSP_HOSTS.connect,
+  ]
+  const policy = serialize(directives, isDev)
   return `${policy}; report-uri ${CSP_REPORT_PATH}; report-to ${CSP_REPORT_GROUP}`
 }
 

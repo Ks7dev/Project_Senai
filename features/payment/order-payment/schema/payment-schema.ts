@@ -115,22 +115,37 @@ export type PixFormData = z.output<typeof pixFormSchema>
 /** Boleto form data of the Payment Brick. */
 export type BoletoFormData = z.output<typeof boletoFormSchema>
 
+/**
+ * Buyer device id created by the Mercado Pago security script (#232)
+ * and sent in the `X-meli-session-id` header: a short token of letters,
+ * digits and `.`, `_`, `:` or `-`, so it never breaks the header.
+ */
+export const deviceIdSchema = z
+  .string("Pagamento inválido.")
+  .regex(/^[A-Za-z0-9._:-]{8,128}$/, "Pagamento inválido.")
+
+/** Fields every payment method shares. */
+const payOrderBase = {
+  orderId: z.uuid("Pedido inválido."),
+  deviceId: deviceIdSchema.optional(),
+}
+
 /** Order payment fields by method (RF28, RF29, RF36). */
 const payOrderFields = z.discriminatedUnion(
   "method",
   [
     z.object({
-      orderId: z.uuid("Pedido inválido."),
+      ...payOrderBase,
       method: z.literal("CARD"),
       formData: cardFormSchema,
     }),
     z.object({
-      orderId: z.uuid("Pedido inválido."),
+      ...payOrderBase,
       method: z.literal("PIX"),
       formData: pixFormSchema,
     }),
     z.object({
-      orderId: z.uuid("Pedido inválido."),
+      ...payOrderBase,
       method: z.literal("BOLETO"),
       formData: boletoFormSchema,
     }),
