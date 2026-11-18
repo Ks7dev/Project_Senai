@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { logger } from "@/features/shared/lib/logger/logger"
-import {
-  findRateLimitRule,
-  RateLimiter,
-} from "@/features/shared/lib/rate-limit/rate-limit"
+import { findRateLimitRule } from "@/features/shared/lib/rate-limit/rate-limit"
+import { checkSharedRateLimit } from "@/features/shared/lib/rate-limit/shared-limit"
 import { REQUEST_ID_HEADER } from "@/features/shared/lib/request/request-id-header"
 import {
   buildPaymentContentSecurityPolicy,
@@ -12,8 +10,6 @@ import {
   NONCE_HEADER,
   reportingEndpoints,
 } from "@/features/shared/lib/security/headers"
-
-const limiter = new RateLimiter()
 
 const isDev = process.env.NODE_ENV !== "production"
 
@@ -31,13 +27,14 @@ function clientIp(request: NextRequest): string {
 
 /**
  * Runs before every request: assigns a request id for log
- * correlation, applies rate limiting to auth forms and APIs (RNF05)
+ * correlation, applies rate limiting to auth forms and APIs (RNF05),
+ * shared by every worker of the app cluster (#79),
  * and sets the CSP with a per request nonce on the payment page (#173).
  *
  * @param request - Incoming request.
  * @returns The response, or 429 when the client exceeded the limit.
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Always generated here: a client-sent id is never trusted in logs
   const requestId = crypto.randomUUID()
   const { pathname } = request.nextUrl
@@ -45,7 +42,7 @@ export function proxy(request: NextRequest) {
   const group = findRateLimitRule(pathname, request.method)
   if (group) {
     const ip = clientIp(request)
-    const result = limiter.check(`${group.name}:${ip}`, group.rule)
+    const result = await checkSharedRateLimit(`${group.name}:${ip}`, group.rule)
     if (!result.allowed) {
       logger.warn("rate limit exceeded", {
         requestId,

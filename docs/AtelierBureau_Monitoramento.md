@@ -32,6 +32,7 @@ O monitoramento tem três camadas:
 - O Caddy só deixa passar endereços privados (rede local). Qualquer outro cliente tem a conexão encerrada.
 - Libere a porta **3001** no Firewall do Windows **só no perfil Privado**, como as portas 80 e 443.
 - **Primeiro acesso:** o Uptime Kuma pede para criar o usuário administrador. Faça isso logo depois do `docker compose up -d`, a partir da máquina servidora, com uma senha forte guardada no gerenciador de senhas da equipe. Até lá, qualquer pessoa da rede poderia criar esse usuário.
+- O usuário e a senha do administrador ficam no `.env` do servidor, em `UPTIME_KUMA_ADMIN_USER` e `UPTIME_KUMA_ADMIN_PASSWORD` (modelo no `.env.example`). Servem só para guardar o acesso ao painel: o app não lê essas variáveis.
 - Os dados do painel (monitores, histórico e usuário) ficam no volume `uptime-kuma-data`.
 
 ## 3. Monitores a cadastrar
@@ -85,7 +86,7 @@ Feito por uma pessoa no servidor, com o `docker compose up -d` rodando:
 
 | Data | Responsável | Tempo até o e-mail de alerta | Observações |
 |---|---|---|---|
-| | | | |
+| 18/11/2026 | Equipe de desenvolvimento (#80) | Não medido: `SMTP_HOST` está vazio no `.env`, então o alerta por e-mail não foi configurado e depende do SMTP real da equipe | No painel, "Loja — app e banco" ficou DOWN 2 min 52 s depois do `docker compose stop app` e voltou a UP cerca de 1 min 30 s depois do `docker compose start app`. Passos 5 e 6 (parar o `db`) não executados. Push do backup: a URL foi validada com `curl` dentro do container `backup`, e o monitor "Backup diário" recebeu o heartbeat UP. O envio feito pelo próprio `backup.sh` só acontece no laço diário (`--daemon`) e fica para conferir no próximo backup automático. |
 
 ## 6. Painel de disponibilidade
 

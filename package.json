@@ -22,6 +22,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "media:generate": "tsx scripts/seed-media/generate.mts",
     "db:validate": "prisma validate",
     "db:docs": "tsx scripts/db-docs/generate-db-docs.mts",
     "accounts:rotate-seed": "tsx scripts/rotate-seed-accounts.ts"

@@ -15,7 +15,8 @@ Autoavaliação dos requisitos mínimos do PCI-DSS para o Checkout Transparente 
 | 1.4 | 17/11/2026 | Equipe Atelier Bureau | Bloqueio de tentativas passa a atender: rate limit nas Server Actions de pagamento e estorno (pendência P3, #175) |
 | 1.5 | 17/11/2026 | Equipe Atelier Bureau | CSP da página de pagamento com nonce, inventário de scripts com baseline versionado e detecção de mudança (#173); hosts concretos do Mercado Pago no lugar dos curingas (#174) |
 | 1.6 | 18/11/2026 | Equipe Atelier Bureau | MFA para acesso administrativo passa a atender: 2FA obrigatório para os perfis internos com acesso a pedidos, pagamentos e estornos (pendência P5 resolvida na #177), conforme a auditoria de documentação de 18/11/2026 (#223) |
-| 1.7 | 18/11/2026 | Equipe Atelier Bureau | Script de segurança do Mercado Pago (`device_id` enviado em `X-meli-session-id`) no inventário da página de pagamento, com os hosts concretos dele na CSP (#232) |
+| 1.7 | 18/11/2026 | Equipe Atelier Bureau | `connect-src` da página de pagamento passa a incluir `secure-fields.mercadopago.com` e `api-static.mercadopago.com`; decisão de aceitar o bloqueio do script inline do SDK (seção 5.1, #240) |
+| 1.8 | 18/11/2026 | Equipe Atelier Bureau | Script de segurança do Mercado Pago (`device_id` enviado em `X-meli-session-id`) no inventário da página de pagamento, com os hosts concretos dele na CSP (#232) |
 
 Revisar este documento **a cada mudança no checkout** (pagamento, Brick, cabeçalhos de segurança, proxy ou integrações) e, no mínimo, **uma vez por ano**.
 
@@ -161,7 +162,17 @@ Legenda: **Atende**, **Parcial** (atende com ressalva ou falta evidência formal
 - A página de pagamento é renderizada inteira por requisição (`instant = false` e leitura dos cabeçalhos antes de qualquer `Suspense`), porque um shell estático não teria o nonce.
 - Os links para a página de pagamento fazem carregamento completo do documento (`<a>` e `window.location.assign`), para que a CSP com nonce venha com a página, e não da página anterior.
 - As demais páginas continuam estáticas, com a CSP de `next.config.ts` (com `'unsafe-inline'`), que não se aplica à página de pagamento (`STATIC_CSP_SOURCE`).
-- Hosts liberados, sem curingas: `sdk.mercadopago.com` e `http2.mlstatic.com` (scripts); `api.mercadopago.com`, `api.mercadolibre.com` e `http2.mlstatic.com` (conexões); `secure-fields.mercadopago.com`, `api-static.mercadopago.com`, `sdk.mercadopago.com`, `www.mercadopago.com.br` e `www.mercadolivre.com.br` (iframes); `http2.mlstatic.com` (imagens, estilos e fontes). A lista saiu dos hosts referenciados pelo SDK JS v2 para o Brasil, porque o Mercado Pago não publica uma lista oficial de CSP para o Checkout Bricks.
+- Hosts liberados, sem curingas: `sdk.mercadopago.com` e `http2.mlstatic.com` (scripts); `api.mercadopago.com`, `api.mercadolibre.com`, `http2.mlstatic.com`, `secure-fields.mercadopago.com` e `api-static.mercadopago.com` (conexões); `secure-fields.mercadopago.com`, `api-static.mercadopago.com`, `sdk.mercadopago.com`, `www.mercadopago.com.br` e `www.mercadolivre.com.br` (iframes); `http2.mlstatic.com` (imagens, estilos e fontes). A lista saiu dos hosts referenciados pelo SDK JS v2 para o Brasil, porque o Mercado Pago não publica uma lista oficial de CSP para o Checkout Bricks.
+
+#### Script inline injetado pelo SDK: bloqueio aceito (#240)
+
+O SDK `sdk.mercadopago.com/js/v2` injeta em tempo de execução um script inline, que a CSP com nonce bloqueia (`script-src-elem`). Os testes em navegador mostraram que o bloqueio não impede o pagamento com cartão. **Decisão: manter a CSP com nonce e aceitar esse bloqueio**, sem `'unsafe-inline'`, `'strict-dynamic'` nem hash. Motivos:
+
+- `'strict-dynamic'` só confia em scripts criados por um script confiável com `createElement` e semelhantes; não libera script inline criado em runtime e, ao ser usado, faz o navegador ignorar a lista de hosts, o que enfraquece a CSP (CSP Level 3, seções 6.1.10 e 8.2; MDN, `script-src`).
+- `'unsafe-inline'` é ignorado quando há nonce ou hash na diretiva, e liberá-lo reabriria a página de pagamento a qualquer script inline (MDN, `script-src`; guia de CSP do Next.js).
+- Um hash exigiria o conteúdo exato do script, e o SDK é publicado sem versão fixa: o hash quebraria a cada atualização do provedor.
+
+Risco residual: o script bloqueado não executa, então não há superfície nova. A violação continua sendo reportada em `/api/csp-report` e pode aparecer no log; é a única violação esperada. Reavaliar se o SDK passar a ter versão fixa ou a publicar os hashes dos scripts.
 
 ### 5.2 Detecção de mudança (11.6.1)
 

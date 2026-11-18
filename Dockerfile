@@ -52,6 +52,8 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 # Prisma CLI, schema and migrations for `prisma migrate deploy` on start
 COPY --from=migrate --chown=nextjs:nodejs /migrate ./migrate
 COPY --chown=nextjs:nodejs deploy/app/entrypoint.sh ./entrypoint.sh
+# Cluster launcher and "use cache" handler of the workers (#79)
+COPY --chown=nextjs:nodejs deploy/app/cluster.mjs deploy/app/cluster-protocol.mjs deploy/app/cache-handler.mjs ./deploy/app/
 
 USER nextjs
 EXPOSE 3000

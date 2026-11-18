@@ -7,6 +7,7 @@ import {
   renderReport,
   runPhase,
   summarizePhase,
+  warmUp,
   type PhaseStats,
   type Sample,
 } from "@/scripts/load-test"
@@ -170,6 +171,34 @@ describe("runPhase", () => {
     expect(samples.length).toBeGreaterThanOrEqual(3)
     expect(samples.filter((sample) => !sample.ok)).toHaveLength(2)
     expect(samples.every((sample) => sample.path === "/")).toBe(true)
+  })
+})
+
+describe("warmUp", () => {
+  it("requests every path in parallel, ignoring failures", async () => {
+    const urls: string[] = []
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url)
+        if (urls.length === 1) throw new Error("refused")
+        return new Response("ok")
+      })
+    )
+    const requests = await warmUp({
+      baseUrl: "http://server.test",
+      paths: [
+        { path: "/", weight: 1 },
+        { path: "/busca?q=a", weight: 1 },
+      ],
+      timeoutMs: 1000,
+    })
+    expect(requests).toBe(urls.length)
+    // Several requests per path, to reach every worker of the cluster
+    expect(urls.filter((url) => url === "http://server.test/")).toHaveLength(
+      requests / 2
+    )
+    expect(requests / 2).toBeGreaterThan(1)
   })
 })
 

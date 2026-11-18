@@ -25,6 +25,7 @@ Os valores ficam em `performance-budget.json`. O orçamento de JavaScript e CSS 
 - A imagem principal do produto, o primeiro slide da home e a primeira linha de cards da listagem carregam com `fetchpriority="high"`. As demais imagens usam `loading="lazy"` e `decoding="async"`.
 - Catálogo, categorias, produto, sugestões de busca e sitemap usam `"use cache"` com tags invalidadas pelo back office, então a vitrine não consulta o banco a cada visita. As consultas da listagem rodam em paralelo (`Promise.all`) e usam os índices `products(category_id, status)` e `skus(product_id)`.
 - Fontes com `next/font` e `display: swap`, sem requisição a servidores externos.
+- **Cluster de workers (#79):** o app roda `APP_WORKERS` processos Node.js (padrão 4) na mesma porta, em vez de um só. Detalhes na seção "Teste de carga" abaixo e em `ARCHITECTURE.md`, seção 5.1.
 
 ## Teste de carga (RNF02, issue #79)
 
@@ -70,9 +71,43 @@ Não roda no CI, que não tem MySQL nem o servidor no ar. Rodar a partir de outr
 
 ### Situação
 
-- O script, a configuração e os testes unitários (`tests/perf/load-test.test.ts`) estão prontos. A execução foi conferida contra um servidor HTTP de teste, sem o app.
-- **Primeira execução real (17/11/2026):** contra a stack Docker completa (`https://localhost`, com banco e seed), a partir do próprio host. O relatório está em [`relatorios/teste-de-carga-2026-11-17.md`](relatorios/teste-de-carga-2026-11-17.md).
-  - **Resultado:** reprovado. A taxa de erro foi 0%, e o tráfego médio passou com folga: p95 de 107 ms.
-  - **Sob carga (3x):** o p95 ficou em 699 ms e o p99 em 1.405 ms, com degradação do p95 de 6,5x. Os limites são 500 ms, 1.000 ms e 2x.
-  - `npm run perf:api` passou: nenhuma rota passou de 500 ms no p95.
-- **Pendente:** investigar a latência sob carga. O container `db` usava cerca de 17% de CPU em repouso. Depois, repetir o teste a partir de outro dispositivo da rede e validar as premissas de tráfego.
+- O script, a configuração e os testes unitários (`tests/perf/load-test.test.ts`) estão prontos.
+- **Primeira execução real (17/11/2026):** reprovada ([`relatorios/teste-de-carga-2026-11-17.md`](relatorios/teste-de-carga-2026-11-17.md)). Sem erros, mas sob 3x o p95 foi 699 ms, o p99 1.405 ms e a degradação do p95 6,5x. A repetição antes da correção ([`relatorios/teste-de-carga-2026-11-17-repeticao.md`](relatorios/teste-de-carga-2026-11-17-repeticao.md)) deu p95 866 ms, p99 1.449 ms e degradação 13,75x. `npm run perf:api` passou.
+- **Depois da correção (18/11/2026):** aprovada ([`relatorios/teste-de-carga-2026-11-18.md`](relatorios/teste-de-carga-2026-11-18.md)).
+
+### Causa da latência sob carga (#79)
+
+- **Não era o banco.** Cada página faz no máximo 3 `SELECT` por requisição (medido pelo contador `Com_select` do MySQL): catálogo, categorias, produto e conteúdo da home vêm do `"use cache"`. Em repouso o MySQL fica perto de 1% de CPU, com picos curtos de rotinas internas do InnoDB depois de uma carga. O pool do adapter MariaDB (10 conexões por processo) nunca ficou cheio.
+- **Era a CPU de renderização num processo só.** Cada página gasta de 20 a 35 ms de CPU para renderizar o React (RSC e HTML), mesmo as estáticas, porque o cabeçalho (carrinho e menu) e o rodapé são renderizados a cada requisição. O Node.js usa um núcleo por processo: a 26 req/s o único processo ficava cerca de 75% ocupado, as requisições entravam em fila e a cauda (p95 e p99) disparava. O perfil de CPU tirado do container confirmou: quase todo o tempo em `react-server-dom` e `react-dom/server`, e quase nada no Prisma.
+- **Agravante na página de produto:** as faixas de desconto por volume (RN04) eram lidas do banco sem cache durante o prerender do shell. O prerender falhava (`Date.now()` do pool de conexões) e era refeito a cada requisição, com um stack trace no log.
+
+### Correção (#79)
+
+1. **Cluster de workers:** `deploy/app/cluster.mjs` sobe `APP_WORKERS` processos (padrão 4, nunca mais que as CPUs) na porta 3000. O primeiro é o coordenador: só ele roda os jobs e a criptografia de dados legados, e guarda os contadores do rate limit (RNF05), que os outros consultam por IPC. Worker que cai é reiniciado com o mesmo papel.
+2. **Cache coerente entre workers:** o `"use cache"` continua em memória em cada worker, e `deploy/app/cache-handler.mjs` repassa a invalidação de tags do back office (`revalidateTag`) aos demais, que a aplicam no `"use cache"` e no manifest de tags do cache incremental (ISR), então nenhum worker continua mostrando preço ou estoque antigo.
+3. **Página de produto:** as faixas de volume só são lidas depois de `connection()`, em tempo de requisição, e o shell volta a ser gerado uma vez.
+4. **Aquecimento do teste:** o script aquece cada rota com requisições em paralelo, em algumas rodadas, para chegar a todos os workers, e não só a um.
+
+Nenhuma regra de negócio mudou. Preço, estoque e permissões continuam sendo conferidos no servidor.
+
+### Resultados
+
+| Execução | p95 1x | p95 3x | p99 3x | Degradação | Resultado |
+|---|---|---|---|---|---|
+| Antes, 1 processo | 63 ms | 866 ms | 1.449 ms | 13,75x | reprovado |
+| Depois, 4 workers, aquecido (relatório oficial) | 83 ms | 107 ms | 165 ms | 1,29x | aprovado |
+| Depois, 4 workers, aquecido (melhor execução) | 44 ms | 53 ms | 79 ms | 1,20x | aprovado |
+| Depois, 4 workers, logo após reiniciar o app (2 execuções) | 48 e 97 ms | 100 e 209 ms | 135 e 293 ms | 2,08x e 2,15x | no limite |
+
+Depois da revisão do PR #219 (18/11/2026, mesma arquitetura, com a invalidação repassada também ao cache ISR), o host estava com outras sessões rodando `npm ci`, Vitest e verificações contra o mesmo servidor, e a RAM livre oscilava entre 0,2 e 2 GB:
+
+| Execução | p95 1x | p95 3x | p99 3x | Degradação | Resultado |
+|---|---|---|---|---|---|
+| [Revisão, 1ª](relatorios/teste-de-carga-2026-11-18-revisao.md) | 394 ms | 113 ms | 252 ms | 0,29x | aprovado (ruído na fase 1x) |
+| [Revisão, 2ª](relatorios/teste-de-carga-2026-11-18-revisao-2.md) | 45 ms | 337 ms | 1.129 ms | 7,49x | reprovado (ruído na fase 3x, 0,5 GB livres) |
+
+Nas duas, o ruído caiu numa fase só, e as outras fases ficaram dentro dos limites. Para a apresentação, rode com a máquina dedicada (sem outras builds ou testes) e com pelo menos 2 GB de RAM livre.
+
+Dentro do container, sem o proxy, o cluster sustentou 30 usuários com p95 41 ms e p99 60 ms (degradação 1,17x).
+
+**Limitações da medição.** O servidor de entrega é um notebook com Docker Desktop, que divide a CPU com outros containers e programas. Com a máquina ocupada ou em throttling térmico, as mesmas imagens deram resultados até 5x piores, inclusive na fase de 1x. Uma execução que coincidiu com o `docker build` de outra branch deu degradação de 5x. Rode o teste com a máquina dedicada, sem build em paralelo, depois de alguns minutos de uso normal do site: logo após `docker compose up`, cada worker ainda compila o código (JIT) e preenche o próprio cache, e a degradação fica perto de 2x.
