@@ -88,7 +88,7 @@ deploy/, docker-compose.yml, Dockerfile → servidor local
 ## 8. Servidor local (Docker, acessível pela rede)
 
 - `docker compose up -d` sobe `proxy` (Caddy, 80/443 e 3001 do painel de disponibilidade), `app` (3000 só na rede interna), `db` (MySQL, 3306 só em `127.0.0.1` por padrão), `backup` e `uptime-kuma` (só pelo `proxy`). O perfil opcional `tunnel` (`docker compose --profile tunnel up -d`) sobe `webhook-gate` e `tunnel` (`cloudflared`), que expõem à internet só a rota do webhook. Outros dispositivos acessam por `https://<ip-da-máquina>`. Detalhes em `ARCHITECTURE.md`, seção 5.1.
-- As portas (80, 443 e 3001, e a 3306 se o banco for aberto à rede) ficam liberadas só no perfil de rede **Privada**. O MySQL aceita só usuários nomeados; o acesso pela rede é pelo usuário `dev`, restrito à sub-rede e com TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL. A exigência de TLS pelo servidor em toda conexão é a #221.
+- As portas (80, 443 e 3001, e a 3306 se o banco for aberto à rede) ficam liberadas só no perfil de rede **Privada**. O MySQL aceita só usuários nomeados; o acesso pela rede é pelo usuário `dev`, restrito à sub-rede e com TLS. O `root` não tem acesso remoto, e o app usa um usuário sem DDL. O servidor exige TLS em toda conexão TCP (`--require-secure-transport=ON`), e todos os usuários são `REQUIRE SSL` (#221, desde a v0.5.0).
 - Toda mudança de infraestrutura (compose, Dockerfile, Caddyfile) tem que funcionar com `docker compose up -d` numa máquina limpa e é testada a partir de outro dispositivo da rede.
 - Segredos ficam só no `.env` (não versionado). Variável nova entra no `.env.example`, sem valor real.
 

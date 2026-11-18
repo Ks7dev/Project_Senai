@@ -51,7 +51,7 @@ Fora do escopo: dados de cartão. Eles nunca chegam ao servidor nem ao banco (RN
 
 ### 4.2 Infraestrutura
 
-- O MySQL aceita só usuários nomeados. O usuário `dev`, para acesso pela rede, tem host restrito à sub-rede e `REQUIRE SSL`, e o app conecta com TLS (`DATABASE_TLS=required`, `features/shared/lib/db/connection-config.ts`). A exigência de TLS pelo servidor em toda conexão é a issue #221. O `root` não tem acesso remoto, o app usa `atelier_app` sem DDL, as migrations usam `atelier_migrate` e o backup usa `atelier_backup` (`deploy/mysql/init/01-users.sh`).
+- O MySQL aceita só usuários nomeados. O servidor exige TLS em toda conexão TCP (`--require-secure-transport=ON` no `docker-compose.yml`, #221, desde a v0.5.0) e os usuários `atelier_app`, `atelier_migrate`, `atelier_backup` e `dev` são `REQUIRE SSL`. O usuário `dev`, para acesso pela rede, tem ainda host restrito à sub-rede, e o app conecta com TLS (`DATABASE_TLS=required`, `features/shared/lib/db/connection-config.ts`). O `root` não tem acesso remoto, o app usa `atelier_app` sem DDL, as migrations usam `atelier_migrate` e o backup usa `atelier_backup` (`deploy/mysql/init/01-users.sh`).
 - A porta 3306 é publicada só em `127.0.0.1`, salvo decisão explícita (`MYSQL_PUBLISH_ADDR`). As portas 80, 443 e 3001 (painel de disponibilidade, que o Caddy só atende para endereços privados) ficam liberadas no firewall só no perfil de rede **Privada**.
 - O túnel do webhook (`cloudflared`) só alcança o `webhook-gate`, que repassa ao app apenas `POST /api/webhooks/mercadopago` (`deploy/caddy/Caddyfile.webhook`).
 - O acesso ao repositório no GitHub é restrito aos membros da equipe. A `master` e a `develop` só recebem PR, sem `push --force` (`CLAUDE.md`, seção 10).
