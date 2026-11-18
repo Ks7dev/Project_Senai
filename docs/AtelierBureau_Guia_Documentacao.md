@@ -57,7 +57,7 @@ export type ActionResult<T> =
 ## Documentação por módulo
 
 - Cada pasta de feature (`features/<dominio>/<feature>/`) pode ter um `README.md` curto quando o fluxo envolver mais de uma action ou integração (ex.: checkout, frete).
-- As integrações em `features/shared/lib/<integracao>/` sempre têm `README.md` com: o que a API faz, variáveis de ambiente, timeout, fallback e como testar em sandbox.
+- As integrações em `features/shared/lib/<integracao>/` documentam no JSDoc do próprio módulo o que a API faz, as variáveis de ambiente, o timeout, o fallback e como testar em sandbox. Um `README.md` na pasta é opcional; hoje nenhuma integração tem.
 - Decisões de arquitetura ficam no `ARCHITECTURE.md`. Regras de negócio ficam no documento de requisitos.
 
 ## Checagem
