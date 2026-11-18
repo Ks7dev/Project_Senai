@@ -271,6 +271,22 @@ export function mercadoPagoPublicKey(): string | null {
 }
 
 /**
+ * E-mail sent as the payer to Mercado Pago. In the sandbox, Mercado Pago
+ * refuses the fictitious `.test` addresses of the seed and the test
+ * user addresses, so `MERCADOPAGO_SANDBOX_PAYER_EMAIL` replaces the
+ * customer e-mail there (#229). With production credentials it is
+ * ignored and the customer e-mail is always sent.
+ *
+ * @param customerEmail - E-mail of the customer who owns the order.
+ * @returns The e-mail to send as `payer.email`.
+ */
+export function mercadoPagoPayerEmail(customerEmail: string): string {
+  const override = process.env.MERCADOPAGO_SANDBOX_PAYER_EMAIL?.trim() ?? ""
+  if (!override || !accessTokenIsSandbox()) return customerEmail
+  return z.email().safeParse(override).success ? override : customerEmail
+}
+
+/**
  * Public URL Mercado Pago calls with the payment notifications (the
  * tunnel address of `/api/webhooks/mercadopago`). Without it, the
  * account-level webhook configured in the Mercado Pago panel is used.

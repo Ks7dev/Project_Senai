@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   ensureMercadoPagoSandboxChecked,
   mercadoPagoConfig,
+  mercadoPagoPayerEmail,
   mercadoPagoProductionAllowed,
   mercadoPagoPublicKey,
   resetMercadoPagoSandboxCheck,
@@ -132,5 +133,27 @@ describe("Mercado Pago test user credentials (#229)", () => {
     vi.stubEnv("MERCADOPAGO_ALLOW_PRODUCTION", "true")
     await ensureMercadoPagoSandboxChecked(fetcher)
     expect(fetcher).not.toHaveBeenCalled()
+  })
+})
+
+describe("sandbox payer e-mail (#229)", () => {
+  it("replaces the customer e-mail only with sandbox credentials", () => {
+    vi.stubEnv("MERCADOPAGO_SANDBOX_PAYER_EMAIL", "comprador@example.com")
+    vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "TEST-1234")
+    expect(mercadoPagoPayerEmail("cliente.pf@atelierbureau.test")).toBe(
+      "comprador@example.com"
+    )
+    vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", PRODUCTION_TOKEN)
+    vi.stubEnv("MERCADOPAGO_ALLOW_PRODUCTION", "true")
+    expect(mercadoPagoPayerEmail("cliente@empresa.com.br")).toBe(
+      "cliente@empresa.com.br"
+    )
+  })
+
+  it("keeps the customer e-mail when the override is empty or invalid", () => {
+    vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "TEST-1234")
+    expect(mercadoPagoPayerEmail("a@b.com.br")).toBe("a@b.com.br")
+    vi.stubEnv("MERCADOPAGO_SANDBOX_PAYER_EMAIL", "not-an-email")
+    expect(mercadoPagoPayerEmail("a@b.com.br")).toBe("a@b.com.br")
   })
 })

@@ -23,6 +23,7 @@ import {
   MercadoPagoError,
   ensureMercadoPagoSandboxChecked,
   mercadoPagoConfig,
+  mercadoPagoPayerEmail,
   mercadoPagoNotificationUrl,
   mercadoPagoPublicKey,
   type CreatePaymentBody,
@@ -385,7 +386,7 @@ function paymentBody(
       three_d_secure_mode: "optional",
       statement_descriptor: "ATELIERBUREAU",
       payer: {
-        email: order.user.email,
+        email: mercadoPagoPayerEmail(order.user.email),
         identification: formData.payer?.identification ?? document,
       },
     }
@@ -394,7 +395,10 @@ function paymentBody(
     return {
       ...common,
       payment_method_id: "pix",
-      payer: { email: order.user.email, identification: document },
+      payer: {
+        email: mercadoPagoPayerEmail(order.user.email),
+        identification: document,
+      },
     }
   }
   const { payer } = input.formData
@@ -402,7 +406,7 @@ function paymentBody(
     ...common,
     payment_method_id: input.formData.payment_method_id,
     payer: {
-      email: order.user.email,
+      email: mercadoPagoPayerEmail(order.user.email),
       first_name: payer.first_name,
       last_name: payer.last_name,
       identification: payer.identification,
