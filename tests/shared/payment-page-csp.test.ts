@@ -343,13 +343,13 @@ describe("CSP report route with real browser requests (#240)", () => {
     )
   })
 
-  it("is not blocked by the proxy and keeps the report endpoint", () => {
-    const response = proxy(
+  it("is not blocked by the proxy and keeps the report endpoint", async () => {
+    const response = await proxy(
       new NextRequest("https://loja.test/api/csp-report", { method: "POST" })
     )
     expect(response.status).toBe(200)
     expect(response.headers.get("content-security-policy")).toBeNull()
-    const page = proxy(
+    const page = await proxy(
       new NextRequest("https://loja.test/conta/pedidos/abc/pagamento")
     )
     expect(page.headers.get("reporting-endpoints")).toBe(
